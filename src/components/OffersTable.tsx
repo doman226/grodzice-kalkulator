@@ -211,6 +211,15 @@ export default function OffersTable({ offers, onOffersChange }: Props) {
                     <span>{formatPLN(selected.cost_per_ton)} PLN/t</span>
                   </div>
                 </div>
+                {selected.weekly_cost_pln != null && (
+                  <div className="bg-blue-900 rounded-lg p-4 text-white">
+                    <p className="text-blue-200 text-xs mb-1">Koszt / kolejny tydzień</p>
+                    <p className="text-3xl font-bold">{formatPLN(selected.weekly_cost_pln)} <span className="text-lg font-normal">PLN</span></p>
+                    <div className="mt-2 pt-2 border-t border-blue-800 text-xs text-blue-200">
+                      {selected.price_per_week_1 != null && <span>Stawka: {formatPLN(selected.price_per_week_1)} PLN/t/tydz.</span>}
+                    </div>
+                  </div>
+                )}
               </section>
 
               {/* Transport */}

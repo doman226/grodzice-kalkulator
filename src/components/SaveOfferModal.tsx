@@ -20,13 +20,15 @@ interface Props {
   rentalWeeks: number;
   result: CalculatorResult;
   transport: TransportData;
+  pricePerWeek1: number;
+  pricePerWeek2: number;
   onSaved: (offer: Offer) => void;
   onClose: () => void;
   onClientAdded: (client: Client) => void;
 }
 
 export default function SaveOfferModal({
-  clients, profile, quantity, lengthM, rentalWeeks, result, transport, onSaved, onClose, onClientAdded,
+  clients, profile, quantity, lengthM, rentalWeeks, result, transport, pricePerWeek1, pricePerWeek2, onSaved, onClose, onClientAdded,
 }: Props) {
   const [clientId, setClientId] = useState('');
   const [notes, setNotes] = useState('');
@@ -89,6 +91,9 @@ export default function SaveOfferModal({
       transport_paid_by: transport.paidBy,
       transport_from: transport.from || null,
       transport_to: transport.to || null,
+      weekly_cost_pln: result.massT * pricePerWeek1,
+      price_per_week_1: pricePerWeek1,
+      price_per_week_2: pricePerWeek2,
       notes: notes.trim() || null,
       valid_days: validDays,
       status: 'szkic',

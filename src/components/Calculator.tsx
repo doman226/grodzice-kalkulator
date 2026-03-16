@@ -420,6 +420,8 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
             from: transportFrom,
             to: transportTo,
           }}
+          pricePerWeek1={prices.price_per_week_1}
+          pricePerWeek2={prices.price_per_week_2}
           onClientAdded={onClientAdded}
           onSaved={(offer) => {
             onOfferSaved(offer);

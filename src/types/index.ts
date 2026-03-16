@@ -86,6 +86,9 @@ export interface Offer {
   status: OfferStatus;
   notes?: string;
   valid_days: number;
+  weekly_cost_pln?: number;
+  price_per_week_1?: number;
+  price_per_week_2?: number;
   transport_trucks?: number;
   transport_cost_per_truck?: number;
   transport_cost_total?: number;
