@@ -195,6 +195,7 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
                 label="Koszt / kolejny tydzień"
                 value={formatPLN(result.massT * prices.price_per_week_1)}
                 unit="PLN/tydz."
+                highlight
               />
               <ResultCard
                 label="Koszt / m²"
