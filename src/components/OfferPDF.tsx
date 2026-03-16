@@ -3,16 +3,17 @@ import type { Offer } from '../types';
 import { formatPLN, formatNumber } from '../lib/calculations';
 
 // Rejestracja fontów obsługujących polskie znaki (ą ę ó ś ź ż ć ń ł)
+// Fonty lokalne w /public/fonts/ – brak zależności od sieci
 Font.register({
   family: 'Roboto',
   fonts: [
     {
-      src: 'https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxP.ttf',
+      src: `${window.location.origin}/fonts/Roboto-Regular.ttf`,
       fontWeight: 400,
     },
     {
-      src: 'https://fonts.gstatic.com/s/roboto/v30/KFOlCnqEu92Fr1MmEU9fBBc4AMP6lQ.ttf',
-        fontWeight: 700,
+      src: `${window.location.origin}/fonts/Roboto-Bold.ttf`,
+      fontWeight: 700,
     },
   ],
 });
