@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PDFDownloadLink } from '@react-pdf/renderer';
+import { pdf } from '@react-pdf/renderer';
 import { supabase } from '../lib/supabase';
 import type { Offer, OfferStatus } from '../types';
 import { formatPLN } from '../lib/calculations';
@@ -29,6 +29,26 @@ export default function OffersTable({ offers, onOffersChange }: Props) {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<OfferStatus | 'wszystkie'>('wszystkie');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  async function handleDownloadPDF(offer: Offer) {
+    setPdfLoading(true);
+    try {
+      const blob = await pdf(<OfferPDF offer={offer} />).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${offer.offer_number.replace(/\//g, '-')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      showToast('Błąd generowania PDF: ' + (err as Error).message, 'error');
+    } finally {
+      setPdfLoading(false);
+    }
+  }
 
   function showToast(msg: string, type: 'success' | 'error' = 'success') {
     setToast({ msg, type });
@@ -159,34 +179,28 @@ export default function OffersTable({ offers, onOffersChange }: Props) {
                 <p className="text-xs text-gray-400 mt-0.5">Utworzona {formatDate(selected.created_at)}</p>
               </div>
               <div className="flex items-center gap-2">
-                <PDFDownloadLink
-                  document={<OfferPDF offer={selected} />}
-                  fileName={`${selected.offer_number.replace(/\//g, '-')}.pdf`}
+                <button
+                  onClick={() => handleDownloadPDF(selected)}
+                  disabled={pdfLoading}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-900 rounded-lg hover:bg-blue-800 disabled:opacity-50"
                 >
-                  {({ loading }) => (
-                    <button
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-900 rounded-lg hover:bg-blue-800 disabled:opacity-50"
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <>
-                          <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                          </svg>
-                          Generowanie...
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          Pobierz PDF
-                        </>
-                      )}
-                    </button>
+                  {pdfLoading ? (
+                    <>
+                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      </svg>
+                      Generowanie...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Pobierz PDF
+                    </>
                   )}
-                </PDFDownloadLink>
+                </button>
                 <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none ml-1">×</button>
               </div>
             </div>
