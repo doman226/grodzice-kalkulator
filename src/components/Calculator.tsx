@@ -184,12 +184,17 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
             <h2 className="text-lg font-semibold text-gray-800 mb-4">
               Koszt wynajmu – pierwsze {prices.base_weeks} tygodnie (cena bazowa)
             </h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <ResultCard
                 label={`Koszt za ${prices.base_weeks} tyg.`}
                 value={formatPLN(baseCost)}
                 unit="PLN"
                 highlight
+              />
+              <ResultCard
+                label="Koszt / kolejny tydzień"
+                value={formatPLN(result.massT * prices.price_per_week_1)}
+                unit="PLN/tydz."
               />
               <ResultCard
                 label="Koszt / m²"
