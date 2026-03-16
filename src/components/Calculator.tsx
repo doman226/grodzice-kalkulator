@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import type { Profile, RentalPrices } from '../types';
-import { calculate, calculateRentalCost, COMPARISON_WEEKS, formatPLN, formatNumber } from '../lib/calculations';
+import { calculate, calculateRentalCost, formatPLN, formatNumber } from '../lib/calculations';
 
 interface Props {
   profiles: Profile[];
@@ -23,18 +23,39 @@ export default function Calculator({ profiles, prices }: Props) {
     return calculate(quantity, lengthM, selectedProfile.weight_kg_per_m, selectedProfile.width_mm, rentalWeeks, prices);
   }, [selectedProfile, quantity, lengthM, rentalWeeks, prices]);
 
-  const comparisonData = useMemo(() => {
+  // Dane dla tabeli kolejnych tygodni (od base_weeks+1 do 26)
+  const weeklyData = useMemo(() => {
     if (!selectedProfile || quantity <= 0 || lengthM <= 0) return [];
     const totalLengthM = quantity * lengthM;
     const massT = (totalLengthM * selectedProfile.weight_kg_per_m) / 1000;
-    return COMPARISON_WEEKS.map((weeks) => ({
-      weeks,
-      cost: calculateRentalCost(massT, weeks, prices),
-      massT,
-    }));
+    const wallArea = totalLengthM * (selectedProfile.width_mm / 1000);
+    const rows = [];
+    for (let w = prices.base_weeks + 1; w <= 26; w++) {
+      const cost = calculateRentalCost(massT, w, prices);
+      const prevCost = calculateRentalCost(massT, w - 1, prices);
+      rows.push({
+        week: w,
+        cost,
+        costPerM2: wallArea > 0 ? cost / wallArea : 0,
+        costPerTon: massT > 0 ? cost / massT : 0,
+        weekRate: cost - prevCost, // koszt samego tego tygodnia
+      });
+    }
+    return rows;
   }, [selectedProfile, quantity, lengthM, prices]);
 
   const isValid = selectedProfile && quantity > 0 && lengthM > 0 && rentalWeeks > 0;
+
+  const baseCost = useMemo(() => {
+    if (!selectedProfile || quantity <= 0 || lengthM <= 0) return 0;
+    const massT = (quantity * lengthM * selectedProfile.weight_kg_per_m) / 1000;
+    return calculateRentalCost(massT, prices.base_weeks, prices);
+  }, [selectedProfile, quantity, lengthM, prices]);
+
+  const wallArea = useMemo(() => {
+    if (!selectedProfile || quantity <= 0 || lengthM <= 0) return 0;
+    return quantity * lengthM * (selectedProfile.width_mm / 1000);
+  }, [selectedProfile, quantity, lengthM]);
 
   return (
     <div className="space-y-6">
@@ -117,93 +138,129 @@ export default function Calculator({ profiles, prices }: Props) {
 
       {/* Wyniki */}
       {isValid && result && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-5">Wyniki kalkulacji</h2>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-            <ResultCard
-              label="Całkowita długość"
-              value={formatNumber(result.totalLengthM, 2)}
-              unit="m"
-            />
-            <ResultCard
-              label="Masa całkowita"
-              value={formatNumber(result.massT, 3)}
-              unit="t"
-            />
-            <ResultCard
-              label="Powierzchnia ścianki"
-              value={formatNumber(result.wallAreaM2, 2)}
-              unit="m²"
-            />
-            <ResultCard
-              label="Koszt wynajmu"
-              value={formatPLN(result.rentalCostPLN)}
-              unit="PLN"
-              highlight
-            />
-            <ResultCard
-              label="Koszt / m²"
-              value={formatPLN(result.costPerM2)}
-              unit="PLN/m²"
-            />
-            <ResultCard
-              label="Koszt / tonę"
-              value={formatPLN(result.costPerTon)}
-              unit="PLN/t"
-            />
+        <>
+          {/* Dane fizyczne */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Dane wynajmu</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <ResultCard label="Całkowita długość" value={formatNumber(result.totalLengthM, 2)} unit="m" />
+              <ResultCard label="Masa całkowita" value={formatNumber(result.massT, 3)} unit="t" />
+              <ResultCard label="Powierzchnia ścianki" value={formatNumber(result.wallAreaM2, 2)} unit="m²" />
+            </div>
           </div>
 
-          {/* Zestawienie cenowe */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
-              Zestawienie cenowe
-            </h3>
+          {/* Koszt bazowy – pierwsze N tygodni */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">
+              Koszt wynajmu – pierwsze {prices.base_weeks} tygodnie (cena bazowa)
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <ResultCard
+                label={`Koszt za ${prices.base_weeks} tyg.`}
+                value={formatPLN(baseCost)}
+                unit="PLN"
+                highlight
+              />
+              <ResultCard
+                label="Koszt / m²"
+                value={formatPLN(wallArea > 0 ? baseCost / wallArea : 0)}
+                unit="PLN/m²"
+              />
+              <ResultCard
+                label="Koszt / tonę"
+                value={formatPLN(result.massT > 0 ? baseCost / result.massT : 0)}
+                unit="PLN/t"
+              />
+            </div>
+            {rentalWeeks !== prices.base_weeks && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide font-medium">
+                  Wybrany okres: {rentalWeeks} tygodni
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <ResultCard
+                    label={`Koszt za ${rentalWeeks} tyg.`}
+                    value={formatPLN(result.rentalCostPLN)}
+                    unit="PLN"
+                    highlight
+                  />
+                  <ResultCard label="Koszt / m²" value={formatPLN(result.costPerM2)} unit="PLN/m²" />
+                  <ResultCard label="Koszt / tonę" value={formatPLN(result.costPerTon)} unit="PLN/t" />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Tabela kolejnych tygodni */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">
+              Koszt za każdy kolejny tydzień (od tygodnia {prices.base_weeks + 1})
+            </h2>
+            <p className="text-xs text-gray-400 mb-4">Kliknij wiersz aby wybrać okres wynajmu</p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gray-50">
-                    <th className="text-left px-4 py-2 font-medium text-gray-600 rounded-tl-lg">Okres</th>
-                    <th className="text-right px-4 py-2 font-medium text-gray-600">Koszt [PLN]</th>
-                    <th className="text-right px-4 py-2 font-medium text-gray-600 rounded-tr-lg">PLN/m²</th>
+                  <tr className="bg-gray-50 text-left">
+                    <th className="px-4 py-2.5 font-medium text-gray-600 rounded-tl-lg">Tydzień</th>
+                    <th className="px-4 py-2.5 font-medium text-gray-600 text-right">Koszt tygodnia [PLN]</th>
+                    <th className="px-4 py-2.5 font-medium text-gray-600 text-right">Koszt łączny [PLN]</th>
+                    <th className="px-4 py-2.5 font-medium text-gray-600 text-right">PLN/m²</th>
+                    <th className="px-4 py-2.5 font-medium text-gray-600 text-right rounded-tr-lg hidden md:table-cell">PLN/t</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {comparisonData.map(({ weeks, cost, massT: mass }) => {
-                    const wallArea = quantity * lengthM * ((selectedProfile?.width_mm ?? 600) / 1000);
-                    const isSelected = weeks === rentalWeeks;
+                  {weeklyData.map(({ week, cost, costPerM2, costPerTon, weekRate }) => {
+                    const isSelected = week === rentalWeeks;
+                    const isThreshold = week === prices.threshold_weeks;
+                    const isPhase2Start = week === prices.threshold_weeks + 1;
                     return (
-                      <tr
-                        key={weeks}
-                        className={`border-t border-gray-100 ${isSelected ? 'bg-blue-50 font-semibold' : 'hover:bg-gray-50'}`}
-                        onClick={() => setRentalWeeks(weeks)}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <td className="px-4 py-2 text-gray-700">
-                          {weeks} tyg.
-                          {weeks === prices.base_weeks && (
-                            <span className="ml-2 text-xs text-blue-600 font-normal">(minimum)</span>
-                          )}
-                          {weeks === prices.threshold_weeks && (
-                            <span className="ml-2 text-xs text-orange-600 font-normal">(4 miesiące)</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2 text-right text-gray-800">{formatPLN(cost)}</td>
-                        <td className="px-4 py-2 text-right text-gray-600">
-                          {wallArea > 0 ? formatPLN(cost / wallArea) : '—'}
-                        </td>
-                        <td className="px-2 py-2 text-right text-gray-400 text-xs hidden md:table-cell">
-                          {mass > 0 ? `${formatPLN(cost / mass)} PLN/t` : '—'}
-                        </td>
-                      </tr>
+                      <>
+                        {isPhase2Start && (
+                          <tr key={`divider-${week}`}>
+                            <td colSpan={5} className="px-4 py-1.5 bg-orange-50 text-orange-700 text-xs font-medium border-t border-orange-200">
+                              ↓ Od tygodnia {week} obowiązuje niższa stawka ({formatPLN(prices.price_per_week_2)} PLN/t/tydz.)
+                            </td>
+                          </tr>
+                        )}
+                        <tr
+                          key={week}
+                          onClick={() => setRentalWeeks(week)}
+                          className={`border-t border-gray-100 cursor-pointer transition-colors ${
+                            isSelected
+                              ? 'bg-blue-50 font-semibold ring-1 ring-inset ring-blue-300'
+                              : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <td className="px-4 py-2.5 text-gray-700">
+                            {week} tyg.
+                            {isThreshold && (
+                              <span className="ml-2 text-xs text-orange-600 font-normal">(≈4 miesiące)</span>
+                            )}
+                            {isSelected && (
+                              <span className="ml-2 text-xs text-blue-600 font-normal">← wybrany</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-gray-500">
+                            + {formatPLN(weekRate)} PLN
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-medium text-gray-800">
+                            {formatPLN(cost)} PLN
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-gray-600">
+                            {formatPLN(costPerM2)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-gray-500 hidden md:table-cell">
+                            {formatPLN(costPerTon)}
+                          </td>
+                        </tr>
+                      </>
                     );
                   })}
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-gray-400 mt-2">Kliknij wiersz aby wybrać okres wynajmu</p>
           </div>
-        </div>
+        </>
       )}
 
       {!isValid && (
