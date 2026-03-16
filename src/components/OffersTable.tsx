@@ -213,6 +213,40 @@ export default function OffersTable({ offers, onOffersChange }: Props) {
                 </div>
               </section>
 
+              {/* Transport */}
+              <section>
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Transport</h4>
+                {selected.transport_cost_per_truck ? (
+                  <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Liczba aut:</span>
+                      <strong>{selected.transport_trucks}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Koszt / auto:</span>
+                      <strong>{formatPLN(selected.transport_cost_per_truck)} PLN</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Koszt łączny:</span>
+                      <strong>{formatPLN(selected.transport_cost_total ?? 0)} PLN</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Płaci:</span>
+                      <span className={`font-medium ${selected.transport_paid_by === 'klient' ? 'text-orange-600' : 'text-gray-700'}`}>
+                        {selected.transport_paid_by === 'klient' ? 'Klient' : 'Intra B.V.'}
+                      </span>
+                    </div>
+                    {selected.transport_from && (
+                      <div className="pt-1 border-t border-gray-200 text-gray-500 text-xs">
+                        🚛 {selected.transport_from} → {selected.transport_to || '—'}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">Brak kosztów transportu</p>
+                )}
+              </section>
+
               {/* Ważność */}
               <section>
                 <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Ważność oferty</h4>

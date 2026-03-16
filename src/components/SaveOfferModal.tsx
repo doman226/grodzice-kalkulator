@@ -3,6 +3,15 @@ import { supabase } from '../lib/supabase';
 import type { Client, Offer, CalculatorResult, Profile } from '../types';
 import { formatPLN, formatNumber } from '../lib/calculations';
 
+interface TransportData {
+  trucks: number;
+  costPerTruck: number;
+  totalCost: number;
+  paidBy: 'intra' | 'klient';
+  from: string;
+  to: string;
+}
+
 interface Props {
   clients: Client[];
   profile: Profile;
@@ -10,13 +19,14 @@ interface Props {
   lengthM: number;
   rentalWeeks: number;
   result: CalculatorResult;
+  transport: TransportData;
   onSaved: (offer: Offer) => void;
   onClose: () => void;
   onClientAdded: (client: Client) => void;
 }
 
 export default function SaveOfferModal({
-  clients, profile, quantity, lengthM, rentalWeeks, result, onSaved, onClose, onClientAdded,
+  clients, profile, quantity, lengthM, rentalWeeks, result, transport, onSaved, onClose, onClientAdded,
 }: Props) {
   const [clientId, setClientId] = useState('');
   const [notes, setNotes] = useState('');
@@ -28,6 +38,10 @@ export default function SaveOfferModal({
   const [addingClient, setAddingClient] = useState(false);
   const [newClient, setNewClient] = useState({ name: '', country: 'PL', nip: '', vat_number: '' });
   const [savingClient, setSavingClient] = useState(false);
+
+  const totalWithTransport = transport.costPerTruck > 0
+    ? result.rentalCostPLN + (transport.paidBy === 'intra' ? transport.totalCost : 0)
+    : result.rentalCostPLN;
 
   async function handleAddClient() {
     if (!newClient.name.trim()) return setError('Podaj nazwę firmy.');
@@ -69,6 +83,12 @@ export default function SaveOfferModal({
       rental_cost_pln: result.rentalCostPLN,
       cost_per_m2: result.costPerM2,
       cost_per_ton: result.costPerTon,
+      transport_trucks: transport.trucks,
+      transport_cost_per_truck: transport.costPerTruck > 0 ? transport.costPerTruck : null,
+      transport_cost_total: transport.costPerTruck > 0 ? transport.totalCost : null,
+      transport_paid_by: transport.paidBy,
+      transport_from: transport.from || null,
+      transport_to: transport.to || null,
       notes: notes.trim() || null,
       valid_days: validDays,
       status: 'szkic',
@@ -81,7 +101,7 @@ export default function SaveOfferModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-100">
           <h3 className="text-lg font-semibold text-gray-800">Zapisz jako ofertę</h3>
           <p className="text-xs text-gray-400 mt-0.5">Numer zostanie nadany automatycznie (OF/{new Date().getFullYear()}/XXX)</p>
@@ -96,11 +116,33 @@ export default function SaveOfferModal({
               <div><span className="text-gray-500">Ilość:</span> <strong>{quantity} szt. × {lengthM} m</strong></div>
               <div><span className="text-gray-500">Masa:</span> <strong>{formatNumber(result.massT, 3)} t</strong></div>
               <div><span className="text-gray-500">Okres:</span> <strong>{rentalWeeks} tygodni</strong></div>
-              <div className="col-span-2 pt-1 border-t border-blue-200">
-                <span className="text-gray-500">Koszt wynajmu:</span>{' '}
-                <strong className="text-blue-900 text-base">{formatPLN(result.rentalCostPLN)} PLN</strong>
+              <div className="col-span-2 pt-2 border-t border-blue-200 space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Wynajem:</span>
+                  <strong>{formatPLN(result.rentalCostPLN)} PLN</strong>
+                </div>
+                {transport.costPerTruck > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">
+                      Transport ({transport.trucks} aut{transport.trucks > 1 ? 'a' : ''})
+                      {transport.paidBy === 'klient' && <span className="text-orange-600 ml-1">[klient]</span>}:
+                    </span>
+                    <strong className={transport.paidBy === 'klient' ? 'text-orange-600' : ''}>
+                      {formatPLN(transport.totalCost)} PLN
+                    </strong>
+                  </div>
+                )}
+                <div className="flex justify-between pt-1 border-t border-blue-200">
+                  <span className="text-gray-600 font-medium">Łączna kwota oferty:</span>
+                  <strong className="text-blue-900 text-base">{formatPLN(totalWithTransport)} PLN</strong>
+                </div>
               </div>
             </div>
+            {transport.to && (
+              <p className="text-xs text-gray-500 mt-2">
+                🚛 {transport.from} → {transport.to}
+              </p>
+            )}
           </div>
 
           {/* Wybór klienta */}
@@ -122,21 +164,14 @@ export default function SaveOfferModal({
                     </option>
                   ))}
                 </select>
-                <button
-                  onClick={() => setAddingClient(true)}
-                  className="px-3 py-2 text-sm text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 whitespace-nowrap"
-                >
+                <button onClick={() => setAddingClient(true)} className="px-3 py-2 text-sm text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 whitespace-nowrap">
                   + Nowy
                 </button>
               </div>
             ) : (
               <div className="border border-blue-200 rounded-lg p-3 bg-blue-50 space-y-2">
                 <p className="text-xs font-medium text-blue-700">Szybkie dodanie klienta</p>
-                <select
-                  value={newClient.country}
-                  onChange={e => setNewClient({ ...newClient, country: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
-                >
+                <select value={newClient.country} onChange={e => setNewClient({ ...newClient, country: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
                   <option value="PL">🇵🇱 Polska</option>
                   <option value="NL">🇳🇱 Holandia</option>
                   <option value="DE">🇩🇪 Niemcy</option>
@@ -145,12 +180,7 @@ export default function SaveOfferModal({
                   <option value="GB">🇬🇧 Wielka Brytania</option>
                   <option value="OTHER">Inne</option>
                 </select>
-                <input
-                  placeholder="Nazwa firmy *"
-                  value={newClient.name}
-                  onChange={e => setNewClient({ ...newClient, name: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                />
+                <input placeholder="Nazwa firmy *" value={newClient.name} onChange={e => setNewClient({ ...newClient, name: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                 {newClient.country === 'PL'
                   ? <input placeholder="NIP *" value={newClient.nip} onChange={e => setNewClient({ ...newClient, nip: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                   : <input placeholder="Numer VAT *" value={newClient.vat_number} onChange={e => setNewClient({ ...newClient, vat_number: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
@@ -167,35 +197,25 @@ export default function SaveOfferModal({
             )}
           </div>
 
-          {/* Ważność oferty */}
+          {/* Ważność */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Ważność oferty [dni]</label>
-            <input
-              type="number" min={1} value={validDays}
-              onChange={e => setValidDays(Math.max(1, parseInt(e.target.value) || 30))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <input type="number" min={1} value={validDays} onChange={e => setValidDays(Math.max(1, parseInt(e.target.value) || 30))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
 
           {/* Notatki */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Notatki do oferty</label>
-            <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              rows={2}
-              placeholder="Opcjonalne uwagi do oferty..."
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Opcjonalne uwagi..."
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
 
           {error && <p className="text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2">{error}</p>}
         </div>
 
         <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">
-            Anuluj
-          </button>
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">Anuluj</button>
           <button onClick={handleSave} disabled={saving} className="px-6 py-2 text-sm text-white bg-blue-900 rounded-lg hover:bg-blue-800 font-medium disabled:opacity-50">
             {saving ? 'Zapisywanie...' : 'Zapisz ofertę'}
           </button>

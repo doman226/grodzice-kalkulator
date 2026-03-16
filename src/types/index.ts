@@ -86,6 +86,12 @@ export interface Offer {
   status: OfferStatus;
   notes?: string;
   valid_days: number;
+  transport_trucks?: number;
+  transport_cost_per_truck?: number;
+  transport_cost_total?: number;
+  transport_paid_by?: 'intra' | 'klient';
+  transport_from?: string;
+  transport_to?: string;
   created_at: string;
   updated_at: string;
 }

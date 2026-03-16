@@ -18,6 +18,13 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
   const [rentalWeeks, setRentalWeeks] = useState<number>(8);
   const [showSaveModal, setShowSaveModal] = useState(false);
 
+  // Transport
+  const TRUCK_CAPACITY_T = 23;
+  const [transportCostPerTruck, setTransportCostPerTruck] = useState<number | ''>('');
+  const [transportPaidBy, setTransportPaidBy] = useState<'intra' | 'klient'>('intra');
+  const [transportFrom, setTransportFrom] = useState('Magazyn Intra B.V.');
+  const [transportTo, setTransportTo] = useState('');
+
   const selectedProfile = useMemo(
     () => profiles.find((p) => p.id === profileId) ?? null,
     [profiles, profileId]
@@ -61,6 +68,14 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
     if (!selectedProfile || quantity <= 0 || lengthM <= 0) return 0;
     return quantity * lengthM * (selectedProfile.width_mm / 1000);
   }, [selectedProfile, quantity, lengthM]);
+
+  const transportCalc = useMemo(() => {
+    if (!result) return null;
+    const trucks = Math.ceil(result.massT / TRUCK_CAPACITY_T);
+    const costPerTruck = typeof transportCostPerTruck === 'number' ? transportCostPerTruck : 0;
+    const totalCost = trucks * costPerTruck;
+    return { trucks, costPerTruck, totalCost };
+  }, [result, transportCostPerTruck]);
 
   return (
     <div className="space-y-6">
@@ -206,6 +221,104 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
             )}
           </div>
 
+          {/* Transport */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">Koszty transportu</h2>
+            <p className="text-xs text-gray-400 mb-4">
+              Ładowność 1 auta: ~{TRUCK_CAPACITY_T} t &nbsp;·&nbsp;
+              Szacowana liczba aut: <strong className="text-gray-700">{transportCalc?.trucks ?? '—'}</strong>
+              {result && <span className="text-gray-500"> (masa: {formatNumber(result.massT, 3)} t)</span>}
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+              {/* Koszt / auto */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Koszt transportu / auto [PLN]</label>
+                <input
+                  type="number" min={0} step={100}
+                  value={transportCostPerTruck}
+                  placeholder="np. 2500"
+                  onChange={e => setTransportCostPerTruck(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value)))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Miejsce załadunku */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Załadunek (magazyn)</label>
+                <input
+                  type="text"
+                  value={transportFrom}
+                  onChange={e => setTransportFrom(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Miejsce dostawy */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Dostawa (adres budowy)</label>
+                <input
+                  type="text"
+                  value={transportTo}
+                  placeholder="ul. Przykładowa 1, Warszawa"
+                  onChange={e => setTransportTo(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Kto płaci + wynik */}
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-1">Koszt transportu po stronie:</p>
+                <div className="flex gap-3">
+                  {(['intra', 'klient'] as const).map(val => (
+                    <label key={val} className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="transportPaidBy"
+                        value={val}
+                        checked={transportPaidBy === val}
+                        onChange={() => setTransportPaidBy(val)}
+                        className="accent-blue-900"
+                      />
+                      <span className="text-sm text-gray-700">{val === 'intra' ? 'Intra B.V.' : 'Klienta'}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {transportCalc && transportCalc.costPerTruck > 0 && (
+                <div className={`ml-auto rounded-lg px-5 py-3 text-right ${transportPaidBy === 'klient' ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-200'}`}>
+                  <p className="text-xs text-gray-500 mb-0.5">
+                    {transportCalc.trucks} auto{transportCalc.trucks > 1 ? 'a' : ''} × {formatPLN(transportCalc.costPerTruck)} PLN
+                  </p>
+                  <p className="text-xl font-bold text-gray-800">
+                    {formatPLN(transportCalc.totalCost)} PLN
+                  </p>
+                  <p className={`text-xs font-medium mt-0.5 ${transportPaidBy === 'klient' ? 'text-orange-600' : 'text-gray-500'}`}>
+                    {transportPaidBy === 'klient' ? '⚠ Koszt po stronie klienta' : 'Koszt po stronie Intra B.V.'}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Podsumowanie łączne */}
+            {transportCalc && transportCalc.costPerTruck > 0 && result && (
+              <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-4">
+                <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
+                  <p className="text-blue-200 text-xs mb-0.5">Łączny koszt (wynajem + transport)</p>
+                  <p className="text-2xl font-bold">
+                    {formatPLN(result.rentalCostPLN + (transportPaidBy === 'intra' ? transportCalc.totalCost : 0))} PLN
+                  </p>
+                  {transportPaidBy === 'klient' && (
+                    <p className="text-blue-300 text-xs mt-0.5">+ {formatPLN(transportCalc.totalCost)} PLN transport (klient)</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Tabela kolejnych tygodni */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-1">
@@ -285,7 +398,7 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
       )}
 
       {/* Modal zapisu oferty */}
-      {showSaveModal && selectedProfile && result && (
+      {showSaveModal && selectedProfile && result && transportCalc && (
         <SaveOfferModal
           clients={clients}
           profile={selectedProfile}
@@ -293,6 +406,14 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
           lengthM={lengthM}
           rentalWeeks={rentalWeeks}
           result={result}
+          transport={{
+            trucks: transportCalc.trucks,
+            costPerTruck: transportCalc.costPerTruck,
+            totalCost: transportCalc.totalCost,
+            paidBy: transportPaidBy,
+            from: transportFrom,
+            to: transportTo,
+          }}
           onClientAdded={onClientAdded}
           onSaved={(offer) => {
             onOfferSaved(offer);
