@@ -1,6 +1,24 @@
-import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, View, Text, Image, StyleSheet, Font } from '@react-pdf/renderer';
 import type { Offer } from '../types';
 import { formatPLN, formatNumber } from '../lib/calculations';
+
+// Rejestracja fontów obsługujących polskie znaki (ą ę ó ś ź ż ć ń ł)
+Font.register({
+  family: 'Roboto',
+  fonts: [
+    {
+      src: 'https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxP.ttf',
+      fontWeight: 400,
+    },
+    {
+      src: 'https://fonts.gstatic.com/s/roboto/v30/KFOlCnqEu92Fr1MmEU9fBBc4AMP6lQ.ttf',
+        fontWeight: 700,
+    },
+  ],
+});
+
+// Wyłącz hyphenation
+Font.registerHyphenationCallback(word => [word]);
 
 interface Props {
   offer: Offer;
@@ -24,7 +42,7 @@ const C = {
 
 const s = StyleSheet.create({
   page: {
-    fontFamily: 'Helvetica',
+    fontFamily: 'Roboto',
     fontSize: 9,
     color: C.gray800,
     paddingTop: 108,
@@ -51,7 +69,8 @@ const s = StyleSheet.create({
   title: {
     textAlign: 'center',
     fontSize: 13,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Roboto',
+    fontWeight: 700,
     letterSpacing: 2,
     marginBottom: 14,
     color: C.navy,
@@ -74,7 +93,8 @@ const s = StyleSheet.create({
     fontSize: 9,
   },
   metaBold: {
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Roboto',
+    fontWeight: 700,
   },
 
   // Separator
@@ -119,7 +139,8 @@ const s = StyleSheet.create({
   thCell: {
     padding: 5,
     color: C.white,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Roboto',
+    fontWeight: 700,
     fontSize: 8,
   },
   tdLabel: {
@@ -130,7 +151,8 @@ const s = StyleSheet.create({
   },
   tdValue: {
     padding: 4,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Roboto',
+    fontWeight: 700,
     color: C.gray800,
     fontSize: 8,
     width: '45%',
@@ -152,12 +174,13 @@ const s = StyleSheet.create({
   },
   priceValue: {
     fontSize: 18,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Roboto',
+    fontWeight: 700,
     color: C.white,
   },
   priceSuffix: {
     fontSize: 10,
-    fontFamily: 'Helvetica',
+    fontFamily: 'Roboto',
     color: C.blue200,
   },
   priceRow: {
@@ -172,7 +195,8 @@ const s = StyleSheet.create({
 
   // Transport section
   sectionTitle: {
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Roboto',
+    fontWeight: 700,
     fontSize: 9,
     color: C.navy,
     marginTop: 10,
@@ -195,7 +219,8 @@ const s = StyleSheet.create({
     color: C.gray500,
   },
   transportValue: {
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Roboto',
+    fontWeight: 700,
     color: C.gray800,
   },
 
@@ -211,12 +236,14 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
   totalLabel: {
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Roboto',
+    fontWeight: 700,
     fontSize: 10,
     color: C.navy,
   },
   totalValue: {
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Roboto',
+    fontWeight: 700,
     fontSize: 11,
     color: C.navy,
   },
@@ -259,7 +286,8 @@ const s = StyleSheet.create({
   validityText: {
     marginTop: 6,
     fontSize: 8,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Roboto',
+    fontWeight: 700,
     color: C.navy,
   },
   notesBox: {
@@ -271,7 +299,8 @@ const s = StyleSheet.create({
   },
   notesLabel: {
     fontSize: 7,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Roboto',
+    fontWeight: 700,
     color: C.blueText,
     marginBottom: 3,
     textTransform: 'uppercase',
@@ -335,7 +364,7 @@ export default function OfferPDF({ offer }: Props) {
             <Text style={[s.metaBold, { fontSize: 9, marginBottom: 3, color: C.navy }]}>Dane klienta:</Text>
             {offer.client ? (
               <>
-                <Text style={[s.metaLine, { fontFamily: 'Helvetica-Bold', textAlign: 'right' }]}>{offer.client.name}</Text>
+                <Text style={[s.metaLine, { fontFamily: 'Roboto', fontWeight: 700, textAlign: 'right' }]}>{offer.client.name}</Text>
                 <Text style={[s.metaLine, { textAlign: 'right', color: C.gray500 }]}>
                   {offer.client.country === 'PL' ? `NIP: ${offer.client.nip}` : `VAT: ${offer.client.vat_number}`}
                   {' · '}{offer.client.country}
