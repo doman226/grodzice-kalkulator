@@ -1,17 +1,22 @@
 import { useState, useMemo } from 'react';
-import type { Profile, RentalPrices } from '../types';
+import type { Profile, RentalPrices, Client, Offer } from '../types';
 import { calculate, calculateRentalCost, formatPLN, formatNumber } from '../lib/calculations';
+import SaveOfferModal from './SaveOfferModal';
 
 interface Props {
   profiles: Profile[];
   prices: RentalPrices;
+  clients: Client[];
+  onClientAdded: (client: Client) => void;
+  onOfferSaved: (offer: Offer) => void;
 }
 
-export default function Calculator({ profiles, prices }: Props) {
+export default function Calculator({ profiles, prices, clients, onClientAdded, onOfferSaved }: Props) {
   const [profileId, setProfileId] = useState(profiles[0]?.id ?? '');
   const [quantity, setQuantity] = useState<number>(10);
   const [lengthM, setLengthM] = useState<number>(12);
   const [rentalWeeks, setRentalWeeks] = useState<number>(8);
+  const [showSaveModal, setShowSaveModal] = useState(false);
 
   const selectedProfile = useMemo(
     () => profiles.find((p) => p.id === profileId) ?? null,
@@ -139,6 +144,16 @@ export default function Calculator({ profiles, prices }: Props) {
       {/* Wyniki */}
       {isValid && result && (
         <>
+          {/* Przycisk zapisu oferty */}
+          <div className="flex justify-end">
+            <button
+              onClick={() => setShowSaveModal(true)}
+              className="px-5 py-2.5 bg-green-700 hover:bg-green-600 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors"
+            >
+              💾 Zapisz jako ofertę
+            </button>
+          </div>
+
           {/* Dane fizyczne */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Dane wynajmu</h2>
@@ -267,6 +282,24 @@ export default function Calculator({ profiles, prices }: Props) {
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5 text-yellow-700 text-sm text-center">
           Wypełnij wszystkie pola powyżej, aby zobaczyć wyniki kalkulacji.
         </div>
+      )}
+
+      {/* Modal zapisu oferty */}
+      {showSaveModal && selectedProfile && result && (
+        <SaveOfferModal
+          clients={clients}
+          profile={selectedProfile}
+          quantity={quantity}
+          lengthM={lengthM}
+          rentalWeeks={rentalWeeks}
+          result={result}
+          onClientAdded={onClientAdded}
+          onSaved={(offer) => {
+            onOfferSaved(offer);
+            setShowSaveModal(false);
+          }}
+          onClose={() => setShowSaveModal(false)}
+        />
       )}
     </div>
   );
