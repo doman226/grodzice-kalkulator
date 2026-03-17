@@ -400,7 +400,7 @@ export default function OfferPDF({ offer }: Props) {
           <View style={s.table}>
             <View style={s.tableHeaderRow}>
               <Text style={[s.thCell, { flex: 2 }]}>Profil</Text>
-              <Text style={[s.thCell, { width: '13%', textAlign: 'right' }]}>Ilość</Text>
+              <Text style={[s.thCell, { width: '13%', textAlign: 'center' }]}>Ilość</Text>
               <Text style={[s.thCell, { width: '14%', textAlign: 'right' }]}>Dług. [m]</Text>
               <Text style={[s.thCell, { width: '16%', textAlign: 'right' }]}>kg/m</Text>
               <Text style={[s.thCell, { width: '16%', textAlign: 'right' }]}>Masa [t]</Text>
@@ -408,7 +408,7 @@ export default function OfferPDF({ offer }: Props) {
             {[...offer.items].sort((a, b) => a.sort_order - b.sort_order).map((item, idx) => (
               <View key={item.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
                 <Text style={[s.tdLabel, { flex: 2, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{item.profile_name} ({item.profile_type})</Text>
-                <Text style={[s.tdLabel, { width: '13%', textAlign: 'right' }]}>{item.quantity} szt.</Text>
+                <Text style={[s.tdLabel, { width: '13%', textAlign: 'center' }]}>{item.quantity} szt.</Text>
                 <Text style={[s.tdLabel, { width: '14%', textAlign: 'right' }]}>{item.length_m} m</Text>
                 <Text style={[s.tdLabel, { width: '16%', textAlign: 'right' }]}>{formatNumber(item.total_length_m > 0 ? item.mass_t * 1000 / item.total_length_m : 0, 1)}</Text>
                 <Text style={[s.tdLabel, { width: '16%', textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{formatNumber(item.mass_t, 3)} t</Text>
