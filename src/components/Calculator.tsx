@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import type { Profile, RentalPrices, Client, Offer } from '../types';
 import { calculateRentalCost, formatPLN, formatNumber } from '../lib/calculations';
 import SaveOfferModal, { type OfferItemInput } from './SaveOfferModal';
@@ -379,15 +379,15 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
                     const isSelected = week === rentalWeeks;
                     const isPhase2Start = week === prices.threshold_weeks + 1;
                     return (
-                      <>
+                      <Fragment key={week}>
                         {isPhase2Start && (
-                          <tr key={`divider-${week}`}>
+                          <tr>
                             <td colSpan={5} className="px-4 py-1.5 bg-orange-50 text-orange-700 text-xs font-medium border-t border-orange-200">
                               ↓ Od tygodnia {week} obowiązuje niższa stawka ({formatPLN(prices.price_per_week_2)} PLN/t/tydz.)
                             </td>
                           </tr>
                         )}
-                        <tr key={week} onClick={() => setRentalWeeks(week)}
+                        <tr onClick={() => setRentalWeeks(week)}
                           className={`border-t border-gray-100 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 font-semibold ring-1 ring-inset ring-blue-300' : 'hover:bg-gray-50'}`}>
                           <td className="px-4 py-2.5 text-gray-700">
                             {week} tyg.
@@ -399,7 +399,7 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
                           <td className="px-4 py-2.5 text-right text-gray-600">{formatPLN(costPerM2)}</td>
                           <td className="px-4 py-2.5 text-right text-gray-500 hidden md:table-cell">{formatPLN(costPerTon)}</td>
                         </tr>
-                      </>
+                      </Fragment>
                     );
                   })}
                 </tbody>
