@@ -402,7 +402,7 @@ export default function OfferPDF({ offer }: Props) {
               <Text style={[s.thCell, { flex: 2 }]}>Profil</Text>
               <Text style={[s.thCell, { width: '13%', textAlign: 'right' }]}>Ilość</Text>
               <Text style={[s.thCell, { width: '14%', textAlign: 'right' }]}>Dług. [m]</Text>
-              <Text style={[s.thCell, { width: '16%', textAlign: 'right' }]}>Łącznie [m]</Text>
+              <Text style={[s.thCell, { width: '16%', textAlign: 'right' }]}>kg/m</Text>
               <Text style={[s.thCell, { width: '16%', textAlign: 'right' }]}>Masa [t]</Text>
             </View>
             {[...offer.items].sort((a, b) => a.sort_order - b.sort_order).map((item, idx) => (
@@ -410,7 +410,7 @@ export default function OfferPDF({ offer }: Props) {
                 <Text style={[s.tdLabel, { flex: 2, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{item.profile_name} ({item.profile_type})</Text>
                 <Text style={[s.tdLabel, { width: '13%', textAlign: 'right' }]}>{item.quantity} szt.</Text>
                 <Text style={[s.tdLabel, { width: '14%', textAlign: 'right' }]}>{item.length_m} m</Text>
-                <Text style={[s.tdLabel, { width: '16%', textAlign: 'right' }]}>{formatNumber(item.total_length_m, 1)} m</Text>
+                <Text style={[s.tdLabel, { width: '16%', textAlign: 'right' }]}>{formatNumber(item.total_length_m > 0 ? item.mass_t * 1000 / item.total_length_m : 0, 1)}</Text>
                 <Text style={[s.tdLabel, { width: '16%', textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{formatNumber(item.mass_t, 3)} t</Text>
               </View>
             ))}
@@ -419,17 +419,13 @@ export default function OfferPDF({ offer }: Props) {
               <Text style={[s.tdLabel, { flex: 2, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>Łącznie</Text>
               <Text style={[s.tdLabel, { width: '13%' }]}></Text>
               <Text style={[s.tdLabel, { width: '14%' }]}></Text>
-              <Text style={[s.tdLabel, { width: '16%', textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{formatNumber(offer.total_length_m, 1)} m</Text>
+              <Text style={[s.tdLabel, { width: '16%' }]}></Text>
               <Text style={[s.tdLabel, { width: '16%', textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{formatNumber(offer.mass_t, 3)} t</Text>
             </View>
-            {/* Okres + powierzchnia */}
-            <View style={s.tableBodyRow}>
+            {/* Okres */}
+            <View style={[s.tableBodyRow, { borderBottom: 0 }]}>
               <Text style={[s.tdLabel, { flex: 2 }]}>Okres dzierżawy</Text>
               <Text style={[s.tdLabel, { width: '59%', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{offer.rental_weeks} tygodni</Text>
-            </View>
-            <View style={[s.tableBodyRow, { borderBottom: 0 }]}>
-              <Text style={[s.tdLabel, { flex: 2 }]}>Powierzchnia ścianki</Text>
-              <Text style={[s.tdLabel, { width: '59%', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{formatNumber(offer.wall_area_m2, 2)} m²</Text>
             </View>
           </View>
         ) : (
