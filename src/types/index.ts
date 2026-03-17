@@ -17,6 +17,13 @@ export interface RentalPrices {
   price_per_week_2: number;
   note?: string;
   updated_at: string;
+  // Cennik szkód i napraw
+  loss_price_pln: number;
+  sorting_price_pln: number;
+  grinding_price_pln: number;
+  welding_price_pln: number;
+  cutting_price_pln: number;
+  repair_price_pln: number;
 }
 
 export interface PriceHistory {
@@ -102,12 +109,21 @@ export interface Offer {
   weekly_cost_pln?: number;
   price_per_week_1?: number;
   price_per_week_2?: number;
+  threshold_weeks?: number;
+  // Cennik szkód (snapshot z chwili wystawienia)
+  loss_price_pln?: number;
+  sorting_price_pln?: number;
+  grinding_price_pln?: number;
+  welding_price_pln?: number;
+  cutting_price_pln?: number;
+  repair_price_pln?: number;
   transport_trucks?: number;
   transport_cost_per_truck?: number;
   transport_cost_total?: number;
   transport_paid_by?: 'intra' | 'klient';
   transport_from?: string;
   transport_to?: string;
+  prepared_by?: string;
   created_at: string;
   updated_at: string;
   items?: OfferItem[];

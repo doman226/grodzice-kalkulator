@@ -353,7 +353,7 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
                     </div>
                     {selected.transport_from && (
                       <div className="pt-1 border-t border-gray-200 text-gray-500 text-xs">
-                        🚛 {selected.transport_from} → {selected.transport_to || '—'}
+                        🚛 {selected.transport_from}{selected.transport_to ? ` — ${selected.transport_to}` : ''}
                       </div>
                     )}
                   </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import type { Client, Offer } from '../types';
+import type { Client, Offer, RentalPrices } from '../types';
 import { formatPLN, formatNumber } from '../lib/calculations';
 
 interface TransportData {
@@ -38,17 +38,24 @@ interface Props {
   rentalWeeks: number;
   totals: Totals;
   transport: TransportData;
-  pricePerWeek1: number;
-  pricePerWeek2: number;
+  prices: RentalPrices;
   onSaved: (offer: Offer) => void;
   onClose: () => void;
   onClientAdded: (client: Client) => void;
 }
 
+const SALES_REPS = [
+  { name: 'Szymon Sobczak', phone: '579 376 107' },
+  { name: 'Mateusz Cieślicki', phone: '579 141 243' },
+  { name: 'Marzena Sobczak', phone: '579 241 508' },
+  { name: 'Piotr Domański', phone: '729 393 743' },
+];
+
 export default function SaveOfferModal({
-  clients, offerItems, rentalWeeks, totals, transport, pricePerWeek1, pricePerWeek2, onSaved, onClose, onClientAdded,
+  clients, offerItems, rentalWeeks, totals, transport, prices, onSaved, onClose, onClientAdded,
 }: Props) {
   const [clientId, setClientId] = useState('');
+  const [preparedBy, setPreparedBy] = useState(SALES_REPS[0].name);
   const [notes, setNotes] = useState('');
   const [validDays, setValidDays] = useState(30);
   const [saving, setSaving] = useState(false);
@@ -115,11 +122,19 @@ export default function SaveOfferModal({
       transport_paid_by: transport.paidBy,
       transport_from: transport.from || null,
       transport_to: transport.to || null,
-      weekly_cost_pln: totals.massT * pricePerWeek1,
-      price_per_week_1: pricePerWeek1,
-      price_per_week_2: pricePerWeek2,
+      weekly_cost_pln: totals.massT * prices.price_per_week_1,
+      price_per_week_1: prices.price_per_week_1,
+      price_per_week_2: prices.price_per_week_2,
+      threshold_weeks: prices.threshold_weeks,
+      loss_price_pln: prices.loss_price_pln,
+      sorting_price_pln: prices.sorting_price_pln,
+      grinding_price_pln: prices.grinding_price_pln,
+      welding_price_pln: prices.welding_price_pln,
+      cutting_price_pln: prices.cutting_price_pln,
+      repair_price_pln: prices.repair_price_pln,
       notes: notes.trim() || null,
       valid_days: validDays,
+      prepared_by: preparedBy,
       status: 'szkic',
     }).select('*, client:clients(*)').single();
 
@@ -251,6 +266,17 @@ export default function SaveOfferModal({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Opiekun handlowy */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Opiekun handlowy <span className="text-red-500">*</span></label>
+            <select value={preparedBy} onChange={e => setPreparedBy(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              {SALES_REPS.map(r => (
+                <option key={r.name} value={r.name}>{r.name} – tel. {r.phone}</option>
+              ))}
+            </select>
           </div>
 
           {/* Ważność */}

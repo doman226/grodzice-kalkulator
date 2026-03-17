@@ -2,6 +2,13 @@ import { Document, Page, View, Text, Image, StyleSheet, Font } from '@react-pdf/
 import type { Offer } from '../types';
 import { formatPLN, formatNumber } from '../lib/calculations';
 
+const SALES_REPS: Record<string, string> = {
+  'Szymon Sobczak': '579 376 107',
+  'Mateusz Cieślicki': '579 141 243',
+  'Marzena Sobczak': '579 241 508',
+  'Piotr Domański': '729 393 743',
+};
+
 // Rejestracja fontów obsługujących polskie znaki (ą ę ó ś ź ż ć ń ł)
 // Fonty lokalne w /public/fonts/ – brak zależności od sieci
 Font.register({
@@ -358,8 +365,14 @@ export default function OfferPDF({ offer }: Props) {
             </Text>
             <Text style={s.metaLine}>
               <Text style={s.metaBold}>Opiekun handlowy: </Text>
-              Intra B.V.
+              {offer.prepared_by ?? 'Intra B.V.'}
             </Text>
+            {offer.prepared_by && SALES_REPS[offer.prepared_by] && (
+              <Text style={s.metaLine}>
+                <Text style={s.metaBold}>Telefon: </Text>
+                {SALES_REPS[offer.prepared_by]}
+              </Text>
+            )}
           </View>
           <View style={s.metaRight}>
             <Text style={[s.metaBold, { fontSize: 9, marginBottom: 3, color: C.navy }]}>Dane klienta:</Text>
@@ -424,8 +437,11 @@ export default function OfferPDF({ offer }: Props) {
             </View>
             {/* Okres */}
             <View style={[s.tableBodyRow, { borderBottom: 0 }]}>
-              <Text style={[s.tdLabel, { flex: 3 }]}>Okres dzierżawy</Text>
-              <Text style={[s.tdLabel, { flex: 6, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{offer.rental_weeks} tygodni</Text>
+              <Text style={[s.tdLabel, { flex: 3, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>Okres dzierżawy</Text>
+              <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{offer.rental_weeks} tyg.</Text>
+              <Text style={[s.tdLabel, { flex: 1.5 }]}></Text>
+              <Text style={[s.tdLabel, { flex: 1.5 }]}></Text>
+              <Text style={[s.tdLabel, { flex: 1.5 }]}></Text>
             </View>
           </View>
         ) : (
@@ -458,19 +474,17 @@ export default function OfferPDF({ offer }: Props) {
           </View>
         </View>
 
-        {/* ── KOSZT KOLEJNEGO TYGODNIA ── */}
-        {offer.weekly_cost_pln != null && (
-          <View style={s.priceBox}>
-            <Text style={s.priceLabel}>Koszt każdego kolejnego tygodnia</Text>
+        {/* ── STAWKA ZA KOLEJNY TYDZIEŃ ── */}
+        {offer.price_per_week_1 != null && (
+          <View style={[s.priceBox, { marginTop: 10 }]}>
+            <Text style={s.priceLabel}>KAŻDY KOLEJNY TYDZIEŃ DZIERŻAWY</Text>
             <Text style={s.priceValue}>
-              {formatPLN(offer.weekly_cost_pln)}
-              <Text style={s.priceSuffix}> PLN netto</Text>
+              {formatPLN(offer.price_per_week_1)}
+              <Text style={s.priceSuffix}> PLN/tona netto</Text>
             </Text>
-            {offer.price_per_week_1 != null && (
-              <View style={s.priceRow}>
-                <Text>Stawka: {formatPLN(offer.price_per_week_1)} PLN/t/tydz.</Text>
-              </View>
-            )}
+            <View style={s.priceRow}>
+              <Text>po upływie {offer.base_weeks ?? 8} tygodni dzierżawy</Text>
+            </View>
           </View>
         )}
 
@@ -500,9 +514,10 @@ export default function OfferPDF({ offer }: Props) {
                 </Text>
               </View>
               {offer.transport_from && (
-                <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}` }]}>
+                <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}`, alignItems: 'flex-end' }]}>
                   <Text style={s.transportLabel}>Trasa:</Text>
-                  <Text style={s.transportValue}>{offer.transport_from} → {offer.transport_to || '—'}</Text>
+                  <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
+                  <Text style={s.transportValue}>{offer.transport_from}{offer.transport_to ? ` — ${offer.transport_to}` : ''}</Text>
                 </View>
               )}
             </View>
@@ -518,20 +533,19 @@ export default function OfferPDF({ offer }: Props) {
         )}
 
         {/* ── WARUNKI DZIERŻAWY ── */}
-        <Text style={s.sectionTitle}>Warunki dzierżawy:</Text>
+        <Text style={[s.sectionTitle, offer.transport_cost_per_truck != null ? { break: 'before' } : {}]}>Warunki dzierżawy:</Text>
         <View style={s.conditionsBox}>
           <Text style={s.conditionItem}>1) Oferowana cena jest ceną z transportami po stronie Intra: magazyn→budowa. Zwrot do magazynu Intra BV (Cieśle 42 k. Wrocławia) jest obowiązkiem i kosztem Klienta.</Text>
           <Text style={s.conditionItem}>2) Podstawowy okres dzierżawy to 2 miesiące (8 tygodni).</Text>
-          <Text style={s.conditionItem}>3) Każdy dodatkowy tydzień dzierżawy to koszt +{offer.price_per_week_1 ?? 25},- zł/tona.</Text>
-          <Text style={s.conditionItem}>4) Na budowie grodzice muszą zostać rozładowane i załadowane na koszt Klienta.</Text>
-          <Text style={[s.conditionItem, { marginBottom: 0 }]}>5) Podane ceny są cenami netto.</Text>
+          <Text style={s.conditionItem}>3) Na budowie grodzice muszą zostać rozładowane i załadowane na koszt Klienta.</Text>
+          <Text style={[s.conditionItem, { marginBottom: 0 }]}>4) Podane ceny są cenami netto.</Text>
         </View>
 
         <Text style={s.paragraph}>
           Pragniemy zaznaczyć, że są to grodzice wypożyczone i w każdym przypadku należy je zwrócić. Zwracamy uwagę, że zwrotowi mogą podlegać wyłącznie materiały dostarczone przez Intra.
         </Text>
         <Text style={s.paragraph}>
-          Dostawa i zwrot grodzic muszą nastąpić wg. EN10248-1/2. Za straty materialne, także spowodowane cięciami uszkodzonych części grodzic, obciążymy Państwa dodatkową kwotą w wysokości 3 950,- zł/tona grodzic.
+          Dostawa i zwrot grodzic muszą nastąpić wg. EN10248-1/2. Za straty materialne, także spowodowane cięciami uszkodzonych części grodzic, obciążymy Państwa dodatkową kwotą w wysokości {offer.loss_price_pln ?? 3950},- zł/tona grodzic.
         </Text>
         <Text style={s.paragraph}>
           Grodzice po zwrocie muszą nadawać się do ponownego użycia – bez konieczności ponownej obróbki, czyszczenia oraz napraw. Grodzice nie mogą posiadać uszkodzeń, zabrudzeń, przylegającej ziemi i innych niedoskonałości ponad normatywne zużycie.
@@ -541,12 +555,12 @@ export default function OfferPDF({ offer }: Props) {
         {/* ── CENNIK SZKÓD ── */}
         <Text style={s.sectionTitle}>Cennik:</Text>
         <View style={s.cennikBox}>
-          <Text style={s.cennikItem}>- Zagubienie / całkowita strata uszkodzonych grodzic = +3 950,- zł / tona;</Text>
-          <Text style={s.cennikItem}>- Sortowanie oraz czyszczenie grodzic = +99,- zł / tona;</Text>
-          <Text style={s.cennikItem}>- Szlifowanie pozostałości przyspawanych kształtowników = +250,- zł/mb;</Text>
-          <Text style={s.cennikItem}>- Spawanie (zamykanie) otworów pod kotwy = +250,- zł / szt.;</Text>
-          <Text style={s.cennikItem}>- Głowica tnąca - w celu np. ucięcia uszkodzenia = +59,- zł / za cięcie;</Text>
-          <Text style={[s.cennikItem, { marginBottom: 0 }]}>- Naprawa / prostowanie zamków = +250,- zł / mb;</Text>
+          <Text style={s.cennikItem}>- Zagubienie / całkowita strata uszkodzonych grodzic = +{offer.loss_price_pln ?? 3950},- zł / tona;</Text>
+          <Text style={s.cennikItem}>- Sortowanie oraz czyszczenie grodzic = +{offer.sorting_price_pln ?? 99},- zł / tona;</Text>
+          <Text style={s.cennikItem}>- Szlifowanie pozostałości przyspawanych kształtowników = +{offer.grinding_price_pln ?? 250},- zł/mb;</Text>
+          <Text style={s.cennikItem}>- Spawanie (zamykanie) otworów pod kotwy = +{offer.welding_price_pln ?? 250},- zł / szt.;</Text>
+          <Text style={s.cennikItem}>- Głowica tnąca - w celu np. ucięcia uszkodzenia = +{offer.cutting_price_pln ?? 59},- zł / za cięcie;</Text>
+          <Text style={[s.cennikItem, { marginBottom: 0 }]}>- Naprawa / prostowanie zamków = +{offer.repair_price_pln ?? 250},- zł / mb;</Text>
         </View>
 
         {/* ── WAŻNOŚĆ ── */}

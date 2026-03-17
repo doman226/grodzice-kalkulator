@@ -3,6 +3,13 @@ import { supabase } from '../lib/supabase';
 import type { Offer, Profile, RentalPrices, Client, OfferItem } from '../types';
 import { calculateRentalCost, formatPLN, formatNumber } from '../lib/calculations';
 
+const SALES_REPS = [
+  { name: 'Szymon Sobczak', phone: '579 376 107' },
+  { name: 'Mateusz Cieślicki', phone: '579 141 243' },
+  { name: 'Marzena Sobczak', phone: '579 241 508' },
+  { name: 'Piotr Domański', phone: '729 393 743' },
+];
+
 interface CalcItem {
   uid: string;
   profileId: string;
@@ -63,6 +70,7 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
   );
   const [transportFrom, setTransportFrom] = useState(offer.transport_from ?? 'Magazyn Intra B.V.');
   const [transportTo, setTransportTo] = useState(offer.transport_to ?? '');
+  const [preparedBy, setPreparedBy] = useState(offer.prepared_by ?? SALES_REPS[0].name);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -148,8 +156,16 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
       weekly_cost_pln: totals.totalMassT * prices.price_per_week_1,
       price_per_week_1: prices.price_per_week_1,
       price_per_week_2: prices.price_per_week_2,
+      threshold_weeks: prices.threshold_weeks,
+      loss_price_pln: prices.loss_price_pln,
+      sorting_price_pln: prices.sorting_price_pln,
+      grinding_price_pln: prices.grinding_price_pln,
+      welding_price_pln: prices.welding_price_pln,
+      cutting_price_pln: prices.cutting_price_pln,
+      repair_price_pln: prices.repair_price_pln,
       notes: notes.trim() || null,
       valid_days: validDays,
+      prepared_by: preparedBy,
       updated_at: new Date().toISOString(),
     }).eq('id', offer.id).select('*, client:clients(*)').single();
 
@@ -322,6 +338,17 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
                 <span className="ml-auto text-sm font-semibold text-gray-700">{formatPLN(transportCalc.totalCost)} PLN</span>
               )}
             </div>
+          </div>
+
+          {/* Opiekun handlowy */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Opiekun handlowy</label>
+            <select value={preparedBy} onChange={e => setPreparedBy(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              {SALES_REPS.map(r => (
+                <option key={r.name} value={r.name}>{r.name} – tel. {r.phone}</option>
+              ))}
+            </select>
           </div>
 
           {/* Notatki */}
