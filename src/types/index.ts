@@ -37,6 +37,19 @@ export interface CalculatorInput {
   rentalWeeks: number;
 }
 
+export interface OfferItem {
+  id: string;
+  offer_id: string;
+  profile_name: string;
+  profile_type: string;
+  quantity: number;
+  length_m: number;
+  total_length_m: number;
+  mass_t: number;
+  wall_area_m2: number;
+  sort_order: number;
+}
+
 export interface CalculatorResult {
   totalLengthM: number;
   massT: number;
@@ -97,4 +110,5 @@ export interface Offer {
   transport_to?: string;
   created_at: string;
   updated_at: string;
+  items?: OfferItem[];
 }

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import type { Profile, RentalPrices, Client, Offer } from '../types';
-import { calculate, calculateRentalCost, formatPLN, formatNumber } from '../lib/calculations';
-import SaveOfferModal from './SaveOfferModal';
+import { calculateRentalCost, formatPLN, formatNumber } from '../lib/calculations';
+import SaveOfferModal, { type OfferItemInput } from './SaveOfferModal';
 
 interface Props {
   profiles: Profile[];
@@ -11,10 +11,18 @@ interface Props {
   onOfferSaved: (offer: Offer) => void;
 }
 
+// Pojedyncza pozycja w kalkulatorze (lokalna, nie trafia do DB bezpośrednio)
+interface CalcItem {
+  uid: string;
+  profileId: string;
+  quantity: number;
+  lengthM: number;
+}
+
 export default function Calculator({ profiles, prices, clients, onClientAdded, onOfferSaved }: Props) {
-  const [profileId, setProfileId] = useState(profiles[0]?.id ?? '');
-  const [quantity, setQuantity] = useState<number>(10);
-  const [lengthM, setLengthM] = useState<number>(12);
+  const [items, setItems] = useState<CalcItem[]>([
+    { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', quantity: 10, lengthM: 12 },
+  ]);
   const [rentalWeeks, setRentalWeeks] = useState<number>(8);
   const [showSaveModal, setShowSaveModal] = useState(false);
 
@@ -25,141 +33,212 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
   const [transportFrom, setTransportFrom] = useState('Magazyn Intra B.V.');
   const [transportTo, setTransportTo] = useState('');
 
-  const selectedProfile = useMemo(
-    () => profiles.find((p) => p.id === profileId) ?? null,
-    [profiles, profileId]
+  // --- Zarządzanie pozycjami ---
+  function addItem() {
+    setItems(prev => [
+      ...prev,
+      { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', quantity: 10, lengthM: 12 },
+    ]);
+  }
+
+  function removeItem(uid: string) {
+    setItems(prev => prev.filter(i => i.uid !== uid));
+  }
+
+  function updateItem(uid: string, patch: Partial<CalcItem>) {
+    setItems(prev => prev.map(i => i.uid === uid ? { ...i, ...patch } : i));
+  }
+
+  // --- Wyliczenia per pozycja ---
+  const itemResults = useMemo(() =>
+    items.map(item => {
+      const profile = profiles.find(p => p.id === item.profileId) ?? null;
+      if (!profile || item.quantity <= 0 || item.lengthM <= 0) {
+        return { profile, totalLengthM: 0, massT: 0, wallAreaM2: 0, valid: false };
+      }
+      const totalLengthM = item.quantity * item.lengthM;
+      const massT = (totalLengthM * profile.weight_kg_per_m) / 1000;
+      const wallAreaM2 = totalLengthM * (profile.width_mm / 1000);
+      return { profile, totalLengthM, massT, wallAreaM2, valid: true };
+    }),
+    [items, profiles]
   );
 
-  const result = useMemo(() => {
-    if (!selectedProfile || quantity <= 0 || lengthM <= 0 || rentalWeeks <= 0) return null;
-    return calculate(quantity, lengthM, selectedProfile.weight_kg_per_m, selectedProfile.width_mm, rentalWeeks, prices);
-  }, [selectedProfile, quantity, lengthM, rentalWeeks, prices]);
+  // --- Sumy łączne ---
+  const totals = useMemo(() => {
+    let totalLengthM = 0, totalMassT = 0, totalWallAreaM2 = 0;
+    for (const r of itemResults) {
+      if (!r.valid) continue;
+      totalLengthM += r.totalLengthM;
+      totalMassT += r.massT;
+      totalWallAreaM2 += r.wallAreaM2;
+    }
+    return { totalLengthM, totalMassT, totalWallAreaM2 };
+  }, [itemResults]);
 
-  // Dane dla tabeli kolejnych tygodni (od base_weeks+1 do 26)
+  const isValid = totals.totalMassT > 0 && rentalWeeks > 0;
+
+  const rentalCost = useMemo(() =>
+    isValid ? calculateRentalCost(totals.totalMassT, rentalWeeks, prices) : 0,
+    [totals.totalMassT, rentalWeeks, prices, isValid]
+  );
+
+  const baseCost = useMemo(() =>
+    totals.totalMassT > 0 ? calculateRentalCost(totals.totalMassT, prices.base_weeks, prices) : 0,
+    [totals.totalMassT, prices]
+  );
+
+  // Dane dla tabeli kolejnych tygodni
   const weeklyData = useMemo(() => {
-    if (!selectedProfile || quantity <= 0 || lengthM <= 0) return [];
-    const totalLengthM = quantity * lengthM;
-    const massT = (totalLengthM * selectedProfile.weight_kg_per_m) / 1000;
-    const wallArea = totalLengthM * (selectedProfile.width_mm / 1000);
+    if (totals.totalMassT <= 0) return [];
     const rows = [];
     for (let w = prices.base_weeks + 1; w <= 26; w++) {
-      const cost = calculateRentalCost(massT, w, prices);
-      const prevCost = calculateRentalCost(massT, w - 1, prices);
+      const cost = calculateRentalCost(totals.totalMassT, w, prices);
+      const prevCost = calculateRentalCost(totals.totalMassT, w - 1, prices);
       rows.push({
         week: w,
         cost,
-        costPerM2: wallArea > 0 ? cost / wallArea : 0,
-        costPerTon: massT > 0 ? cost / massT : 0,
-        weekRate: cost - prevCost, // koszt samego tego tygodnia
+        costPerM2: totals.totalWallAreaM2 > 0 ? cost / totals.totalWallAreaM2 : 0,
+        costPerTon: totals.totalMassT > 0 ? cost / totals.totalMassT : 0,
+        weekRate: cost - prevCost,
       });
     }
     return rows;
-  }, [selectedProfile, quantity, lengthM, prices]);
-
-  const isValid = selectedProfile && quantity > 0 && lengthM > 0 && rentalWeeks > 0;
-
-  const baseCost = useMemo(() => {
-    if (!selectedProfile || quantity <= 0 || lengthM <= 0) return 0;
-    const massT = (quantity * lengthM * selectedProfile.weight_kg_per_m) / 1000;
-    return calculateRentalCost(massT, prices.base_weeks, prices);
-  }, [selectedProfile, quantity, lengthM, prices]);
-
-  const wallArea = useMemo(() => {
-    if (!selectedProfile || quantity <= 0 || lengthM <= 0) return 0;
-    return quantity * lengthM * (selectedProfile.width_mm / 1000);
-  }, [selectedProfile, quantity, lengthM]);
+  }, [totals, prices]);
 
   const transportCalc = useMemo(() => {
-    if (!result) return null;
-    const trucks = Math.ceil(result.massT / TRUCK_CAPACITY_T);
+    if (!isValid) return null;
+    const trucks = Math.ceil(totals.totalMassT / TRUCK_CAPACITY_T);
     const costPerTruck = typeof transportCostPerTruck === 'number' ? transportCostPerTruck : 0;
-    const totalCost = trucks * costPerTruck;
-    return { trucks, costPerTruck, totalCost };
-  }, [result, transportCostPerTruck]);
+    return { trucks, costPerTruck, totalCost: trucks * costPerTruck };
+  }, [isValid, totals.totalMassT, transportCostPerTruck]);
+
+  // Dane do SaveOfferModal
+  const offerItems = useMemo((): OfferItemInput[] =>
+    items.flatMap((item, idx) => {
+      const r = itemResults[idx];
+      if (!r.profile || !r.valid) return [];
+      return [{
+        profileId: item.profileId,
+        profileName: r.profile.name,
+        profileType: r.profile.type,
+        quantity: item.quantity,
+        lengthM: item.lengthM,
+        totalLengthM: r.totalLengthM,
+        massT: r.massT,
+        wallAreaM2: r.wallAreaM2,
+      }];
+    }),
+    [items, itemResults]
+  );
 
   return (
     <div className="space-y-6">
-      {/* Formularz */}
+
+      {/* ── POZYCJE OFERTY ── */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-800 mb-5">Dane wejściowe</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {/* Profil */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Profil grodzicy
-            </label>
-            <select
-              value={profileId}
-              onChange={(e) => setProfileId(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              {profiles.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.type})
-                </option>
-              ))}
-            </select>
-            {selectedProfile && (
-              <p className="text-xs text-gray-400 mt-1">
-                {selectedProfile.weight_kg_per_m} kg/m · {selectedProfile.width_mm} mm
-              </p>
-            )}
-          </div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-800">Pozycje oferty</h2>
+          <button
+            onClick={addItem}
+            className="px-3 py-1.5 text-sm font-medium text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            + Dodaj pozycję
+          </button>
+        </div>
 
-          {/* Ilość */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Ilość sztuk
-            </label>
-            <input
-              type="number"
-              min={1}
-              step={1}
-              value={quantity}
-              onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 0))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+        <div className="space-y-3">
+          {items.map((item, idx) => {
+            const r = itemResults[idx];
+            const profile = r.profile;
+            return (
+              <div key={item.uid} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-3 bg-gray-50 rounded-lg border border-gray-200">
+                {/* Profil */}
+                <div className="sm:col-span-4">
+                  {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Profil grodzicy</label>}
+                  <select
+                    value={item.profileId}
+                    onChange={e => updateItem(item.uid, { profileId: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.type})</option>
+                    ))}
+                  </select>
+                  {profile && (
+                    <p className="text-xs text-gray-400 mt-0.5">{profile.weight_kg_per_m} kg/m · {profile.width_mm} mm</p>
+                  )}
+                </div>
 
-          {/* Długość */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Długość grodzicy [m]
-            </label>
-            <input
-              type="number"
-              min={0.1}
-              step={0.5}
-              value={lengthM}
-              onChange={(e) => setLengthM(Math.max(0.1, parseFloat(e.target.value) || 0))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+                {/* Ilość */}
+                <div className="sm:col-span-2">
+                  {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Ilość [szt.]</label>}
+                  <input
+                    type="number" min={1} step={1}
+                    value={item.quantity}
+                    onChange={e => updateItem(item.uid, { quantity: Math.max(1, parseInt(e.target.value) || 0) })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
 
-          {/* Tygodnie */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Okres wynajmu [tygodnie]
-            </label>
+                {/* Długość */}
+                <div className="sm:col-span-2">
+                  {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Długość [m]</label>}
+                  <input
+                    type="number" min={0.1} step={0.5}
+                    value={item.lengthM}
+                    onChange={e => updateItem(item.uid, { lengthM: Math.max(0.1, parseFloat(e.target.value) || 0) })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Masa tej pozycji */}
+                <div className="sm:col-span-3">
+                  {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Masa pozycji</label>}
+                  <div className="rounded-lg bg-white border border-gray-200 px-3 py-2 text-sm text-gray-700 min-h-[38px] flex items-center">
+                    {r.valid
+                      ? <><span className="font-semibold">{formatNumber(r.massT, 3)} t</span><span className="text-gray-400 ml-2">{formatNumber(r.totalLengthM, 1)} m</span></>
+                      : <span className="text-gray-400">—</span>
+                    }
+                  </div>
+                </div>
+
+                {/* Usuń */}
+                <div className="sm:col-span-1 flex justify-end">
+                  {items.length > 1 && (
+                    <button
+                      onClick={() => removeItem(item.uid)}
+                      className="w-9 h-9 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200 transition-colors"
+                      title="Usuń pozycję"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Okres wynajmu – globalny */}
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <div className="max-w-xs">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Okres wynajmu [tygodnie]</label>
             <input
-              type="number"
-              min={1}
-              step={1}
+              type="number" min={1} step={1}
               value={rentalWeeks}
-              onChange={(e) => setRentalWeeks(Math.max(1, parseInt(e.target.value) || 0))}
+              onChange={e => setRentalWeeks(Math.max(1, parseInt(e.target.value) || 0))}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <p className="text-xs text-gray-400 mt-1">
-              ≈ {(rentalWeeks / 4.33).toFixed(1)} miesięcy
-            </p>
+            <p className="text-xs text-gray-400 mt-1">≈ {(rentalWeeks / 4.33).toFixed(1)} miesięcy</p>
           </div>
         </div>
       </div>
 
-      {/* Wyniki */}
-      {isValid && result && (
+      {/* ── WYNIKI ── */}
+      {isValid && (
         <>
-          {/* Przycisk zapisu oferty */}
+          {/* Przycisk zapisu */}
           <div className="flex justify-end">
             <button
               onClick={() => setShowSaveModal(true)}
@@ -169,59 +248,47 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
             </button>
           </div>
 
-          {/* Dane fizyczne */}
+          {/* Dane wynajmu */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Dane wynajmu</h2>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Dane wynajmu – łącznie</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <ResultCard label="Całkowita długość" value={formatNumber(result.totalLengthM, 2)} unit="m" />
-              <ResultCard label="Masa całkowita" value={formatNumber(result.massT, 3)} unit="t" />
-              <ResultCard label="Powierzchnia ścianki" value={formatNumber(result.wallAreaM2, 2)} unit="m²" />
+              <ResultCard label="Całkowita długość" value={formatNumber(totals.totalLengthM, 2)} unit="m" />
+              <ResultCard label="Masa całkowita" value={formatNumber(totals.totalMassT, 3)} unit="t" />
+              <ResultCard label="Powierzchnia ścianki" value={formatNumber(totals.totalWallAreaM2, 2)} unit="m²" />
             </div>
+            {items.length > 1 && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-2">Rozkład pozycji</p>
+                <div className="space-y-1">
+                  {itemResults.map((r, idx) => r.valid && (
+                    <div key={items[idx].uid} className="flex justify-between text-sm text-gray-600">
+                      <span>{r.profile!.name} – {items[idx].quantity} szt. × {items[idx].lengthM} m</span>
+                      <span className="font-medium">{formatNumber(r.massT, 3)} t</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Koszt bazowy – pierwsze N tygodni */}
+          {/* Koszt bazowy */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">
               Koszt wynajmu – pierwsze {prices.base_weeks} tygodnie (cena bazowa)
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <ResultCard
-                label={`Koszt za ${prices.base_weeks} tyg.`}
-                value={formatPLN(baseCost)}
-                unit="PLN"
-                highlight
-              />
-              <ResultCard
-                label="Koszt / kolejny tydzień"
-                value={formatPLN(result.massT * prices.price_per_week_1)}
-                unit="PLN/tydz."
-                highlight
-              />
-              <ResultCard
-                label="Koszt / m²"
-                value={formatPLN(wallArea > 0 ? baseCost / wallArea : 0)}
-                unit="PLN/m²"
-              />
-              <ResultCard
-                label="Koszt / tonę"
-                value={formatPLN(result.massT > 0 ? baseCost / result.massT : 0)}
-                unit="PLN/t"
-              />
+              <ResultCard label={`Koszt za ${prices.base_weeks} tyg.`} value={formatPLN(baseCost)} unit="PLN" highlight />
+              <ResultCard label="Koszt / kolejny tydzień" value={formatPLN(totals.totalMassT * prices.price_per_week_1)} unit="PLN/tydz." highlight />
+              <ResultCard label="Koszt / m²" value={formatPLN(totals.totalWallAreaM2 > 0 ? baseCost / totals.totalWallAreaM2 : 0)} unit="PLN/m²" />
+              <ResultCard label="Koszt / tonę" value={formatPLN(totals.totalMassT > 0 ? baseCost / totals.totalMassT : 0)} unit="PLN/t" />
             </div>
             {rentalWeeks !== prices.base_weeks && (
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide font-medium">
-                  Wybrany okres: {rentalWeeks} tygodni
-                </p>
+                <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide font-medium">Wybrany okres: {rentalWeeks} tygodni</p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <ResultCard
-                    label={`Koszt za ${rentalWeeks} tyg.`}
-                    value={formatPLN(result.rentalCostPLN)}
-                    unit="PLN"
-                    highlight
-                  />
-                  <ResultCard label="Koszt / m²" value={formatPLN(result.costPerM2)} unit="PLN/m²" />
-                  <ResultCard label="Koszt / tonę" value={formatPLN(result.costPerTon)} unit="PLN/t" />
+                  <ResultCard label={`Koszt za ${rentalWeeks} tyg.`} value={formatPLN(rentalCost)} unit="PLN" highlight />
+                  <ResultCard label="Koszt / m²" value={formatPLN(totals.totalWallAreaM2 > 0 ? rentalCost / totals.totalWallAreaM2 : 0)} unit="PLN/m²" />
+                  <ResultCard label="Koszt / tonę" value={formatPLN(totals.totalMassT > 0 ? rentalCost / totals.totalMassT : 0)} unit="PLN/t" />
                 </div>
               </div>
             )}
@@ -233,89 +300,56 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
             <p className="text-xs text-gray-400 mb-4">
               Ładowność 1 auta: ~{TRUCK_CAPACITY_T} t &nbsp;·&nbsp;
               Szacowana liczba aut: <strong className="text-gray-700">{transportCalc?.trucks ?? '—'}</strong>
-              {result && <span className="text-gray-500"> (masa: {formatNumber(result.massT, 3)} t)</span>}
+              <span className="text-gray-500"> (masa: {formatNumber(totals.totalMassT, 3)} t)</span>
             </p>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-              {/* Koszt / auto */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Koszt transportu / auto [PLN]</label>
-                <input
-                  type="number" min={0} step={100}
-                  value={transportCostPerTruck}
-                  placeholder="np. 2500"
+                <input type="number" min={0} step={100} value={transportCostPerTruck} placeholder="np. 2500"
                   onChange={e => setTransportCostPerTruck(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value)))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
-
-              {/* Miejsce załadunku */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Załadunek (magazyn)</label>
-                <input
-                  type="text"
-                  value={transportFrom}
-                  onChange={e => setTransportFrom(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <input type="text" value={transportFrom} onChange={e => setTransportFrom(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
-
-              {/* Miejsce dostawy */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Dostawa (adres budowy)</label>
-                <input
-                  type="text"
-                  value={transportTo}
-                  placeholder="ul. Przykładowa 1, Warszawa"
+                <input type="text" value={transportTo} placeholder="ul. Przykładowa 1, Warszawa"
                   onChange={e => setTransportTo(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             </div>
-
-            {/* Kto płaci + wynik */}
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
               <div>
                 <p className="text-sm font-medium text-gray-700 mb-1">Koszt transportu po stronie:</p>
                 <div className="flex gap-3">
                   {(['intra', 'klient'] as const).map(val => (
                     <label key={val} className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="transportPaidBy"
-                        value={val}
-                        checked={transportPaidBy === val}
-                        onChange={() => setTransportPaidBy(val)}
-                        className="accent-blue-900"
-                      />
+                      <input type="radio" name="transportPaidBy" value={val} checked={transportPaidBy === val}
+                        onChange={() => setTransportPaidBy(val)} className="accent-blue-900" />
                       <span className="text-sm text-gray-700">{val === 'intra' ? 'Intra B.V.' : 'Klienta'}</span>
                     </label>
                   ))}
                 </div>
               </div>
-
               {transportCalc && transportCalc.costPerTruck > 0 && (
                 <div className={`ml-auto rounded-lg px-5 py-3 text-right ${transportPaidBy === 'klient' ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-200'}`}>
-                  <p className="text-xs text-gray-500 mb-0.5">
-                    {transportCalc.trucks} auto{transportCalc.trucks > 1 ? 'a' : ''} × {formatPLN(transportCalc.costPerTruck)} PLN
-                  </p>
-                  <p className="text-xl font-bold text-gray-800">
-                    {formatPLN(transportCalc.totalCost)} PLN
-                  </p>
+                  <p className="text-xs text-gray-500 mb-0.5">{transportCalc.trucks} auto{transportCalc.trucks > 1 ? 'a' : ''} × {formatPLN(transportCalc.costPerTruck)} PLN</p>
+                  <p className="text-xl font-bold text-gray-800">{formatPLN(transportCalc.totalCost)} PLN</p>
                   <p className={`text-xs font-medium mt-0.5 ${transportPaidBy === 'klient' ? 'text-orange-600' : 'text-gray-500'}`}>
                     {transportPaidBy === 'klient' ? '⚠ Koszt po stronie klienta' : 'Koszt po stronie Intra B.V.'}
                   </p>
                 </div>
               )}
             </div>
-
-            {/* Podsumowanie łączne */}
-            {transportCalc && transportCalc.costPerTruck > 0 && result && (
+            {transportCalc && transportCalc.costPerTruck > 0 && (
               <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-4">
                 <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
                   <p className="text-blue-200 text-xs mb-0.5">Łączny koszt (wynajem + transport)</p>
                   <p className="text-2xl font-bold">
-                    {formatPLN(result.rentalCostPLN + (transportPaidBy === 'intra' ? transportCalc.totalCost : 0))} PLN
+                    {formatPLN(rentalCost + (transportPaidBy === 'intra' ? transportCalc.totalCost : 0))} PLN
                   </p>
                   {transportPaidBy === 'klient' && (
                     <p className="text-blue-300 text-xs mt-0.5">+ {formatPLN(transportCalc.totalCost)} PLN transport (klient)</p>
@@ -327,9 +361,7 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
 
           {/* Tabela kolejnych tygodni */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-1">
-              Koszt za każdy kolejny tydzień (od tygodnia {prices.base_weeks + 1})
-            </h2>
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">Koszt za każdy kolejny tydzień (od tygodnia {prices.base_weeks + 1})</h2>
             <p className="text-xs text-gray-400 mb-4">Kliknij wiersz aby wybrać okres wynajmu</p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -345,7 +377,6 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
                 <tbody>
                   {weeklyData.map(({ week, cost, costPerM2, costPerTon, weekRate }) => {
                     const isSelected = week === rentalWeeks;
-                    const isThreshold = week === prices.threshold_weeks;
                     const isPhase2Start = week === prices.threshold_weeks + 1;
                     return (
                       <>
@@ -356,36 +387,17 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
                             </td>
                           </tr>
                         )}
-                        <tr
-                          key={week}
-                          onClick={() => setRentalWeeks(week)}
-                          className={`border-t border-gray-100 cursor-pointer transition-colors ${
-                            isSelected
-                              ? 'bg-blue-50 font-semibold ring-1 ring-inset ring-blue-300'
-                              : 'hover:bg-gray-50'
-                          }`}
-                        >
+                        <tr key={week} onClick={() => setRentalWeeks(week)}
+                          className={`border-t border-gray-100 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 font-semibold ring-1 ring-inset ring-blue-300' : 'hover:bg-gray-50'}`}>
                           <td className="px-4 py-2.5 text-gray-700">
                             {week} tyg.
-                            {isThreshold && (
-                              <span className="ml-2 text-xs text-orange-600 font-normal">(≈4 miesiące)</span>
-                            )}
-                            {isSelected && (
-                              <span className="ml-2 text-xs text-blue-600 font-normal">← wybrany</span>
-                            )}
+                            {week === prices.threshold_weeks && <span className="ml-2 text-xs text-orange-600 font-normal">(≈4 miesiące)</span>}
+                            {isSelected && <span className="ml-2 text-xs text-blue-600 font-normal">← wybrany</span>}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-gray-500">
-                            + {formatPLN(weekRate)} PLN
-                          </td>
-                          <td className="px-4 py-2.5 text-right font-medium text-gray-800">
-                            {formatPLN(cost)} PLN
-                          </td>
-                          <td className="px-4 py-2.5 text-right text-gray-600">
-                            {formatPLN(costPerM2)}
-                          </td>
-                          <td className="px-4 py-2.5 text-right text-gray-500 hidden md:table-cell">
-                            {formatPLN(costPerTon)}
-                          </td>
+                          <td className="px-4 py-2.5 text-right text-gray-500">+ {formatPLN(weekRate)} PLN</td>
+                          <td className="px-4 py-2.5 text-right font-medium text-gray-800">{formatPLN(cost)} PLN</td>
+                          <td className="px-4 py-2.5 text-right text-gray-600">{formatPLN(costPerM2)}</td>
+                          <td className="px-4 py-2.5 text-right text-gray-500 hidden md:table-cell">{formatPLN(costPerTon)}</td>
                         </tr>
                       </>
                     );
@@ -399,34 +411,22 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
 
       {!isValid && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5 text-yellow-700 text-sm text-center">
-          Wypełnij wszystkie pola powyżej, aby zobaczyć wyniki kalkulacji.
+          Dodaj przynajmniej jedną pozycję z poprawnymi danymi, aby zobaczyć wyniki kalkulacji.
         </div>
       )}
 
-      {/* Modal zapisu oferty */}
-      {showSaveModal && selectedProfile && result && transportCalc && (
+      {/* Modal zapisu */}
+      {showSaveModal && isValid && transportCalc && (
         <SaveOfferModal
           clients={clients}
-          profile={selectedProfile}
-          quantity={quantity}
-          lengthM={lengthM}
+          offerItems={offerItems}
           rentalWeeks={rentalWeeks}
-          result={result}
-          transport={{
-            trucks: transportCalc.trucks,
-            costPerTruck: transportCalc.costPerTruck,
-            totalCost: transportCalc.totalCost,
-            paidBy: transportPaidBy,
-            from: transportFrom,
-            to: transportTo,
-          }}
+          totals={{ massT: totals.totalMassT, wallAreaM2: totals.totalWallAreaM2, totalLengthM: totals.totalLengthM, rentalCostPLN: rentalCost, costPerM2: totals.totalWallAreaM2 > 0 ? rentalCost / totals.totalWallAreaM2 : 0, costPerTon: totals.totalMassT > 0 ? rentalCost / totals.totalMassT : 0 }}
+          transport={{ trucks: transportCalc.trucks, costPerTruck: transportCalc.costPerTruck, totalCost: transportCalc.totalCost, paidBy: transportPaidBy, from: transportFrom, to: transportTo }}
           pricePerWeek1={prices.price_per_week_1}
           pricePerWeek2={prices.price_per_week_2}
           onClientAdded={onClientAdded}
-          onSaved={(offer) => {
-            onOfferSaved(offer);
-            setShowSaveModal(false);
-          }}
+          onSaved={(offer) => { onOfferSaved(offer); setShowSaveModal(false); }}
           onClose={() => setShowSaveModal(false)}
         />
       )}
@@ -434,19 +434,11 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
   );
 }
 
-interface ResultCardProps {
-  label: string;
-  value: string;
-  unit: string;
-  highlight?: boolean;
-}
-
+interface ResultCardProps { label: string; value: string; unit: string; highlight?: boolean; }
 function ResultCard({ label, value, unit, highlight = false }: ResultCardProps) {
   return (
     <div className={`rounded-lg p-4 ${highlight ? 'bg-blue-900 text-white' : 'bg-gray-50 text-gray-800'}`}>
-      <p className={`text-xs font-medium uppercase tracking-wide mb-1 ${highlight ? 'text-blue-200' : 'text-gray-500'}`}>
-        {label}
-      </p>
+      <p className={`text-xs font-medium uppercase tracking-wide mb-1 ${highlight ? 'text-blue-200' : 'text-gray-500'}`}>{label}</p>
       <p className={`text-2xl font-bold ${highlight ? 'text-white' : 'text-gray-900'}`}>{value}</p>
       <p className={`text-xs mt-0.5 ${highlight ? 'text-blue-300' : 'text-gray-400'}`}>{unit}</p>
     </div>

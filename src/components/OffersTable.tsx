@@ -225,18 +225,64 @@ export default function OffersTable({ offers, onOffersChange }: Props) {
                 )}
               </section>
 
-              {/* Parametry */}
+              {/* Pozycje oferty */}
               <section>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Parametry wynajmu</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Pozycje oferty {selected.items && selected.items.length > 0 ? `(${selected.items.length})` : ''}
+                </h4>
+                {selected.items && selected.items.length > 0 ? (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 text-left">
+                          <th className="px-3 py-2 font-medium text-gray-500 text-xs">Profil</th>
+                          <th className="px-3 py-2 font-medium text-gray-500 text-xs text-right">Ilość</th>
+                          <th className="px-3 py-2 font-medium text-gray-500 text-xs text-right">Dług. [m]</th>
+                          <th className="px-3 py-2 font-medium text-gray-500 text-xs text-right">Masa [t]</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...selected.items].sort((a, b) => a.sort_order - b.sort_order).map((item, idx) => (
+                          <tr key={item.id || idx} className={idx % 2 === 1 ? 'bg-gray-50' : ''}>
+                            <td className="px-3 py-2 font-medium text-gray-800">{item.profile_name}</td>
+                            <td className="px-3 py-2 text-right text-gray-600">{item.quantity} szt.</td>
+                            <td className="px-3 py-2 text-right text-gray-600">{item.length_m} m</td>
+                            <td className="px-3 py-2 text-right font-semibold text-gray-800">{item.mass_t.toFixed(3)} t</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t border-gray-200 bg-gray-100">
+                          <td className="px-3 py-2 font-semibold text-gray-700 text-xs" colSpan={3}>Łącznie</td>
+                          <td className="px-3 py-2 text-right font-bold text-gray-900 text-xs">{selected.mass_t.toFixed(3)} t</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                ) : (
+                  // Fallback dla starych ofert bez offer_items
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {[
+                      ['Profil', `${selected.profile_name} (${selected.profile_type})`],
+                      ['Ilość', `${selected.quantity} szt.`],
+                      ['Długość', `${selected.length_m ? selected.length_m + ' m / szt.' : '—'}`],
+                      ['Okres', `${selected.rental_weeks} tygodnie`],
+                      ['Łączna długość', `${selected.total_length_m} m`],
+                      ['Masa', `${selected.mass_t} t`],
+                      ['Powierzchnia', `${selected.wall_area_m2} m²`],
+                    ].map(([label, value]) => (
+                      <div key={label} className="bg-gray-50 rounded p-2">
+                        <p className="text-xs text-gray-400">{label}</p>
+                        <p className="font-medium text-gray-800">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="grid grid-cols-3 gap-2 text-sm mt-2">
                   {[
-                    ['Profil', `${selected.profile_name} (${selected.profile_type})`],
-                    ['Ilość', `${selected.quantity} szt.`],
-                    ['Długość', `${selected.length_m} m / szt.`],
-                    ['Okres', `${selected.rental_weeks} tygodnie`],
-                    ['Łączna długość', `${selected.total_length_m} m`],
-                    ['Masa', `${selected.mass_t} t`],
-                    ['Powierzchnia', `${selected.wall_area_m2} m²`],
+                    ['Okres', `${selected.rental_weeks} tyg.`],
+                    ['Pow. ścianki', `${selected.wall_area_m2} m²`],
+                    ['Dług. łączna', `${selected.total_length_m} m`],
                   ].map(([label, value]) => (
                     <div key={label} className="bg-gray-50 rounded p-2">
                       <p className="text-xs text-gray-400">{label}</p>

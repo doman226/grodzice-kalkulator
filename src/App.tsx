@@ -31,7 +31,7 @@ function App() {
         supabase.from('profiles').select('*').eq('active', true).order('name'),
         supabase.from('rental_prices').select('*').single(),
         supabase.from('clients').select('*').eq('active', true).order('name'),
-        supabase.from('offers').select('*, client:clients(*)').order('created_at', { ascending: false }),
+        supabase.from('offers').select('*, client:clients(*), items:offer_items(*)').order('created_at', { ascending: false }),
       ]);
 
       if (profilesRes.error) throw profilesRes.error;

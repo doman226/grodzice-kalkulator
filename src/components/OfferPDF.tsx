@@ -394,20 +394,60 @@ export default function OfferPDF({ offer }: Props) {
           W nawiązaniu do przesłanego zapytania oraz naszych Ogólnych Warunków Sprzedaży i Płatności oferujemy usługę dzierżawy grodzic stalowych:
         </Text>
 
-        {/* ── TABELA PARAMETRÓW ── */}
-        <View style={s.table}>
-          <View style={s.tableHeaderRow}>
-            <Text style={[s.thCell, { flex: 1 }]}>Parametr</Text>
-            <Text style={[s.thCell, { width: '45%' }]}>Wartość</Text>
+        {/* ── TABELA POZYCJI ── */}
+        {offer.items && offer.items.length > 0 ? (
+          // Wielopozycyjna tabela (nowe oferty)
+          <View style={s.table}>
+            <View style={s.tableHeaderRow}>
+              <Text style={[s.thCell, { flex: 2 }]}>Profil</Text>
+              <Text style={[s.thCell, { width: '13%', textAlign: 'right' }]}>Ilość</Text>
+              <Text style={[s.thCell, { width: '14%', textAlign: 'right' }]}>Dług. [m]</Text>
+              <Text style={[s.thCell, { width: '16%', textAlign: 'right' }]}>Łącznie [m]</Text>
+              <Text style={[s.thCell, { width: '16%', textAlign: 'right' }]}>Masa [t]</Text>
+            </View>
+            {[...offer.items].sort((a, b) => a.sort_order - b.sort_order).map((item, idx) => (
+              <View key={item.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
+                <Text style={[s.tdLabel, { flex: 2, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{item.profile_name} ({item.profile_type})</Text>
+                <Text style={[s.tdLabel, { width: '13%', textAlign: 'right' }]}>{item.quantity} szt.</Text>
+                <Text style={[s.tdLabel, { width: '14%', textAlign: 'right' }]}>{item.length_m} m</Text>
+                <Text style={[s.tdLabel, { width: '16%', textAlign: 'right' }]}>{formatNumber(item.total_length_m, 1)} m</Text>
+                <Text style={[s.tdLabel, { width: '16%', textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{formatNumber(item.mass_t, 3)} t</Text>
+              </View>
+            ))}
+            {/* Podsumowanie */}
+            <View style={[s.tableBodyRow, { backgroundColor: C.gray100 }]}>
+              <Text style={[s.tdLabel, { flex: 2, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>Łącznie</Text>
+              <Text style={[s.tdLabel, { width: '13%' }]}></Text>
+              <Text style={[s.tdLabel, { width: '14%' }]}></Text>
+              <Text style={[s.tdLabel, { width: '16%', textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{formatNumber(offer.total_length_m, 1)} m</Text>
+              <Text style={[s.tdLabel, { width: '16%', textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{formatNumber(offer.mass_t, 3)} t</Text>
+            </View>
+            {/* Okres + powierzchnia */}
+            <View style={s.tableBodyRow}>
+              <Text style={[s.tdLabel, { flex: 2 }]}>Okres dzierżawy</Text>
+              <Text style={[s.tdLabel, { width: '59%', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{offer.rental_weeks} tygodni</Text>
+            </View>
+            <View style={[s.tableBodyRow, { borderBottom: 0 }]}>
+              <Text style={[s.tdLabel, { flex: 2 }]}>Powierzchnia ścianki</Text>
+              <Text style={[s.tdLabel, { width: '59%', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{formatNumber(offer.wall_area_m2, 2)} m²</Text>
+            </View>
           </View>
-          <Row label="Profil grodzicy" value={`${offer.profile_name} (${offer.profile_type})`} alt={false} />
-          <Row label="Ilość" value={`${offer.quantity} szt.`} alt={true} />
-          <Row label="Długość jednej grodzicy" value={`${offer.length_m} m`} alt={false} />
-          <Row label="Łączna długość" value={`${offer.total_length_m} m`} alt={true} />
-          <Row label="Masa całkowita" value={`${formatNumber(offer.mass_t, 3)} t`} alt={false} />
-          <Row label="Powierzchnia ścianki" value={`${formatPLN(offer.wall_area_m2)} m²`} alt={true} />
-          <Row label="Okres dzierżawy" value={`${offer.rental_weeks} tygodni`} alt={false} />
-        </View>
+        ) : (
+          // Fallback – stare oferty (jeden profil)
+          <View style={s.table}>
+            <View style={s.tableHeaderRow}>
+              <Text style={[s.thCell, { flex: 1 }]}>Parametr</Text>
+              <Text style={[s.thCell, { width: '45%' }]}>Wartość</Text>
+            </View>
+            <Row label="Profil grodzicy" value={`${offer.profile_name} (${offer.profile_type})`} alt={false} />
+            <Row label="Ilość" value={`${offer.quantity} szt.`} alt={true} />
+            <Row label="Długość jednej grodzicy" value={`${offer.length_m} m`} alt={false} />
+            <Row label="Łączna długość" value={`${formatNumber(offer.total_length_m, 1)} m`} alt={true} />
+            <Row label="Masa całkowita" value={`${formatNumber(offer.mass_t, 3)} t`} alt={false} />
+            <Row label="Powierzchnia ścianki" value={`${formatNumber(offer.wall_area_m2, 2)} m²`} alt={true} />
+            <Row label="Okres dzierżawy" value={`${offer.rental_weeks} tygodni`} alt={false} />
+          </View>
+        )}
 
         {/* ── CENA DZIERŻAWY ── */}
         <View style={s.priceBox}>

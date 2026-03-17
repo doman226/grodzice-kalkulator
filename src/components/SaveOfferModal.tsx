@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import type { Client, Offer, CalculatorResult, Profile } from '../types';
+import type { Client, Offer } from '../types';
 import { formatPLN, formatNumber } from '../lib/calculations';
 
 interface TransportData {
@@ -12,13 +12,31 @@ interface TransportData {
   to: string;
 }
 
-interface Props {
-  clients: Client[];
-  profile: Profile;
+export interface OfferItemInput {
+  profileId: string;
+  profileName: string;
+  profileType: string;
   quantity: number;
   lengthM: number;
+  totalLengthM: number;
+  massT: number;
+  wallAreaM2: number;
+}
+
+interface Totals {
+  massT: number;
+  wallAreaM2: number;
+  totalLengthM: number;
+  rentalCostPLN: number;
+  costPerM2: number;
+  costPerTon: number;
+}
+
+interface Props {
+  clients: Client[];
+  offerItems: OfferItemInput[];
   rentalWeeks: number;
-  result: CalculatorResult;
+  totals: Totals;
   transport: TransportData;
   pricePerWeek1: number;
   pricePerWeek2: number;
@@ -28,7 +46,7 @@ interface Props {
 }
 
 export default function SaveOfferModal({
-  clients, profile, quantity, lengthM, rentalWeeks, result, transport, pricePerWeek1, pricePerWeek2, onSaved, onClose, onClientAdded,
+  clients, offerItems, rentalWeeks, totals, transport, pricePerWeek1, pricePerWeek2, onSaved, onClose, onClientAdded,
 }: Props) {
   const [clientId, setClientId] = useState('');
   const [notes, setNotes] = useState('');
@@ -42,8 +60,12 @@ export default function SaveOfferModal({
   const [savingClient, setSavingClient] = useState(false);
 
   const totalWithTransport = transport.costPerTruck > 0
-    ? result.rentalCostPLN + (transport.paidBy === 'intra' ? transport.totalCost : 0)
-    : result.rentalCostPLN;
+    ? totals.rentalCostPLN + (transport.paidBy === 'intra' ? transport.totalCost : 0)
+    : totals.rentalCostPLN;
+
+  // Nazwa profilu do wyświetlenia w liście ofert (1 pozycja → nazwa profilu, wiele → "Wiele profili")
+  const mainProfileName = offerItems.length === 1 ? offerItems[0].profileName : 'Wiele profili';
+  const mainProfileType = offerItems.length === 1 ? offerItems[0].profileType : 'MIX';
 
   async function handleAddClient() {
     if (!newClient.name.trim()) return setError('Podaj nazwę firmy.');
@@ -71,27 +93,29 @@ export default function SaveOfferModal({
     setSaving(true);
     setError('');
 
+    // 1. Zapisz główny rekord oferty
     const { data, error: err } = await supabase.from('offers').insert({
       offer_number: '',
       client_id: clientId,
-      profile_name: profile.name,
-      profile_type: profile.type,
-      quantity,
-      length_m: lengthM,
+      // Główny profil (dla kompatybilności z listą)
+      profile_name: mainProfileName,
+      profile_type: mainProfileType,
+      quantity: offerItems.reduce((s, i) => s + i.quantity, 0),
+      length_m: offerItems.length === 1 ? offerItems[0].lengthM : null,
       rental_weeks: rentalWeeks,
-      total_length_m: result.totalLengthM,
-      mass_t: result.massT,
-      wall_area_m2: result.wallAreaM2,
-      rental_cost_pln: result.rentalCostPLN,
-      cost_per_m2: result.costPerM2,
-      cost_per_ton: result.costPerTon,
+      total_length_m: totals.totalLengthM,
+      mass_t: totals.massT,
+      wall_area_m2: totals.wallAreaM2,
+      rental_cost_pln: totals.rentalCostPLN,
+      cost_per_m2: totals.costPerM2,
+      cost_per_ton: totals.costPerTon,
       transport_trucks: transport.trucks,
       transport_cost_per_truck: transport.costPerTruck > 0 ? transport.costPerTruck : null,
       transport_cost_total: transport.costPerTruck > 0 ? transport.totalCost : null,
       transport_paid_by: transport.paidBy,
       transport_from: transport.from || null,
       transport_to: transport.to || null,
-      weekly_cost_pln: result.massT * pricePerWeek1,
+      weekly_cost_pln: totals.massT * pricePerWeek1,
       price_per_week_1: pricePerWeek1,
       price_per_week_2: pricePerWeek2,
       notes: notes.trim() || null,
@@ -99,9 +123,43 @@ export default function SaveOfferModal({
       status: 'szkic',
     }).select('*, client:clients(*)').single();
 
+    if (err) { setSaving(false); return setError('Błąd zapisu: ' + err.message); }
+
+    const savedOffer = data as Offer;
+
+    // 2. Zapisz pozycje oferty (offer_items)
+    const { error: itemsErr } = await supabase.from('offer_items').insert(
+      offerItems.map((item, idx) => ({
+        offer_id: savedOffer.id,
+        profile_name: item.profileName,
+        profile_type: item.profileType,
+        quantity: item.quantity,
+        length_m: item.lengthM,
+        total_length_m: item.totalLengthM,
+        mass_t: item.massT,
+        wall_area_m2: item.wallAreaM2,
+        sort_order: idx,
+      }))
+    );
+
     setSaving(false);
-    if (err) return setError('Błąd zapisu: ' + err.message);
-    onSaved(data as Offer);
+    if (itemsErr) return setError('Oferta zapisana, ale błąd pozycji: ' + itemsErr.message);
+
+    // Dołącz items do obiektu (żeby PDF od razu działał)
+    savedOffer.items = offerItems.map((item, idx) => ({
+      id: '',
+      offer_id: savedOffer.id,
+      profile_name: item.profileName,
+      profile_type: item.profileType,
+      quantity: item.quantity,
+      length_m: item.lengthM,
+      total_length_m: item.totalLengthM,
+      mass_t: item.massT,
+      wall_area_m2: item.wallAreaM2,
+      sort_order: idx,
+    }));
+
+    onSaved(savedOffer);
   }
 
   return (
@@ -113,65 +171,60 @@ export default function SaveOfferModal({
         </div>
 
         <div className="p-6 space-y-4">
-          {/* Podsumowanie wyceny */}
+          {/* Podsumowanie pozycji */}
           <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-            <p className="text-xs text-blue-700 font-medium uppercase tracking-wide mb-2">Podsumowanie wyceny</p>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div><span className="text-gray-500">Profil:</span> <strong>{profile.name}</strong></div>
-              <div><span className="text-gray-500">Ilość:</span> <strong>{quantity} szt. × {lengthM} m</strong></div>
-              <div><span className="text-gray-500">Masa:</span> <strong>{formatNumber(result.massT, 3)} t</strong></div>
+            <p className="text-xs text-blue-700 font-medium uppercase tracking-wide mb-2">Pozycje oferty ({offerItems.length})</p>
+            <div className="space-y-1 mb-3">
+              {offerItems.map((item, idx) => (
+                <div key={idx} className="flex justify-between text-sm">
+                  <span className="text-gray-600">{item.profileName} – {item.quantity} szt. × {item.lengthM} m</span>
+                  <span className="font-medium text-gray-800">{formatNumber(item.massT, 3)} t</span>
+                </div>
+              ))}
+            </div>
+            <div className="pt-2 border-t border-blue-200 grid grid-cols-2 gap-2 text-sm">
+              <div><span className="text-gray-500">Masa łączna:</span> <strong>{formatNumber(totals.massT, 3)} t</strong></div>
               <div><span className="text-gray-500">Okres:</span> <strong>{rentalWeeks} tygodni</strong></div>
-              <div className="col-span-2 pt-2 border-t border-blue-200 space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Wynajem:</span>
-                  <strong>{formatPLN(result.rentalCostPLN)} PLN</strong>
+            </div>
+            <div className="pt-2 border-t border-blue-200 mt-2 space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Wynajem:</span>
+                <strong>{formatPLN(totals.rentalCostPLN)} PLN</strong>
+              </div>
+              {transport.costPerTruck > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">
+                    Transport ({transport.trucks} aut{transport.trucks > 1 ? 'a' : ''})
+                    {transport.paidBy === 'klient' && <span className="text-orange-600 ml-1">[klient]</span>}:
+                  </span>
+                  <strong className={transport.paidBy === 'klient' ? 'text-orange-600' : ''}>
+                    {formatPLN(transport.totalCost)} PLN
+                  </strong>
                 </div>
-                {transport.costPerTruck > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">
-                      Transport ({transport.trucks} aut{transport.trucks > 1 ? 'a' : ''})
-                      {transport.paidBy === 'klient' && <span className="text-orange-600 ml-1">[klient]</span>}:
-                    </span>
-                    <strong className={transport.paidBy === 'klient' ? 'text-orange-600' : ''}>
-                      {formatPLN(transport.totalCost)} PLN
-                    </strong>
-                  </div>
-                )}
-                <div className="flex justify-between pt-1 border-t border-blue-200">
-                  <span className="text-gray-600 font-medium">Łączna kwota oferty:</span>
-                  <strong className="text-blue-900 text-base">{formatPLN(totalWithTransport)} PLN</strong>
-                </div>
+              )}
+              <div className="flex justify-between pt-1 border-t border-blue-200 text-sm">
+                <span className="text-gray-600 font-medium">Łączna kwota oferty:</span>
+                <strong className="text-blue-900 text-base">{formatPLN(totalWithTransport)} PLN</strong>
               </div>
             </div>
             {transport.to && (
-              <p className="text-xs text-gray-500 mt-2">
-                🚛 {transport.from} → {transport.to}
-              </p>
+              <p className="text-xs text-gray-500 mt-2">🚛 {transport.from} → {transport.to}</p>
             )}
           </div>
 
           {/* Wybór klienta */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Klient <span className="text-red-500">*</span>
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Klient <span className="text-red-500">*</span></label>
             {!addingClient ? (
               <div className="flex gap-2">
-                <select
-                  value={clientId}
-                  onChange={e => setClientId(e.target.value)}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                >
+                <select value={clientId} onChange={e => setClientId(e.target.value)}
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                   <option value="">— wybierz klienta —</option>
                   {clients.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.country === 'PL' ? c.nip : c.vat_number})
-                    </option>
+                    <option key={c.id} value={c.id}>{c.name} ({c.country === 'PL' ? c.nip : c.vat_number})</option>
                   ))}
                 </select>
-                <button onClick={() => setAddingClient(true)} className="px-3 py-2 text-sm text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 whitespace-nowrap">
-                  + Nowy
-                </button>
+                <button onClick={() => setAddingClient(true)} className="px-3 py-2 text-sm text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 whitespace-nowrap">+ Nowy</button>
               </div>
             ) : (
               <div className="border border-blue-200 rounded-lg p-3 bg-blue-50 space-y-2">
@@ -194,9 +247,7 @@ export default function SaveOfferModal({
                   <button onClick={handleAddClient} disabled={savingClient} className="flex-1 py-1.5 text-sm bg-blue-900 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50">
                     {savingClient ? 'Dodawanie...' : 'Dodaj i wybierz'}
                   </button>
-                  <button onClick={() => setAddingClient(false)} className="px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">
-                    Anuluj
-                  </button>
+                  <button onClick={() => setAddingClient(false)} className="px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">Anuluj</button>
                 </div>
               </div>
             )}
