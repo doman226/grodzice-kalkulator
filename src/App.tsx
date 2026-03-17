@@ -142,8 +142,14 @@ function App() {
             {activeTab === 'clients' && (
               <ClientsTable clients={clients} onClientsChange={setClients} />
             )}
-            {activeTab === 'offers' && (
-              <OffersTable offers={offers} onOffersChange={setOffers} />
+            {activeTab === 'offers' && prices && (
+              <OffersTable
+                offers={offers}
+                onOffersChange={setOffers}
+                profiles={profiles}
+                prices={prices}
+                clients={clients}
+              />
             )}
             {activeTab === 'profiles' && (
               <ProfileTable profiles={profiles} onProfilesChange={setProfiles} />

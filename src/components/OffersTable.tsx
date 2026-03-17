@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { supabase } from '../lib/supabase';
-import type { Offer, OfferStatus } from '../types';
+import type { Offer, OfferStatus, Profile, RentalPrices, Client } from '../types';
 import { formatPLN } from '../lib/calculations';
 import OfferPDF from './OfferPDF';
+import EditOfferModal from './EditOfferModal';
 
 interface Props {
   offers: Offer[];
   onOffersChange: (offers: Offer[]) => void;
+  profiles: Profile[];
+  prices: RentalPrices;
+  clients: Client[];
 }
 
 const STATUS_LABELS: Record<OfferStatus, string> = {
@@ -24,8 +28,9 @@ const STATUS_COLORS: Record<OfferStatus, string> = {
   odrzucona: 'bg-red-100 text-red-600',
 };
 
-export default function OffersTable({ offers, onOffersChange }: Props) {
+export default function OffersTable({ offers, onOffersChange, profiles, prices, clients }: Props) {
   const [selected, setSelected] = useState<Offer | null>(null);
+  const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<OfferStatus | 'wszystkie'>('wszystkie');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -179,6 +184,15 @@ export default function OffersTable({ offers, onOffersChange }: Props) {
                 <p className="text-xs text-gray-400 mt-0.5">Utworzona {formatDate(selected.created_at)}</p>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setEditingOffer(selected)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Edytuj
+                </button>
                 <button
                   onClick={() => handleDownloadPDF(selected)}
                   disabled={pdfLoading}
@@ -385,6 +399,22 @@ export default function OffersTable({ offers, onOffersChange }: Props) {
           </div>
         )}
       </div>
+
+      {editingOffer && (
+        <EditOfferModal
+          offer={editingOffer}
+          profiles={profiles}
+          prices={prices}
+          clients={clients}
+          onSaved={(updated) => {
+            onOffersChange(offers.map(o => o.id === updated.id ? updated : o));
+            if (selected?.id === updated.id) setSelected(updated);
+            setEditingOffer(null);
+            showToast('Oferta zaktualizowana.');
+          }}
+          onClose={() => setEditingOffer(null)}
+        />
+      )}
     </div>
   );
 }
