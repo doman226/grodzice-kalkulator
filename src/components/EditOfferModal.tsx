@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Offer, Profile, RentalPrices, Client, OfferItem } from '../types';
-import { calculateRentalCostLegacy as calculateRentalCost, formatPLN, formatNumber } from '../lib/calculations';
+import { calculateRentalCost, formatPLN, formatNumber } from '../lib/calculations';
 
 const SALES_REPS = [
   { name: 'Szymon Sobczak', phone: '579 376 107' },
@@ -131,9 +131,10 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
     return { totalLengthM, totalMassT, totalWallAreaM2 };
   }, [itemResults]);
 
+  // Nowa logika: koszt = masa [t] × cena [PLN/t] — bez progów czasowych
   const rentalCost = useMemo(() =>
-    totals.totalMassT > 0 ? calculateRentalCost(totals.totalMassT, rentalWeeks, effectivePrices) : 0,
-    [totals.totalMassT, rentalWeeks, effectivePrices]
+    totals.totalMassT > 0 ? calculateRentalCost(totals.totalMassT, customBasePricePln) : 0,
+    [totals.totalMassT, customBasePricePln]
   );
 
   const transportCalc = useMemo(() => {
@@ -330,7 +331,7 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Cena bazowa za {prices.base_weeks} tyg. [PLN/t]
+                  Cena wynajmu [PLN/t]
                 </label>
                 <input
                   type="number" min={0} step={1}

@@ -76,9 +76,9 @@ function App() {
             </div>
             {prices && (
               <div className="inline-flex items-center bg-blue-800 rounded-full px-4 py-1.5 text-sm font-medium">
-                <span className="text-blue-300 mr-1">Aktualna stawka:</span>
+                <span className="text-blue-300 mr-1">Cena minimalna:</span>
                 <span className="text-white font-bold">
-                  {formatPLN(prices.base_price_pln)} PLN/t za {prices.base_weeks} tyg.
+                  {formatPLN(prices.base_price_pln)} PLN/t / {prices.base_weeks} tyg.
                 </span>
               </div>
             )}
