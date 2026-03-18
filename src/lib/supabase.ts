@@ -4,3 +4,24 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+export interface NipData {
+  name: string;
+  nip: string;
+  regon: string | null;
+  krs: string | null;
+  address: string;
+  postal_code: string;
+  city: string;
+}
+
+/** Centralna funkcja pobierania danych firmy po NIP (GUS/MF).
+ *  Jeden punkt dostępu – klucz Supabase czytany tylko tutaj. */
+export async function fetchNipData(nip: string): Promise<NipData> {
+  const res = await fetch(`${supabaseUrl}/functions/v1/nip-lookup?nip=${nip}`, {
+    headers: { apikey: supabaseAnonKey, Authorization: `Bearer ${supabaseAnonKey}` },
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error ?? 'Nie znaleziono firmy.');
+  return data as NipData;
+}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, fetchNipData } from '../lib/supabase';
 import type { Client, Offer, RentalPrices } from '../types';
 import { formatPLN, formatNumber } from '../lib/calculations';
 
@@ -76,15 +76,12 @@ export default function SaveOfferModal({
     if (!/^\d{10}$/.test(nip)) { setError('Wpisz poprawny NIP (10 cyfr).'); return; }
     setNipLookupLoading(true);
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const res = await fetch(`${supabaseUrl}/functions/v1/nip-lookup?nip=${nip}`, {
-        headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` },
-      });
-      const data = await res.json();
-      if (!res.ok || data.error) { setError(data.error ?? 'Nie znaleziono firmy.'); }
-      else { setNewClient(prev => ({ ...prev, name: data.name ?? prev.name })); setError(''); }
-    } catch { setError('Błąd połączenia z GUS.'); }
+      const data = await fetchNipData(nip);
+      setNewClient(prev => ({ ...prev, name: data.name ?? prev.name }));
+      setError('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Błąd połączenia z GUS.');
+    }
     setNipLookupLoading(false);
   }
 

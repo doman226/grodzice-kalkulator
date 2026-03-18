@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, fetchNipData } from '../lib/supabase';
 import type { Client } from '../types';
 
 interface Props {
@@ -92,25 +92,17 @@ export default function ClientsTable({ clients, onClientsChange }: Props) {
     if (!/^\d{10}$/.test(nip)) return showToast('Wpisz poprawny NIP (10 cyfr).', 'error');
     setNipLookupLoading(true);
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const res = await fetch(`${supabaseUrl}/functions/v1/nip-lookup?nip=${nip}`, {
-        headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` },
-      });
-      const data = await res.json();
-      if (!res.ok || data.error) { showToast(data.error ?? 'Nie znaleziono firmy.', 'error'); }
-      else {
-        setForm(prev => ({
-          ...prev,
-          name: data.name ?? prev.name,
-          address: data.address ?? prev.address,
-          postal_code: data.postal_code ?? prev.postal_code,
-          city: data.city ?? prev.city,
-        }));
-        showToast('Dane pobrane z GUS.');
-      }
-    } catch {
-      showToast('Błąd połączenia z GUS.', 'error');
+      const data = await fetchNipData(nip);
+      setForm(prev => ({
+        ...prev,
+        name: data.name ?? prev.name,
+        address: data.address ?? prev.address,
+        postal_code: data.postal_code ?? prev.postal_code,
+        city: data.city ?? prev.city,
+      }));
+      showToast('Dane pobrane z GUS.');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Błąd połączenia z GUS.', 'error');
     }
     setNipLookupLoading(false);
   }
