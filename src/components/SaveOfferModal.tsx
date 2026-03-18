@@ -186,9 +186,12 @@ export default function SaveOfferModal({
     );
 
     if (itemsErr) {
-      // Rollback: usuń ofertę (po stronie DB – admin RLS) żeby nie zostały puste rekordy
-      await supabase.rpc('soft_delete_offer', { p_offer_id: savedOffer.id });
+      // Rollback: usuń ofertę żeby nie zostały puste rekordy
+      const { error: rollbackErr } = await supabase.rpc('soft_delete_offer', { p_offer_id: savedOffer.id });
       setSaving(false);
+      if (rollbackErr) {
+        return setError(`Błąd zapisu pozycji i rollback się nie powiódł – skontaktuj się z administratorem. (${itemsErr.message})`);
+      }
       return setError('Błąd zapisu pozycji – oferta anulowana. Spróbuj ponownie: ' + itemsErr.message);
     }
     setSaving(false);

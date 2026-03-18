@@ -147,7 +147,7 @@ export default function ProfileTable({ profiles, onProfilesChange }: Props) {
             onChange={(e) => setEditing({ ...editing, value: e.target.value })}
             onBlur={commitEdit}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') commitEdit();
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
               if (e.key === 'Escape') setEditing(null);
             }}
             className="w-24 text-right border border-blue-400 rounded px-1 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"

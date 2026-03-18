@@ -224,8 +224,22 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
         p_offer_id: offer.id,
         p_items: newItems,
       });
+    if (rpcErr) {
+      // Nagłówek oferty już zaktualizowany – cofnij do poprzednich wartości
+      await supabase.from('offers').update({
+        mass_t: offer.mass_t,
+        total_length_m: offer.total_length_m,
+        wall_area_m2: offer.wall_area_m2,
+        rental_cost_pln: offer.rental_cost_pln,
+        cost_per_m2: offer.cost_per_m2,
+        cost_per_ton: offer.cost_per_ton,
+        quantity: offer.quantity,
+        updated_at: offer.updated_at,
+      }).eq('id', offer.id);
+      setSaving(false);
+      return setError('Błąd aktualizacji pozycji – przywrócono poprzedni stan oferty. Spróbuj ponownie: ' + rpcErr.message);
+    }
     setSaving(false);
-    if (rpcErr) return setError('Błąd aktualizacji pozycji: ' + rpcErr.message);
 
     const updatedOffer = data as Offer;
     updatedOffer.items = Array.isArray(rpcItems) ? rpcItems : [];
