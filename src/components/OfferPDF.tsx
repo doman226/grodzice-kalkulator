@@ -610,7 +610,7 @@ export default function OfferPDF({ offer }: Props) {
         <Text style={s.sectionTitle}>Warunki płatności:</Text>
         <View style={s.conditionsBox}>
           <Text style={[s.conditionItem, { marginBottom: 0 }]}>
-            - 30 dni od daty wystawienia faktury, z zastrzeżeniem uzyskania zabezpieczenia wartości zamówienia (Limit kupiecki, gwarancja bankowa, gwarancja płatności publicznego inwestora lub inne zabezpieczenie zaakceptowane przez Intra BV).
+            - {offer.payment_days ?? 30} dni od daty wystawienia faktury, z zastrzeżeniem uzyskania zabezpieczenia wartości zamówienia (Limit kupiecki, gwarancja bankowa, gwarancja płatności publicznego inwestora lub inne zabezpieczenie zaakceptowane przez Intra BV).
           </Text>
         </View>
 

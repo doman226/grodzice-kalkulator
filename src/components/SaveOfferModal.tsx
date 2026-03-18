@@ -60,6 +60,7 @@ export default function SaveOfferModal({
   const [preparedBy, setPreparedBy] = useState(SALES_REPS[0].name);
   const [notes, setNotes] = useState('');
   const [validDays, setValidDays] = useState(1);
+  const [paymentDays, setPaymentDays] = useState(30);
   const [deliveryInfo, setDeliveryInfo] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -158,6 +159,7 @@ export default function SaveOfferModal({
       repair_price_pln: prices.repair_price_pln,
       notes: notes.trim() || null,
       valid_days: validDays,
+      payment_days: paymentDays,
       prepared_by: preparedBy,
       display_unit: displayUnit,
       status: 'szkic',
@@ -337,11 +339,18 @@ export default function SaveOfferModal({
             <p className="text-xs text-gray-400 mt-1">Pojawi się na PDF w sekcji „Termin dostawy"</p>
           </div>
 
-          {/* Ważność */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Ważność oferty [dni]</label>
-            <input type="number" min={1} value={validDays} onChange={e => setValidDays(Math.max(1, parseInt(e.target.value) || 30))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          {/* Ważność + Termin płatności */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ważność oferty [dni]</label>
+              <input type="number" min={1} value={validDays} onChange={e => setValidDays(Math.max(1, parseInt(e.target.value) || 30))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Termin płatności [dni]</label>
+              <input type="number" min={1} value={paymentDays} onChange={e => setPaymentDays(Math.max(1, parseInt(e.target.value) || 30))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
           </div>
 
           {/* Notatki */}

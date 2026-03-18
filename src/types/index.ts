@@ -108,6 +108,7 @@ export interface Offer {
   status: OfferStatus;
   notes?: string;
   valid_days: number;
+  payment_days: number;
   weekly_cost_pln?: number;
   steel_grade?: string;
   delivery_info?: string;

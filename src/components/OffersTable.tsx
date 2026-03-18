@@ -362,10 +362,16 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
                 )}
               </section>
 
-              {/* Ważność */}
-              <section>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Ważność oferty</h4>
-                <p className="text-sm text-gray-700">{selected.valid_days} dni od daty wystawienia</p>
+              {/* Ważność + Termin płatności */}
+              <section className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Ważność oferty</h4>
+                  <p className="text-sm text-gray-700">{selected.valid_days} dni od daty wystawienia</p>
+                </div>
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Termin płatności</h4>
+                  <p className="text-sm text-gray-700">{selected.payment_days ?? 30} dni od faktury</p>
+                </div>
               </section>
 
               {/* Notatki */}

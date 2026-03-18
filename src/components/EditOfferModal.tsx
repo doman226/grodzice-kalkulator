@@ -71,6 +71,7 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
   const [notes, setNotes] = useState(offer.notes ?? '');
   const [deliveryInfo, setDeliveryInfo] = useState(offer.delivery_info ?? '');
   const [validDays, setValidDays] = useState(offer.valid_days);
+  const [paymentDays, setPaymentDays] = useState(offer.payment_days ?? 30);
   const [transportCostPerTruck, setTransportCostPerTruck] = useState<number | ''>(
     offer.transport_cost_per_truck ?? ''
   );
@@ -193,6 +194,7 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
       repair_price_pln: effectivePrices.repair_price_pln,
       notes: notes.trim() || null,
       valid_days: validDays,
+      payment_days: paymentDays,
       prepared_by: preparedBy,
       updated_at: new Date().toISOString(),
     }).eq('id', offer.id).select('*, client:clients(*)').single();
@@ -345,6 +347,12 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
               <label className="block text-sm font-medium text-gray-700 mb-1">Ważność oferty [dni]</label>
               <input type="number" min={1} value={validDays}
                 onChange={e => setValidDays(Math.max(1, parseInt(e.target.value) || 30))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Termin płatności [dni]</label>
+              <input type="number" min={1} value={paymentDays}
+                onChange={e => setPaymentDays(Math.max(1, parseInt(e.target.value) || 30))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
