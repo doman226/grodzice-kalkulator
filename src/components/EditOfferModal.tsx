@@ -31,7 +31,7 @@ interface Props {
   onClose: () => void;
 }
 
-const TRUCK_CAPACITY_T = 23;
+const TRUCK_CAPACITY_T = 24.5;
 
 function itemsFromOffer(offer: Offer, profiles: Profile[]): CalcItem[] {
   if (offer.items && offer.items.length > 0) {
