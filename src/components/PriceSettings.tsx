@@ -73,12 +73,12 @@ export default function PriceSettings({ prices, onPricesChange }: Props) {
   }
 
   async function clearAllHistory() {
-    const confirm1 = window.confirm(`Usunąć CAŁĄ historię zmian cen (${history.length} wpisów)?\n\nTa operacja jest nieodwracalna.`);
+    const confirm1 = window.confirm(`Usunąć CAŁĄ historię zmian cen?\n\nTa operacja jest nieodwracalna.`);
     if (!confirm1) return;
     const typed = window.prompt('Wpisz "WYCZYŚĆ" aby potwierdzić:');
     if (typed !== 'WYCZYŚĆ') { showToast('Anulowano – nie wyczyszczono historii.'); return; }
-    const ids = history.map(h => h.id);
-    const { error } = await supabase.from('price_history').delete().in('id', ids);
+    // Usuń wszystkie rekordy w tabeli (nie tylko załadowane 20)
+    const { error } = await supabase.from('price_history').delete().gte('id', '00000000-0000-0000-0000-000000000000');
     if (error) { showToast('Błąd czyszczenia historii', 'error'); }
     else { setHistory([]); showToast('Historia została wyczyszczona'); }
   }

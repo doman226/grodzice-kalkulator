@@ -75,6 +75,10 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
   const [transportCostPerTruck, setTransportCostPerTruck] = useState<number | ''>(
     offer.transport_cost_per_truck ?? ''
   );
+  // Zachowaj ręcznie ustawioną liczbę aut z oryginalnej oferty
+  const [customTrucks, setCustomTrucks] = useState<number | ''>(
+    offer.transport_trucks ?? ''
+  );
   const [transportPaidBy, setTransportPaidBy] = useState<'intra' | 'klient'>(
     offer.transport_paid_by ?? 'intra'
   );
@@ -142,10 +146,11 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
   );
 
   const transportCalc = useMemo(() => {
-    const trucks = totals.totalMassT > 0 ? Math.ceil(totals.totalMassT / TRUCK_CAPACITY_T) : 0;
+    const autoTrucks = totals.totalMassT > 0 ? Math.ceil(totals.totalMassT / TRUCK_CAPACITY_T) : 0;
+    const trucks = typeof customTrucks === 'number' && customTrucks > 0 ? customTrucks : autoTrucks;
     const costPerTruck = typeof transportCostPerTruck === 'number' ? transportCostPerTruck : 0;
-    return { trucks, costPerTruck, totalCost: trucks * costPerTruck };
-  }, [totals.totalMassT, transportCostPerTruck]);
+    return { trucks, autoTrucks, costPerTruck, totalCost: trucks * costPerTruck };
+  }, [totals.totalMassT, transportCostPerTruck, customTrucks]);
 
   const validItems = itemResults.filter(r => r.valid);
 
@@ -427,14 +432,24 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
           <div className="border border-gray-200 rounded-lg p-4 space-y-3">
             <h4 className="text-sm font-semibold text-gray-700">Transport
               <span className="text-xs font-normal text-gray-400 ml-2">
-                ({transportCalc.trucks} aut × {TRUCK_CAPACITY_T} t, masa: {formatNumber(totals.totalMassT, 3)} t)
+                (auto {TRUCK_CAPACITY_T} t, masa: {formatNumber(totals.totalMassT, 3)} t, auto: {transportCalc.autoTrucks} szt.)
               </span>
             </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Koszt / auto [PLN]</label>
                 <input type="number" min={0} step={100} value={transportCostPerTruck} placeholder="np. 2500"
                   onChange={e => setTransportCostPerTruck(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value)))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  Liczba aut{typeof customTrucks === 'number' && customTrucks > 0 && <span className="ml-1 text-amber-600">(ręcznie)</span>}
+                </label>
+                <input type="number" min={1} step={1}
+                  value={customTrucks}
+                  placeholder={String(transportCalc.autoTrucks)}
+                  onChange={e => setCustomTrucks(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
