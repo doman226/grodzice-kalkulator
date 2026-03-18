@@ -26,6 +26,8 @@ function App() {
   async function loadData() {
     setLoading(true);
     setError(null);
+    let cancelled = false;
+
     try {
       const [profilesRes, pricesRes, clientsRes, offersRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('active', true).order('name'),
@@ -33,6 +35,8 @@ function App() {
         supabase.from('clients').select('*').eq('active', true).order('name'),
         supabase.from('offers').select('*, client:clients(*), items:offer_items(*)').order('created_at', { ascending: false }),
       ]);
+
+      if (cancelled) return;
 
       if (profilesRes.error) throw profilesRes.error;
       if (pricesRes.error) throw pricesRes.error;
@@ -44,11 +48,16 @@ function App() {
       setClients(clientsRes.data as Client[]);
       setOffers(offersRes.data as Offer[]);
     } catch (err) {
-      setError('Błąd podczas ładowania danych. Sprawdź połączenie z bazą danych.');
-      console.error(err);
+      if (!cancelled) {
+        setError('Błąd podczas ładowania danych. Sprawdź połączenie z bazą danych.');
+        console.error(err);
+      }
     } finally {
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     }
+
+    // Zwróć funkcję czyszczącą (do użycia przez wywołującego jeśli potrzeba)
+    return () => { cancelled = true; };
   }
 
   function handleOfferSaved(offer: Offer) {

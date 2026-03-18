@@ -332,8 +332,9 @@ function Row({ label, value, alt }: { label: string; value: string; alt: boolean
 export default function OfferPDF({ offer }: Props) {
   const dateStr = new Intl.DateTimeFormat('pl-PL', { dateStyle: 'long' }).format(new Date(offer.created_at));
 
+  // Używamy > 0 zamiast truthy – chroni przed edge case transport_cost_per_truck = 0
   const totalWithTransport =
-    offer.transport_cost_per_truck
+    offer.transport_cost_per_truck != null && offer.transport_cost_per_truck > 0
       ? offer.rental_cost_pln + (offer.transport_paid_by === 'intra' ? (offer.transport_cost_total ?? 0) : 0)
       : offer.rental_cost_pln;
 
