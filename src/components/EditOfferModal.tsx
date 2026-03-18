@@ -64,6 +64,9 @@ function itemsFromOffer(offer: Offer, profiles: Profile[]): CalcItem[] {
 export default function EditOfferModal({ offer, profiles, prices, clients, onSaved, onClose }: Props) {
   const [items, setItems] = useState<CalcItem[]>(() => itemsFromOffer(offer, profiles));
   const [rentalWeeks, setRentalWeeks] = useState(offer.rental_weeks);
+  const [displayUnit, setDisplayUnit] = useState<'weeks' | 'months'>(offer.display_unit ?? 'weeks');
+  const weeksToMonths = (w: number) => w / 4;
+  const monthsToWeeks = (m: number) => Math.max(1, m * 4);
   const [clientId, setClientId] = useState(offer.client_id ?? '');
   const [notes, setNotes] = useState(offer.notes ?? '');
   const [deliveryInfo, setDeliveryInfo] = useState(offer.delivery_info ?? '');
@@ -162,6 +165,7 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
       quantity: items.reduce((s, i) => s + i.quantity, 0),
       length_m: validItems.length === 1 ? items.find(i => itemResults[items.indexOf(i)]?.valid)?.lengthM ?? null : null,
       rental_weeks: rentalWeeks,
+      display_unit: displayUnit,
       total_length_m: totals.totalLengthM,
       mass_t: totals.totalMassT,
       wall_area_m2: totals.totalWallAreaM2,
@@ -307,10 +311,35 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
           {/* Okres */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Okres wynajmu [tygodnie]</label>
-              <input type="number" min={1} value={rentalWeeks}
-                onChange={e => setRentalWeeks(Math.max(1, parseInt(e.target.value) || 0))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <div className="flex items-center gap-2 mb-1">
+                <label className="text-sm font-medium text-gray-700">Podstawowy okres dzierżawy</label>
+                <div className="flex rounded-lg border border-gray-300 overflow-hidden text-xs font-medium">
+                  <button type="button"
+                    onClick={() => setDisplayUnit('weeks')}
+                    className={`px-2 py-1 transition-colors ${displayUnit === 'weeks' ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  >Tyg.</button>
+                  <button type="button"
+                    onClick={() => setDisplayUnit('months')}
+                    className={`px-2 py-1 transition-colors ${displayUnit === 'months' ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  >Mies.</button>
+                </div>
+              </div>
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <input type="number" min={1} step={1} value={rentalWeeks}
+                    onChange={e => setRentalWeeks(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <p className="text-xs text-gray-400 mt-0.5">tygodnie</p>
+                </div>
+                <div className="pb-5 text-gray-400 text-sm">=</div>
+                <div className="flex-1">
+                  <input type="number" min={0.25} step={0.5}
+                    value={weeksToMonths(rentalWeeks)}
+                    onChange={e => setRentalWeeks(monthsToWeeks(parseFloat(e.target.value) || 0))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <p className="text-xs text-gray-400 mt-0.5">miesiące</p>
+                </div>
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Ważność oferty [dni]</label>
