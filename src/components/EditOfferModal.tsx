@@ -194,15 +194,12 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
 
     if (err) { setSaving(false); return setError('Błąd zapisu: ' + err.message); }
 
-    // 2. Usuń stare pozycje i wstaw nowe
-    const { error: delErr } = await supabase.from('offer_items').delete().eq('offer_id', offer.id);
-    if (delErr) { setSaving(false); return setError('Błąd usuwania pozycji: ' + delErr.message); }
-
+    // 2. Atomowe zastąpienie pozycji przez Postgres RPC (DELETE + INSERT w jednej transakcji)
+    // Jeśli INSERT się nie powiedzie, DELETE jest automatycznie cofany
     const newItems = items.flatMap((item, idx) => {
       const r = itemResults[idx];
       if (!r.profile || !r.valid) return [];
       return [{
-        offer_id: offer.id,
         profile_name: r.profile.name,
         profile_type: r.profile.type,
         steel_grade: item.steelGrade,
@@ -215,13 +212,16 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
       }];
     });
 
-    const { data: insertedItems, error: itemsErr } = await supabase
-      .from('offer_items').insert(newItems).select();
+    const { data: rpcItems, error: rpcErr } = await supabase
+      .rpc('update_offer_items_atomic', {
+        p_offer_id: offer.id,
+        p_items: newItems,
+      });
     setSaving(false);
-    if (itemsErr) return setError('Oferta zaktualizowana, ale błąd pozycji: ' + itemsErr.message);
+    if (rpcErr) return setError('Błąd aktualizacji pozycji: ' + rpcErr.message);
 
     const updatedOffer = data as Offer;
-    updatedOffer.items = insertedItems ?? [];
+    updatedOffer.items = Array.isArray(rpcItems) ? rpcItems : [];
     onSaved(updatedOffer);
   }
 

@@ -183,8 +183,13 @@ export default function SaveOfferModal({
       }))
     );
 
+    if (itemsErr) {
+      // Rollback: usuń ofertę (po stronie DB – admin RLS) żeby nie zostały puste rekordy
+      await supabase.from('offers').update({ deleted_at: new Date().toISOString() }).eq('id', savedOffer.id);
+      setSaving(false);
+      return setError('Błąd zapisu pozycji – oferta anulowana. Spróbuj ponownie: ' + itemsErr.message);
+    }
     setSaving(false);
-    if (itemsErr) return setError('Oferta zapisana, ale błąd pozycji: ' + itemsErr.message);
 
     // Dołącz items do obiektu (żeby PDF od razu działał)
     savedOffer.items = offerItems.map((item, idx) => ({
