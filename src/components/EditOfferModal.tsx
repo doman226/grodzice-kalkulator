@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Offer, Profile, RentalPrices, Client, OfferItem } from '../types';
-import { calculateRentalCost, formatPLN, formatNumber } from '../lib/calculations';
+import { calculateRentalCostLegacy as calculateRentalCost, formatPLN, formatNumber } from '../lib/calculations';
 
 const SALES_REPS = [
   { name: 'Szymon Sobczak', phone: '579 376 107' },

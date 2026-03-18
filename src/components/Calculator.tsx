@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useMemo } from 'react';
 import type { Profile, RentalPrices, Client, Offer } from '../types';
 import { calculateRentalCost, formatPLN, formatNumber } from '../lib/calculations';
 import SaveOfferModal, { type OfferItemInput } from './SaveOfferModal';
@@ -13,7 +13,6 @@ interface Props {
 
 const STEEL_GRADES = ['min. S270GP', 'S270GP', 'min. S355GP', 'S355GP'];
 
-// Pojedyncza pozycja w kalkulatorze (lokalna, nie trafia do DB bezpośrednio)
 interface CalcItem {
   uid: string;
   profileId: string;
@@ -30,19 +29,11 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
   const [displayUnit, setDisplayUnit] = useState<'weeks' | 'months'>('weeks');
   const weeksToMonths = (w: number) => w / 4;
   const monthsToWeeks = (m: number) => Math.max(1, m * 4);
+
+  // Cena PLN/t wpisywana ręcznie przez handlowca (domyślnie z globalnych ustawień)
+  const [pricePerTon, setPricePerTon] = useState<number>(prices.base_price_pln);
+
   const [showSaveModal, setShowSaveModal] = useState(false);
-
-  // Indywidualne nadpisanie cen (dla konkretnej oferty)
-  const [customBasePricePln, setCustomBasePricePln] = useState<number | ''>('');
-  const [customPricePerWeek1, setCustomPricePerWeek1] = useState<number | ''>('');
-  const [showCustomPrices, setShowCustomPrices] = useState(false);
-
-  // Efektywne ceny = globalne + nadpisane (jeśli wpisano)
-  const effectivePrices = useMemo(() => ({
-    ...prices,
-    base_price_pln: typeof customBasePricePln === 'number' ? customBasePricePln : prices.base_price_pln,
-    price_per_week_1: typeof customPricePerWeek1 === 'number' ? customPricePerWeek1 : prices.price_per_week_1,
-  }), [prices, customBasePricePln, customPricePerWeek1]);
 
   // Transport
   const TRUCK_CAPACITY_T = 24.5;
@@ -95,35 +86,13 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
     return { totalLengthM, totalMassT, totalWallAreaM2 };
   }, [itemResults]);
 
-  const isValid = totals.totalMassT > 0 && rentalWeeks > 0;
+  const isValid = totals.totalMassT > 0;
 
+  // Koszt = masa [t] × cena [PLN/t]
   const rentalCost = useMemo(() =>
-    isValid ? calculateRentalCost(totals.totalMassT, rentalWeeks, effectivePrices) : 0,
-    [totals.totalMassT, rentalWeeks, effectivePrices, isValid]
+    isValid ? calculateRentalCost(totals.totalMassT, pricePerTon) : 0,
+    [totals.totalMassT, pricePerTon, isValid]
   );
-
-  const baseCost = useMemo(() =>
-    totals.totalMassT > 0 ? calculateRentalCost(totals.totalMassT, effectivePrices.base_weeks, effectivePrices) : 0,
-    [totals.totalMassT, effectivePrices]
-  );
-
-  // Dane dla tabeli kolejnych tygodni
-  const weeklyData = useMemo(() => {
-    if (totals.totalMassT <= 0) return [];
-    const rows = [];
-    for (let w = effectivePrices.base_weeks + 1; w <= 26; w++) {
-      const cost = calculateRentalCost(totals.totalMassT, w, effectivePrices);
-      const prevCost = calculateRentalCost(totals.totalMassT, w - 1, effectivePrices);
-      rows.push({
-        week: w,
-        cost,
-        costPerM2: totals.totalWallAreaM2 > 0 ? cost / totals.totalWallAreaM2 : 0,
-        costPerTon: totals.totalMassT > 0 ? cost / totals.totalMassT : 0,
-        weekRate: cost - prevCost,
-      });
-    }
-    return rows;
-  }, [totals, effectivePrices]);
 
   const transportCalc = useMemo(() => {
     if (!isValid) return null;
@@ -133,7 +102,6 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
     return { trucks, autoTrucks, costPerTruck, totalCost: trucks * costPerTruck };
   }, [isValid, totals.totalMassT, transportCostPerTruck, customTrucks]);
 
-  // Całkowity koszt dla klienta – wlicza transport gdy po stronie Intra
   const totalCostInclTransport = useMemo(() => {
     const transportAdd = (transportPaidBy === 'intra' && transportCalc) ? transportCalc.totalCost : 0;
     return rentalCost + transportAdd;
@@ -158,6 +126,12 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
     }),
     [items, itemResults]
   );
+
+  // Ceny przekazywane do oferty – base_price_pln = ręcznie wpisana cena PLN/t
+  const effectivePricesForOffer = useMemo(() => ({
+    ...prices,
+    base_price_pln: pricePerTon,
+  }), [prices, pricePerTon]);
 
   return (
     <div className="space-y-6">
@@ -261,10 +235,11 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
           })}
         </div>
 
-        {/* Okres wynajmu */}
+        {/* Okres dzierżawy (tylko informacyjny) */}
         <div className="mt-4 pt-4 border-t border-gray-100">
           <div className="flex items-center gap-3 mb-3">
-            <span className="text-sm font-medium text-gray-700">Okres wynajmu</span>
+            <span className="text-sm font-medium text-gray-700">Podstawowy okres dzierżawy</span>
+            <span className="text-xs text-gray-400">(informacyjnie – nie wpływa na cenę)</span>
             <div className="flex rounded-lg border border-gray-300 overflow-hidden text-xs font-medium">
               <button type="button"
                 onClick={() => setDisplayUnit('weeks')}
@@ -302,49 +277,24 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
           </p>
         </div>
 
-        {/* Indywidualna wycena */}
+        {/* Cena wynajmu PLN/t */}
         <div className="mt-4 pt-4 border-t border-gray-100">
-          <button
-            type="button"
-            onClick={() => { setShowCustomPrices(v => !v); if (showCustomPrices) { setCustomBasePricePln(''); setCustomPricePerWeek1(''); } }}
-            className="flex items-center gap-2 text-sm font-medium text-blue-700 hover:text-blue-900 transition-colors"
-          >
-            <span className="text-base">{showCustomPrices ? '▼' : '▶'}</span>
-            Indywidualna wycena
-            {(customBasePricePln !== '' || customPricePerWeek1 !== '') && (
-              <span className="ml-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full font-semibold">aktywna</span>
-            )}
-          </button>
-          {showCustomPrices && (
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cena bazowa za {prices.base_weeks} tyg. [PLN/t]
-                </label>
-                <input
-                  type="number" min={0} step={1}
-                  value={customBasePricePln}
-                  placeholder={String(prices.base_price_pln)}
-                  onChange={e => setCustomBasePricePln(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                  className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-amber-50"
-                />
-                <p className="text-xs text-gray-400 mt-1">Domyślnie: {formatPLN(prices.base_price_pln)} PLN/t</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cena za każdy kolejny tydzień [PLN/t]
-                </label>
-                <input
-                  type="number" min={0} step={1}
-                  value={customPricePerWeek1}
-                  placeholder={String(prices.price_per_week_1)}
-                  onChange={e => setCustomPricePerWeek1(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                  className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-amber-50"
-                />
-                <p className="text-xs text-gray-400 mt-1">Domyślnie: {formatPLN(prices.price_per_week_1)} PLN/t</p>
-              </div>
-            </div>
-          )}
+          <div className="max-w-xs">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Cena wynajmu [PLN/t]</label>
+            <input
+              type="number" min={0} step={1}
+              value={pricePerTon}
+              onChange={e => setPricePerTon(parseFloat(e.target.value) || 0)}
+              className="w-full border border-blue-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-blue-50 font-semibold"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Stawka globalna: <button
+                type="button"
+                className="text-blue-600 hover:underline"
+                onClick={() => setPricePerTon(prices.base_price_pln)}
+              >{formatPLN(prices.base_price_pln)} PLN/t</button>
+            </p>
+          </div>
         </div>
       </div>
 
@@ -373,27 +323,15 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
             )}
           </div>
 
-          {/* Koszt bazowy */}
+          {/* Koszt dzierżawy */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">
-              Koszt wynajmu – pierwsze {prices.base_weeks} tygodnie (cena bazowa)
-            </h2>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Koszt dzierżawy</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <ResultCard label={`Koszt za ${effectivePrices.base_weeks} tyg.`} value={formatPLN(baseCost)} unit="PLN" highlight />
-              <ResultCard label="Koszt / kolejny tydzień" value={formatPLN(totals.totalMassT * effectivePrices.price_per_week_1)} unit="PLN/tydz." highlight />
-              <ResultCard label="Koszt / m²" value={formatPLN(totals.totalWallAreaM2 > 0 ? baseCost / totals.totalWallAreaM2 : 0)} unit="PLN/m²" />
-              <ResultCard label="Koszt / tonę" value={formatPLN(totals.totalMassT > 0 ? baseCost / totals.totalMassT : 0)} unit="PLN/t" />
+              <ResultCard label="Koszt łączny" value={formatPLN(totalCostInclTransport)} unit="PLN" highlight />
+              <ResultCard label="Koszt / m²" value={formatPLN(totals.totalWallAreaM2 > 0 ? totalCostInclTransport / totals.totalWallAreaM2 : 0)} unit="PLN/m²" />
+              <ResultCard label="Koszt / tonę" value={formatPLN(totals.totalMassT > 0 ? totalCostInclTransport / totals.totalMassT : 0)} unit="PLN/t" />
+              <ResultCard label="Masa × cena" value={`${formatNumber(totals.totalMassT, 3)} t × ${formatPLN(pricePerTon)}`} unit="PLN/t" />
             </div>
-            {rentalWeeks !== effectivePrices.base_weeks && (
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide font-medium">Wybrany okres: {rentalWeeks} tygodni</p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <ResultCard label={`Koszt za ${rentalWeeks} tyg.`} value={formatPLN(totalCostInclTransport)} unit="PLN" highlight />
-                  <ResultCard label="Koszt / m²" value={formatPLN(totals.totalWallAreaM2 > 0 ? totalCostInclTransport / totals.totalWallAreaM2 : 0)} unit="PLN/m²" />
-                  <ResultCard label="Koszt / tonę" value={formatPLN(totals.totalMassT > 0 ? totalCostInclTransport / totals.totalMassT : 0)} unit="PLN/t" />
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Transport */}
@@ -463,17 +401,17 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
               <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-4">
                 {transportPaidBy === 'intra' ? (
                   <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
-                    <p className="text-blue-200 text-xs mb-0.5">Łączny koszt dla klienta (wynajem + transport)</p>
+                    <p className="text-blue-200 text-xs mb-0.5">Łączny koszt dla klienta (dzierżawa + transport)</p>
                     <p className="text-2xl font-bold">
                       {formatPLN(rentalCost + transportCalc.totalCost)} PLN
                     </p>
                     <p className="text-blue-300 text-xs mt-0.5">
-                      wynajem {formatPLN(rentalCost)} + transport {formatPLN(transportCalc.totalCost)} PLN
+                      dzierżawa {formatPLN(rentalCost)} + transport {formatPLN(transportCalc.totalCost)} PLN
                     </p>
                   </div>
                 ) : (
                   <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
-                    <p className="text-blue-200 text-xs mb-0.5">Koszt wynajmu dla klienta</p>
+                    <p className="text-blue-200 text-xs mb-0.5">Koszt dzierżawy dla klienta</p>
                     <p className="text-2xl font-bold">{formatPLN(rentalCost)} PLN</p>
                     <p className="text-orange-300 text-xs mt-0.5">+ {formatPLN(transportCalc.totalCost)} PLN transport (po stronie klienta)</p>
                   </div>
@@ -489,45 +427,6 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
           >
             💾 Zapisz jako ofertę
           </button>
-
-          {/* Tabela kolejnych tygodni */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-1">Koszt za każdy kolejny tydzień (od tygodnia {prices.base_weeks + 1})</h2>
-            <p className="text-xs text-gray-400 mb-4">Kliknij wiersz aby wybrać okres wynajmu</p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-left">
-                    <th className="px-4 py-2.5 font-medium text-gray-600 rounded-tl-lg">Tydzień</th>
-                    <th className="px-4 py-2.5 font-medium text-gray-600 text-right">Koszt tygodnia [PLN]</th>
-                    <th className="px-4 py-2.5 font-medium text-gray-600 text-right">Koszt łączny [PLN]</th>
-                    <th className="px-4 py-2.5 font-medium text-gray-600 text-right">PLN/m²</th>
-                    <th className="px-4 py-2.5 font-medium text-gray-600 text-right rounded-tr-lg hidden md:table-cell">PLN/t</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {weeklyData.map(({ week, cost, costPerM2, costPerTon, weekRate }) => {
-                    const isSelected = week === rentalWeeks;
-                    return (
-                      <Fragment key={week}>
-                        <tr onClick={() => setRentalWeeks(week)}
-                          className={`border-t border-gray-100 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 font-semibold ring-1 ring-inset ring-blue-300' : 'hover:bg-gray-50'}`}>
-                          <td className="px-4 py-2.5 text-gray-700">
-                            {week} tyg.
-                            {isSelected && <span className="ml-2 text-xs text-blue-600 font-normal">← wybrany</span>}
-                          </td>
-                          <td className="px-4 py-2.5 text-right text-gray-500">+ {formatPLN(weekRate)} PLN</td>
-                          <td className="px-4 py-2.5 text-right font-medium text-gray-800">{formatPLN(cost)} PLN</td>
-                          <td className="px-4 py-2.5 text-right text-gray-600">{formatPLN(costPerM2)}</td>
-                          <td className="px-4 py-2.5 text-right text-gray-500 hidden md:table-cell">{formatPLN(costPerTon)}</td>
-                        </tr>
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </>
       )}
 
@@ -546,7 +445,7 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
           displayUnit={displayUnit}
           totals={{ massT: totals.totalMassT, wallAreaM2: totals.totalWallAreaM2, totalLengthM: totals.totalLengthM, rentalCostPLN: rentalCost, costPerM2: totals.totalWallAreaM2 > 0 ? totalCostInclTransport / totals.totalWallAreaM2 : 0, costPerTon: totals.totalMassT > 0 ? totalCostInclTransport / totals.totalMassT : 0 }}
           transport={{ trucks: transportCalc.trucks, costPerTruck: transportCalc.costPerTruck, totalCost: transportCalc.totalCost, paidBy: transportPaidBy, from: transportFrom, to: transportTo }}
-          prices={effectivePrices}
+          prices={effectivePricesForOffer}
           onClientAdded={onClientAdded}
           onSaved={(offer) => { onOfferSaved(offer); setShowSaveModal(false); }}
           onClose={() => setShowSaveModal(false)}
