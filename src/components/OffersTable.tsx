@@ -71,10 +71,7 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
 
   async function handleDelete(offer: Offer) {
     if (!confirm(`Przenieść ofertę ${offer.offer_number} do kosza?\n\nOferta zostanie ukryta, ale dane pozostaną w bazie.`)) return;
-    const { error } = await supabase
-      .from('offers')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', offer.id);
+    const { error } = await supabase.rpc('soft_delete_offer', { p_offer_id: offer.id });
     if (error) return showToast('Błąd: ' + error.message, 'error');
     onOffersChange(offers.filter(o => o.id !== offer.id));
     if (selected?.id === offer.id) setSelected(null);
