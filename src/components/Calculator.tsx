@@ -11,17 +11,20 @@ interface Props {
   onOfferSaved: (offer: Offer) => void;
 }
 
+const STEEL_GRADES = ['min. S270GP', 'S270GP', 'min. S355GP', 'S355GP'];
+
 // Pojedyncza pozycja w kalkulatorze (lokalna, nie trafia do DB bezpośrednio)
 interface CalcItem {
   uid: string;
   profileId: string;
+  steelGrade: string;
   quantity: number;
   lengthM: number;
 }
 
 export default function Calculator({ profiles, prices, clients, onClientAdded, onOfferSaved }: Props) {
   const [items, setItems] = useState<CalcItem[]>([
-    { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', quantity: 10, lengthM: 12 },
+    { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: STEEL_GRADES[0], quantity: 10, lengthM: 12 },
   ]);
   const [rentalWeeks, setRentalWeeks] = useState<number>(8);
   const [displayUnit, setDisplayUnit] = useState<'weeks' | 'months'>('weeks');
@@ -53,7 +56,7 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
   function addItem() {
     setItems(prev => [
       ...prev,
-      { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', quantity: 10, lengthM: 12 },
+      { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: STEEL_GRADES[0], quantity: 10, lengthM: 12 },
     ]);
   }
 
@@ -145,6 +148,7 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
         profileId: item.profileId,
         profileName: r.profile.name,
         profileType: r.profile.type,
+        steelGrade: item.steelGrade,
         quantity: item.quantity,
         lengthM: item.lengthM,
         totalLengthM: r.totalLengthM,
@@ -177,7 +181,7 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
             return (
               <div key={item.uid} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-3 bg-gray-50 rounded-lg border border-gray-200">
                 {/* Profil */}
-                <div className="sm:col-span-4">
+                <div className="sm:col-span-3">
                   {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Profil grodzicy</label>}
                   <select
                     value={item.profileId}
@@ -191,6 +195,20 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
                   {profile && (
                     <p className="text-xs text-gray-400 mt-0.5">{profile.weight_kg_per_m} kg/m · {profile.width_mm} mm</p>
                   )}
+                </div>
+
+                {/* Gatunek stali */}
+                <div className="sm:col-span-3">
+                  {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Gatunek stali</label>}
+                  <select
+                    value={item.steelGrade}
+                    onChange={e => updateItem(item.uid, { steelGrade: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    {STEEL_GRADES.map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Ilość */}

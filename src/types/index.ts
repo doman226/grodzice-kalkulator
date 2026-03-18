@@ -49,6 +49,7 @@ export interface OfferItem {
   offer_id: string;
   profile_name: string;
   profile_type: string;
+  steel_grade?: string;
   quantity: number;
   length_m: number;
   total_length_m: number;
@@ -108,6 +109,9 @@ export interface Offer {
   notes?: string;
   valid_days: number;
   weekly_cost_pln?: number;
+  steel_grade?: string;
+  delivery_info?: string;
+  base_price_pln?: number;
   price_per_week_1?: number;
   price_per_week_2?: number;
   threshold_weeks?: number;

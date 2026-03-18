@@ -349,6 +349,12 @@ export default function OfferPDF({ offer }: Props) {
   const headerUrl = `${window.location.origin}/header-logo.png`;
   const footerUrl = `${window.location.origin}/footer-logo.png`;
 
+  function formatValidDays(days: number): string {
+    if (days === 1) return '24 godziny';
+    if (days === 2 || days === 3 || days === 4) return `${days} dni`;
+    return `${days} dni`;
+  }
+
   return (
     <Document title={`Oferta ${offer.offer_number}`} author="Intra B.V." language="pl">
       <Page size="A4" style={s.page}>
@@ -422,6 +428,7 @@ export default function OfferPDF({ offer }: Props) {
           <View style={s.table}>
             <View style={s.tableHeaderRow}>
               <Text style={[s.thCell, { flex: 3 }]}>Profil</Text>
+              <Text style={[s.thCell, { flex: 2 }]}>Gatunek stali</Text>
               <Text style={[s.thCell, { flex: 1.5, textAlign: 'center' }]}>Ilość</Text>
               <Text style={[s.thCell, { flex: 1.5, textAlign: 'right' }]}>Dług. [m]</Text>
               <Text style={[s.thCell, { flex: 1.5, textAlign: 'right' }]}>kg/m</Text>
@@ -430,6 +437,7 @@ export default function OfferPDF({ offer }: Props) {
             {[...offer.items].sort((a, b) => a.sort_order - b.sort_order).map((item, idx) => (
               <View key={item.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
                 <Text style={[s.tdLabel, { flex: 3, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{item.profile_name} ({item.profile_type})</Text>
+                <Text style={[s.tdLabel, { flex: 2, color: C.gray700 }]}>{item.steel_grade ?? '—'}</Text>
                 <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'center' }]}>{item.quantity} szt.</Text>
                 <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'right' }]}>{item.length_m} m</Text>
                 <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'right' }]}>{formatNumber(item.total_length_m > 0 ? item.mass_t * 1000 / item.total_length_m : 0, 1)}</Text>
@@ -582,12 +590,44 @@ export default function OfferPDF({ offer }: Props) {
           <Text style={[s.cennikItem, { marginBottom: 0 }]}>- Naprawa / prostowanie zamków = +{offer.repair_price_pln ?? 250},- zł / mb;</Text>
         </View>
 
-        {/* ── WAŻNOŚĆ ── */}
-        <Text style={s.validityText}>
-          Oferta ważna {offer.valid_days} dni od daty wystawienia.
+        {/* ── TERMIN DOSTAWY ── */}
+        <Text style={s.sectionTitle}>Termin dostawy:</Text>
+        <View style={s.conditionsBox}>
+          <Text style={[s.conditionItem, { marginBottom: 0 }]}>
+            - z magazynu, dostawa w dniach: {offer.delivery_info ?? '............'}
+          </Text>
+        </View>
+
+        {/* ── WARUNKI TECHNICZNE ── */}
+        <Text style={s.sectionTitle}>Warunki techniczne:</Text>
+        <View style={s.conditionsBox}>
+          <Text style={s.conditionItem}>- dostawa wg. EN10248-1/2.</Text>
+          <Text style={s.conditionItem}>- gatunek stali zgodny z ofertą.</Text>
+          <Text style={s.conditionItem}>- tolerancja długości +-200mm.</Text>
+          <Text style={[s.conditionItem, { marginBottom: 0 }]}>- fakturowanie wg. wagi teoretycznej.</Text>
+        </View>
+
+        {/* ── WARUNKI PŁATNOŚCI ── */}
+        <Text style={s.sectionTitle}>Warunki płatności:</Text>
+        <View style={s.conditionsBox}>
+          <Text style={[s.conditionItem, { marginBottom: 0 }]}>
+            - 30 dni od daty wystawienia faktury, z zastrzeżeniem uzyskania zabezpieczenia wartości zamówienia (Limit kupiecki, gwarancja bankowa, gwarancja płatności publicznego inwestora lub inne zabezpieczenie zaakceptowane przez Intra BV).
+          </Text>
+        </View>
+
+        {/* ── WAŻNOŚĆ OFERTY ── */}
+        <Text style={s.sectionTitle}>Ważność oferty:</Text>
+        <View style={s.conditionsBox}>
+          <Text style={[s.conditionItem, { marginBottom: 0 }]}>
+            - {formatValidDays(offer.valid_days)} od daty przesłania oferty.
+          </Text>
+        </View>
+
+        <Text style={[s.paragraph, { color: C.gray500 }]}>
+          Oferta nie rezerwuje dostępności z magazynu oraz możliwości produkcyjnych i wymaga finalnego potwierdzenia.
         </Text>
 
-        {/* ── NOTATKI ── */}
+        {/* ── NOTATKI (opcjonalne) ── */}
         {offer.notes && (
           <View style={s.notesBox}>
             <Text style={s.notesLabel}>Uwagi</Text>

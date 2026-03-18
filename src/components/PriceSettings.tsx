@@ -186,7 +186,8 @@ export default function PriceSettings({ prices, onPricesChange }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {field('base_price_pln', 'Cena bazowa [PLN/t]', `Wynajem za pierwsze ${form.base_weeks} tygodni`, 'number', '0.01')}
           {field('base_weeks', 'Tygodnie w cenie bazowej', 'Liczba tygodni objęta ceną bazową')}
-          {field('price_per_week_1', 'Cena / tydzień po cenie bazowej [PLN/t]', 'Stała stawka za każdy kolejny tydzień po zakończeniu okresu bazowego', 'number', '0.01')}
+          {field('price_per_week_1', `Cena / tydzień (tygodnie ${parseInt(form.base_weeks) + 1 || '?'}–${form.threshold_weeks || '?'}) [PLN/t]`, 'Stawka za każdy tydzień po zakończeniu okresu bazowego, do progu obniżki', 'number', '0.01')}
+          {field('price_per_week_2', `Cena / tydzień od tygodnia ${parseInt(form.threshold_weeks) + 1 || '?'} [PLN/t]`, 'Obniżona stawka po przekroczeniu progu (długi wynajem)', 'number', '0.01')}
           {field('note', 'Notatka (opcjonalna)', 'Opis zmiany cennika, np. "aktualizacja Q1 2025"', 'text')}
         </div>
 
@@ -195,7 +196,8 @@ export default function PriceSettings({ prices, onPricesChange }: Props) {
           <h4 className="text-sm font-semibold text-blue-800 mb-2">Podgląd struktury cennika</h4>
           <div className="text-sm text-blue-700 space-y-1">
             <p>• Tygodnie 1–{form.base_weeks || '?'}: <strong>{formatPLN(parseFloat(form.base_price_pln) || 0)} PLN/t</strong> (cena bazowa)</p>
-            <p>• Od tygodnia {parseInt(form.base_weeks) + 1 || '?'}: <strong>+{formatPLN(parseFloat(form.price_per_week_1) || 0)} PLN/t</strong> za każdy kolejny tydzień</p>
+            <p>• Tygodnie {parseInt(form.base_weeks) + 1 || '?'}–{form.threshold_weeks || '?'}: <strong>+{formatPLN(parseFloat(form.price_per_week_1) || 0)} PLN/t</strong> za tydzień</p>
+            <p>• Od tygodnia {parseInt(form.threshold_weeks) + 1 || '?'}: <strong>+{formatPLN(parseFloat(form.price_per_week_2) || 0)} PLN/t</strong> za tydzień (stawka obniżona)</p>
           </div>
         </div>
 

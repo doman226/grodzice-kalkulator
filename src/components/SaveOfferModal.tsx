@@ -16,6 +16,7 @@ export interface OfferItemInput {
   profileId: string;
   profileName: string;
   profileType: string;
+  steelGrade: string;
   quantity: number;
   lengthM: number;
   totalLengthM: number;
@@ -58,7 +59,8 @@ export default function SaveOfferModal({
   const [clientId, setClientId] = useState('');
   const [preparedBy, setPreparedBy] = useState(SALES_REPS[0].name);
   const [notes, setNotes] = useState('');
-  const [validDays, setValidDays] = useState(30);
+  const [validDays, setValidDays] = useState(1);
+  const [deliveryInfo, setDeliveryInfo] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -141,6 +143,9 @@ export default function SaveOfferModal({
       transport_paid_by: transport.paidBy,
       transport_from: transport.from || null,
       transport_to: transport.to || null,
+      steel_grade: offerItems.length === 1 ? offerItems[0].steelGrade : null,
+      delivery_info: deliveryInfo.trim() || null,
+      base_price_pln: prices.base_price_pln,
       weekly_cost_pln: totals.massT * prices.price_per_week_1,
       price_per_week_1: prices.price_per_week_1,
       price_per_week_2: prices.price_per_week_2,
@@ -168,6 +173,7 @@ export default function SaveOfferModal({
         offer_id: savedOffer.id,
         profile_name: item.profileName,
         profile_type: item.profileType,
+        steel_grade: item.steelGrade,
         quantity: item.quantity,
         length_m: item.lengthM,
         total_length_m: item.totalLengthM,
@@ -303,6 +309,19 @@ export default function SaveOfferModal({
                 <option key={r.name} value={r.name}>{r.name} – tel. {r.phone}</option>
               ))}
             </select>
+          </div>
+
+          {/* Termin dostawy */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Termin dostawy</label>
+            <input
+              type="text"
+              value={deliveryInfo}
+              onChange={e => setDeliveryInfo(e.target.value)}
+              placeholder="np. 5-7 dni roboczych"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-gray-400 mt-1">Pojawi się na PDF w sekcji „Termin dostawy"</p>
           </div>
 
           {/* Ważność */}

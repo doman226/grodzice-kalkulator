@@ -10,9 +10,12 @@ const SALES_REPS = [
   { name: 'Piotr Domański', phone: '729 393 743' },
 ];
 
+const STEEL_GRADES = ['min. S270GP', 'S270GP', 'min. S355GP', 'S355GP'];
+
 interface CalcItem {
   uid: string;
   profileId: string;
+  steelGrade: string;
   quantity: number;
   lengthM: number;
   // oryginalne ID z bazy (dla istniejących pozycji)
@@ -40,6 +43,7 @@ function itemsFromOffer(offer: Offer, profiles: Profile[]): CalcItem[] {
         return {
           uid: crypto.randomUUID(),
           profileId: profile?.id ?? profiles[0]?.id ?? '',
+          steelGrade: item.steel_grade ?? STEEL_GRADES[0],
           quantity: item.quantity,
           lengthM: item.length_m,
           originalProfileName: item.profile_name,
@@ -51,6 +55,7 @@ function itemsFromOffer(offer: Offer, profiles: Profile[]): CalcItem[] {
   return [{
     uid: crypto.randomUUID(),
     profileId: profile?.id ?? profiles[0]?.id ?? '',
+    steelGrade: offer.steel_grade ?? STEEL_GRADES[0],
     quantity: offer.quantity,
     lengthM: offer.length_m ?? 12,
   }];
@@ -61,6 +66,7 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
   const [rentalWeeks, setRentalWeeks] = useState(offer.rental_weeks);
   const [clientId, setClientId] = useState(offer.client_id ?? '');
   const [notes, setNotes] = useState(offer.notes ?? '');
+  const [deliveryInfo, setDeliveryInfo] = useState(offer.delivery_info ?? '');
   const [validDays, setValidDays] = useState(offer.valid_days);
   const [transportCostPerTruck, setTransportCostPerTruck] = useState<number | ''>(
     offer.transport_cost_per_truck ?? ''
@@ -71,12 +77,26 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
   const [transportFrom, setTransportFrom] = useState(offer.transport_from ?? 'Magazyn Intra B.V.');
   const [transportTo, setTransportTo] = useState(offer.transport_to ?? '');
   const [preparedBy, setPreparedBy] = useState(offer.prepared_by ?? SALES_REPS[0].name);
+  // Indywidualne ceny (inicjalizowane z snapshotu oferty lub globalnego cennika)
+  const [customBasePricePln, setCustomBasePricePln] = useState<number>(
+    offer.base_price_pln ?? prices.base_price_pln
+  );
+  const [customPricePerWeek1, setCustomPricePerWeek1] = useState<number>(
+    offer.price_per_week_1 ?? prices.price_per_week_1
+  );
+
+  const effectivePrices = useMemo(() => ({
+    ...prices,
+    base_price_pln: customBasePricePln,
+    price_per_week_1: customPricePerWeek1,
+  }), [prices, customBasePricePln, customPricePerWeek1]);
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   // --- Zarządzanie pozycjami ---
   function addItem() {
-    setItems(prev => [...prev, { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', quantity: 10, lengthM: 12 }]);
+    setItems(prev => [...prev, { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: STEEL_GRADES[0], quantity: 10, lengthM: 12 }]);
   }
   function removeItem(uid: string) {
     setItems(prev => prev.filter(i => i.uid !== uid));
@@ -112,8 +132,8 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
   }, [itemResults]);
 
   const rentalCost = useMemo(() =>
-    totals.totalMassT > 0 ? calculateRentalCost(totals.totalMassT, rentalWeeks, prices) : 0,
-    [totals.totalMassT, rentalWeeks, prices]
+    totals.totalMassT > 0 ? calculateRentalCost(totals.totalMassT, rentalWeeks, effectivePrices) : 0,
+    [totals.totalMassT, rentalWeeks, effectivePrices]
   );
 
   const transportCalc = useMemo(() => {
@@ -153,16 +173,19 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
       transport_paid_by: transportPaidBy,
       transport_from: transportFrom || null,
       transport_to: transportTo || null,
-      weekly_cost_pln: totals.totalMassT * prices.price_per_week_1,
-      price_per_week_1: prices.price_per_week_1,
-      price_per_week_2: prices.price_per_week_2,
-      threshold_weeks: prices.threshold_weeks,
-      loss_price_pln: prices.loss_price_pln,
-      sorting_price_pln: prices.sorting_price_pln,
-      grinding_price_pln: prices.grinding_price_pln,
-      welding_price_pln: prices.welding_price_pln,
-      cutting_price_pln: prices.cutting_price_pln,
-      repair_price_pln: prices.repair_price_pln,
+      steel_grade: validItems.length === 1 ? items.find((_, i) => itemResults[i]?.valid)?.steelGrade ?? null : null,
+      delivery_info: deliveryInfo.trim() || null,
+      base_price_pln: effectivePrices.base_price_pln,
+      weekly_cost_pln: totals.totalMassT * effectivePrices.price_per_week_1,
+      price_per_week_1: effectivePrices.price_per_week_1,
+      price_per_week_2: effectivePrices.price_per_week_2,
+      threshold_weeks: effectivePrices.threshold_weeks,
+      loss_price_pln: effectivePrices.loss_price_pln,
+      sorting_price_pln: effectivePrices.sorting_price_pln,
+      grinding_price_pln: effectivePrices.grinding_price_pln,
+      welding_price_pln: effectivePrices.welding_price_pln,
+      cutting_price_pln: effectivePrices.cutting_price_pln,
+      repair_price_pln: effectivePrices.repair_price_pln,
       notes: notes.trim() || null,
       valid_days: validDays,
       prepared_by: preparedBy,
@@ -182,6 +205,7 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
         offer_id: offer.id,
         profile_name: r.profile.name,
         profile_type: r.profile.type,
+        steel_grade: item.steelGrade,
         quantity: item.quantity,
         length_m: item.lengthM,
         total_length_m: r.totalLengthM,
@@ -227,11 +251,18 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
                 const r = itemResults[idx];
                 return (
                   <div key={item.uid} className="grid grid-cols-12 gap-2 items-center p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="col-span-5">
+                    <div className="col-span-3">
                       {idx === 0 && <p className="text-xs text-gray-400 mb-1">Profil</p>}
                       <select value={item.profileId} onChange={e => updateItem(item.uid, { profileId: e.target.value })}
                         className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                         {profiles.map(p => <option key={p.id} value={p.id}>{p.name} ({p.type})</option>)}
+                      </select>
+                    </div>
+                    <div className="col-span-3">
+                      {idx === 0 && <p className="text-xs text-gray-400 mb-1">Gatunek stali</p>}
+                      <select value={item.steelGrade} onChange={e => updateItem(item.uid, { steelGrade: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        {STEEL_GRADES.map(g => <option key={g} value={g}>{g}</option>)}
                       </select>
                     </div>
                     <div className="col-span-2">
@@ -286,6 +317,48 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
                 onChange={e => setValidDays(Math.max(1, parseInt(e.target.value) || 30))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
+          </div>
+
+          {/* Ceny */}
+          <div className="border border-amber-200 rounded-lg p-4 bg-amber-50 space-y-3">
+            <h4 className="text-sm font-semibold text-gray-700">
+              Ceny wynajmu dla tej oferty
+              {(customBasePricePln !== prices.base_price_pln || customPricePerWeek1 !== prices.price_per_week_1) && (
+                <span className="ml-2 px-2 py-0.5 bg-amber-200 text-amber-800 text-xs rounded-full font-semibold">zmodyfikowane</span>
+              )}
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Cena bazowa za {prices.base_weeks} tyg. [PLN/t]
+                </label>
+                <input
+                  type="number" min={0} step={1}
+                  value={customBasePricePln}
+                  onChange={e => setCustomBasePricePln(Math.max(0, parseFloat(e.target.value) || 0))}
+                  className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+                />
+                <p className="text-xs text-gray-400 mt-1">Globalnie: {formatPLN(prices.base_price_pln)} PLN/t</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Każdy kolejny tydzień [PLN/t]
+                </label>
+                <input
+                  type="number" min={0} step={1}
+                  value={customPricePerWeek1}
+                  onChange={e => setCustomPricePerWeek1(Math.max(0, parseFloat(e.target.value) || 0))}
+                  className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+                />
+                <p className="text-xs text-gray-400 mt-1">Globalnie: {formatPLN(prices.price_per_week_1)} PLN/t</p>
+              </div>
+            </div>
+            {totals.totalMassT > 0 && (
+              <div className="pt-2 border-t border-amber-200 text-sm text-gray-700">
+                Koszt przy tych cenach:
+                <strong className="text-blue-900 ml-1">{formatPLN(rentalCost)} PLN</strong>
+              </div>
+            )}
           </div>
 
           {/* Klient */}
@@ -349,6 +422,18 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
                 <option key={r.name} value={r.name}>{r.name} – tel. {r.phone}</option>
               ))}
             </select>
+          </div>
+
+          {/* Termin dostawy */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Termin dostawy</label>
+            <input
+              type="text"
+              value={deliveryInfo}
+              onChange={e => setDeliveryInfo(e.target.value)}
+              placeholder="np. 5-7 dni roboczych"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
 
           {/* Notatki */}
