@@ -16,3 +16,6 @@ dist
 # Editor
 .vscode
 .idea
+
+# Local Netlify folder
+.netlify

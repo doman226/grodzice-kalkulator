@@ -36,6 +36,7 @@ interface Props {
   clients: Client[];
   offerItems: OfferItemInput[];
   rentalWeeks: number;
+  displayUnit: 'weeks' | 'months';
   totals: Totals;
   transport: TransportData;
   prices: RentalPrices;
@@ -52,7 +53,7 @@ const SALES_REPS = [
 ];
 
 export default function SaveOfferModal({
-  clients, offerItems, rentalWeeks, totals, transport, prices, onSaved, onClose, onClientAdded,
+  clients, offerItems, rentalWeeks, displayUnit, totals, transport, prices, onSaved, onClose, onClientAdded,
 }: Props) {
   const [clientId, setClientId] = useState('');
   const [preparedBy, setPreparedBy] = useState(SALES_REPS[0].name);
@@ -65,6 +66,24 @@ export default function SaveOfferModal({
   const [addingClient, setAddingClient] = useState(false);
   const [newClient, setNewClient] = useState({ name: '', country: 'PL', nip: '', vat_number: '' });
   const [savingClient, setSavingClient] = useState(false);
+  const [nipLookupLoading, setNipLookupLoading] = useState(false);
+
+  async function lookupNip() {
+    const nip = newClient.nip.replace(/[-\s]/g, '');
+    if (!/^\d{10}$/.test(nip)) { setError('Wpisz poprawny NIP (10 cyfr).'); return; }
+    setNipLookupLoading(true);
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const res = await fetch(`${supabaseUrl}/functions/v1/nip-lookup?nip=${nip}`, {
+        headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` },
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) { setError(data.error ?? 'Nie znaleziono firmy.'); }
+      else { setNewClient(prev => ({ ...prev, name: data.name ?? prev.name })); setError(''); }
+    } catch { setError('Błąd połączenia z GUS.'); }
+    setNipLookupLoading(false);
+  }
 
   const totalWithTransport = transport.costPerTruck > 0
     ? totals.rentalCostPLN + (transport.paidBy === 'intra' ? transport.totalCost : 0)
@@ -135,6 +154,7 @@ export default function SaveOfferModal({
       notes: notes.trim() || null,
       valid_days: validDays,
       prepared_by: preparedBy,
+      display_unit: displayUnit,
       status: 'szkic',
     }).select('*, client:clients(*)').single();
 
@@ -254,10 +274,16 @@ export default function SaveOfferModal({
                   <option value="OTHER">Inne</option>
                 </select>
                 <input placeholder="Nazwa firmy *" value={newClient.name} onChange={e => setNewClient({ ...newClient, name: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-                {newClient.country === 'PL'
-                  ? <input placeholder="NIP *" value={newClient.nip} onChange={e => setNewClient({ ...newClient, nip: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-                  : <input placeholder="Numer VAT *" value={newClient.vat_number} onChange={e => setNewClient({ ...newClient, vat_number: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-                }
+                {newClient.country === 'PL' ? (
+                  <div className="flex gap-2">
+                    <input placeholder="NIP *" value={newClient.nip} onChange={e => setNewClient({ ...newClient, nip: e.target.value })} className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                    <button type="button" onClick={lookupNip} disabled={nipLookupLoading} className="px-3 py-2 bg-blue-700 hover:bg-blue-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50">
+                      {nipLookupLoading ? '...' : '🔍 GUS'}
+                    </button>
+                  </div>
+                ) : (
+                  <input placeholder="Numer VAT *" value={newClient.vat_number} onChange={e => setNewClient({ ...newClient, vat_number: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                )}
                 <div className="flex gap-2">
                   <button onClick={handleAddClient} disabled={savingClient} className="flex-1 py-1.5 text-sm bg-blue-900 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50">
                     {savingClient ? 'Dodawanie...' : 'Dodaj i wybierz'}

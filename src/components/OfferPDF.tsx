@@ -337,6 +337,15 @@ export default function OfferPDF({ offer }: Props) {
       ? offer.rental_cost_pln + (offer.transport_paid_by === 'intra' ? (offer.transport_cost_total ?? 0) : 0)
       : offer.rental_cost_pln;
 
+  function formatMonths(n: number): string {
+    if (n === 1) return '1 miesiąc';
+    if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) return `${n} miesiące`;
+    return `${n} miesięcy`;
+  }
+  const rentalPeriodLabel = offer.display_unit === 'months'
+    ? formatMonths(offer.rental_weeks / 4)
+    : `${offer.rental_weeks} tygodni`;
+
   const headerUrl = `${window.location.origin}/header-logo.png`;
   const footerUrl = `${window.location.origin}/footer-logo.png`;
 
@@ -438,7 +447,7 @@ export default function OfferPDF({ offer }: Props) {
             {/* Okres */}
             <View style={[s.tableBodyRow, { borderBottom: 0 }]}>
               <Text style={[s.tdLabel, { flex: 3, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>Okres dzierżawy</Text>
-              <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{offer.rental_weeks} tyg.</Text>
+              <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{rentalPeriodLabel}</Text>
               <Text style={[s.tdLabel, { flex: 1.5 }]}></Text>
               <Text style={[s.tdLabel, { flex: 1.5 }]}></Text>
               <Text style={[s.tdLabel, { flex: 1.5 }]}></Text>
@@ -457,7 +466,7 @@ export default function OfferPDF({ offer }: Props) {
             <Row label="Łączna długość" value={`${formatNumber(offer.total_length_m, 1)} m`} alt={true} />
             <Row label="Masa całkowita" value={`${formatNumber(offer.mass_t, 3)} t`} alt={false} />
             <Row label="Powierzchnia ścianki" value={`${formatNumber(offer.wall_area_m2, 2)} m²`} alt={true} />
-            <Row label="Okres dzierżawy" value={`${offer.rental_weeks} tygodni`} alt={false} />
+            <Row label="Okres dzierżawy" value={rentalPeriodLabel} alt={false} />
           </View>
         )}
 
@@ -465,12 +474,12 @@ export default function OfferPDF({ offer }: Props) {
         <View style={s.priceBox}>
           <Text style={s.priceLabel}>Koszt dzierżawy</Text>
           <Text style={s.priceValue}>
-            {formatPLN(offer.rental_cost_pln)}
+            {formatPLN(totalWithTransport)}
             <Text style={s.priceSuffix}> PLN netto</Text>
           </Text>
           <View style={s.priceRow}>
-            <Text>{formatPLN(offer.cost_per_m2)} PLN/m²</Text>
-            <Text>{formatPLN(offer.cost_per_ton)} PLN/t</Text>
+            <Text>{formatPLN(offer.wall_area_m2 > 0 ? totalWithTransport / offer.wall_area_m2 : offer.cost_per_m2)} PLN/m²</Text>
+            <Text>{formatPLN(offer.mass_t > 0 ? totalWithTransport / offer.mass_t : offer.cost_per_ton)} PLN/t</Text>
           </View>
         </View>
 
@@ -483,7 +492,7 @@ export default function OfferPDF({ offer }: Props) {
               <Text style={s.priceSuffix}> PLN/tona netto</Text>
             </Text>
             <View style={s.priceRow}>
-              <Text>po upływie {offer.base_weeks ?? 8} tygodni dzierżawy</Text>
+              <Text>po upływie podstawowego okresu dzierżawy</Text>
             </View>
           </View>
         )}
@@ -493,47 +502,57 @@ export default function OfferPDF({ offer }: Props) {
           <>
             <Text style={s.sectionTitle}>Transport:</Text>
             <View style={s.transportBox}>
-              <View style={s.transportRow}>
-                <Text style={s.transportLabel}>Liczba aut:</Text>
-                <Text style={s.transportValue}>{offer.transport_trucks}</Text>
-              </View>
-              <View style={s.transportRow}>
-                <Text style={s.transportLabel}>Koszt / auto:</Text>
-                <Text style={s.transportValue}>{formatPLN(offer.transport_cost_per_truck)} PLN</Text>
-              </View>
-              <View style={s.transportRow}>
-                <Text style={s.transportLabel}>Łączny koszt transportu:</Text>
-                <Text style={[s.transportValue, { color: offer.transport_paid_by === 'klient' ? '#D97706' : C.gray800 }]}>
-                  {formatPLN(offer.transport_cost_total ?? 0)} PLN
-                </Text>
-              </View>
-              <View style={s.transportRow}>
-                <Text style={s.transportLabel}>Koszt transportu pokrywa:</Text>
-                <Text style={[s.transportValue, { color: offer.transport_paid_by === 'klient' ? '#D97706' : C.gray800 }]}>
-                  {offer.transport_paid_by === 'klient' ? 'Klient' : 'Intra B.V.'}
-                </Text>
-              </View>
-              {offer.transport_from && (
-                <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}`, alignItems: 'flex-end' }]}>
-                  <Text style={s.transportLabel}>Trasa:</Text>
-                  <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
-                  <Text style={s.transportValue}>{offer.transport_from}{offer.transport_to ? ` — ${offer.transport_to}` : ''}</Text>
-                </View>
+              {offer.transport_paid_by === 'intra' ? (
+                // Transport Intra – nie pokazujemy cen klientowi
+                <>
+                  <View style={s.transportRow}>
+                    <Text style={s.transportLabel}>Transport:</Text>
+                    <Text style={[s.transportValue, { color: C.navy }]}>W cenie / Intra B.V.</Text>
+                  </View>
+                  {offer.transport_from && (
+                    <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}`, alignItems: 'flex-end' }]}>
+                      <Text style={s.transportLabel}>Trasa:</Text>
+                      <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
+                      <Text style={s.transportValue}>{offer.transport_from}{offer.transport_to ? ` — ${offer.transport_to}` : ''}</Text>
+                    </View>
+                  )}
+                </>
+              ) : (
+                // Transport klient – pokazujemy pełne szczegóły
+                <>
+                  <View style={s.transportRow}>
+                    <Text style={s.transportLabel}>Liczba aut:</Text>
+                    <Text style={s.transportValue}>{offer.transport_trucks}</Text>
+                  </View>
+                  <View style={s.transportRow}>
+                    <Text style={s.transportLabel}>Koszt / auto:</Text>
+                    <Text style={s.transportValue}>{formatPLN(offer.transport_cost_per_truck)} PLN</Text>
+                  </View>
+                  <View style={s.transportRow}>
+                    <Text style={s.transportLabel}>Łączny koszt transportu:</Text>
+                    <Text style={[s.transportValue, { color: '#D97706' }]}>
+                      {formatPLN(offer.transport_cost_total ?? 0)} PLN
+                    </Text>
+                  </View>
+                  <View style={s.transportRow}>
+                    <Text style={s.transportLabel}>Koszt transportu pokrywa:</Text>
+                    <Text style={[s.transportValue, { color: '#D97706' }]}>Klient</Text>
+                  </View>
+                  {offer.transport_from && (
+                    <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}`, alignItems: 'flex-end' }]}>
+                      <Text style={s.transportLabel}>Trasa:</Text>
+                      <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
+                      <Text style={s.transportValue}>{offer.transport_from}{offer.transport_to ? ` — ${offer.transport_to}` : ''}</Text>
+                    </View>
+                  )}
+                </>
               )}
             </View>
           </>
         )}
 
-        {/* ── ŁĄCZNA KWOTA (jeśli jest transport po stronie Intra) ── */}
-        {offer.transport_cost_per_truck != null && offer.transport_paid_by === 'intra' && (
-          <View style={s.totalRow}>
-            <Text style={s.totalLabel}>Łączna kwota oferty:</Text>
-            <Text style={s.totalValue}>{formatPLN(totalWithTransport)} PLN netto</Text>
-          </View>
-        )}
-
         {/* ── WARUNKI DZIERŻAWY ── */}
-        <Text style={[s.sectionTitle, offer.transport_cost_per_truck != null ? { break: 'before' } : {}]}>Warunki dzierżawy:</Text>
+        <Text style={s.sectionTitle} break={offer.transport_cost_per_truck != null}>Warunki dzierżawy:</Text>
         <View style={s.conditionsBox}>
           <Text style={s.conditionItem}>1) Oferowana cena jest ceną z transportami po stronie Intra: magazyn→budowa. Zwrot do magazynu Intra BV (Cieśle 42 k. Wrocławia) jest obowiązkiem i kosztem Klienta.</Text>
           <Text style={s.conditionItem}>2) Podstawowy okres dzierżawy to 2 miesiące (8 tygodni).</Text>

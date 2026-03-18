@@ -19,6 +19,7 @@ export default function ClientsTable({ clients, onClientsChange }: Props) {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [nipLookupLoading, setNipLookupLoading] = useState(false);
 
   function showToast(msg: string, type: 'success' | 'error' = 'success') {
     setToast({ msg, type });
@@ -84,6 +85,34 @@ export default function ClientsTable({ clients, onClientsChange }: Props) {
       showToast(editClient ? 'Klient zaktualizowany.' : 'Klient dodany.');
       setShowModal(false);
     }
+  }
+
+  async function lookupNip() {
+    const nip = form.nip.replace(/[-\s]/g, '');
+    if (!/^\d{10}$/.test(nip)) return showToast('Wpisz poprawny NIP (10 cyfr).', 'error');
+    setNipLookupLoading(true);
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const res = await fetch(`${supabaseUrl}/functions/v1/nip-lookup?nip=${nip}`, {
+        headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` },
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) { showToast(data.error ?? 'Nie znaleziono firmy.', 'error'); }
+      else {
+        setForm(prev => ({
+          ...prev,
+          name: data.name ?? prev.name,
+          address: data.address ?? prev.address,
+          postal_code: data.postal_code ?? prev.postal_code,
+          city: data.city ?? prev.city,
+        }));
+        showToast('Dane pobrane z GUS.');
+      }
+    } catch {
+      showToast('Błąd połączenia z GUS.', 'error');
+    }
+    setNipLookupLoading(false);
   }
 
   async function handleDelete(c: Client) {
@@ -230,10 +259,29 @@ export default function ClientsTable({ clients, onClientsChange }: Props) {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {f('name', 'Nazwa firmy', true)}
-                {form.country === 'PL'
-                  ? f('nip', 'NIP', true)
-                  : f('vat_number', 'Numer VAT', true)
-                }
+                {form.country === 'PL' ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">NIP <span className="text-red-500">*</span></label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={form.nip}
+                        onChange={e => setForm({ ...form, nip: e.target.value })}
+                        placeholder="np. 5223222993"
+                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={lookupNip}
+                        disabled={nipLookupLoading}
+                        title="Pobierz dane z GUS"
+                        className="px-3 py-2 bg-blue-700 hover:bg-blue-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50 whitespace-nowrap"
+                      >
+                        {nipLookupLoading ? '...' : '🔍 GUS'}
+                      </button>
+                    </div>
+                  </div>
+                ) : f('vat_number', 'Numer VAT', true)}
                 {f('address', 'Adres (ulica, nr)')}
                 {f('postal_code', 'Kod pocztowy')}
                 {f('city', 'Miasto')}

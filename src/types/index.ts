@@ -97,6 +97,7 @@ export interface Offer {
   quantity: number;
   length_m: number;
   rental_weeks: number;
+  display_unit?: 'weeks' | 'months';
   total_length_m: number;
   mass_t: number;
   wall_area_m2: number;

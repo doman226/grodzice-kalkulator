@@ -24,6 +24,9 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
     { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', quantity: 10, lengthM: 12 },
   ]);
   const [rentalWeeks, setRentalWeeks] = useState<number>(8);
+  const [displayUnit, setDisplayUnit] = useState<'weeks' | 'months'>('weeks');
+  const weeksToMonths = (w: number) => w / 4;
+  const monthsToWeeks = (m: number) => Math.max(1, m * 4);
   const [showSaveModal, setShowSaveModal] = useState(false);
 
   // Indywidualne nadpisanie cen (dla konkretnej oferty)
@@ -39,8 +42,9 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
   }), [prices, customBasePricePln, customPricePerWeek1]);
 
   // Transport
-  const TRUCK_CAPACITY_T = 23;
+  const TRUCK_CAPACITY_T = 24.5;
   const [transportCostPerTruck, setTransportCostPerTruck] = useState<number | ''>('');
+  const [customTrucks, setCustomTrucks] = useState<number | ''>('');
   const [transportPaidBy, setTransportPaidBy] = useState<'intra' | 'klient'>('intra');
   const [transportFrom, setTransportFrom] = useState('Magazyn Intra B.V.');
   const [transportTo, setTransportTo] = useState('');
@@ -120,10 +124,17 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
 
   const transportCalc = useMemo(() => {
     if (!isValid) return null;
-    const trucks = Math.ceil(totals.totalMassT / TRUCK_CAPACITY_T);
+    const autoTrucks = Math.ceil(totals.totalMassT / TRUCK_CAPACITY_T);
+    const trucks = typeof customTrucks === 'number' && customTrucks > 0 ? customTrucks : autoTrucks;
     const costPerTruck = typeof transportCostPerTruck === 'number' ? transportCostPerTruck : 0;
-    return { trucks, costPerTruck, totalCost: trucks * costPerTruck };
-  }, [isValid, totals.totalMassT, transportCostPerTruck]);
+    return { trucks, autoTrucks, costPerTruck, totalCost: trucks * costPerTruck };
+  }, [isValid, totals.totalMassT, transportCostPerTruck, customTrucks]);
+
+  // Całkowity koszt dla klienta – wlicza transport gdy po stronie Intra
+  const totalCostInclTransport = useMemo(() => {
+    const transportAdd = (transportPaidBy === 'intra' && transportCalc) ? transportCalc.totalCost : 0;
+    return rentalCost + transportAdd;
+  }, [rentalCost, transportCalc, transportPaidBy]);
 
   // Dane do SaveOfferModal
   const offerItems = useMemo((): OfferItemInput[] =>
@@ -232,18 +243,45 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
           })}
         </div>
 
-        {/* Okres wynajmu – globalny */}
+        {/* Okres wynajmu */}
         <div className="mt-4 pt-4 border-t border-gray-100">
-          <div className="max-w-xs">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Okres wynajmu [tygodnie]</label>
-            <input
-              type="number" min={1} step={1}
-              value={rentalWeeks}
-              onChange={e => setRentalWeeks(Math.max(1, parseInt(e.target.value) || 0))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-gray-400 mt-1">≈ {(rentalWeeks / 4.33).toFixed(1)} miesięcy</p>
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-sm font-medium text-gray-700">Okres wynajmu</span>
+            <div className="flex rounded-lg border border-gray-300 overflow-hidden text-xs font-medium">
+              <button type="button"
+                onClick={() => setDisplayUnit('weeks')}
+                className={`px-3 py-1.5 transition-colors ${displayUnit === 'weeks' ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              >Tygodnie</button>
+              <button type="button"
+                onClick={() => setDisplayUnit('months')}
+                className={`px-3 py-1.5 transition-colors ${displayUnit === 'months' ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              >Miesiące</button>
+            </div>
           </div>
+          <div className="flex items-end gap-4 max-w-sm">
+            <div className="flex-1">
+              <label className="block text-xs text-gray-500 mb-1">Tygodnie</label>
+              <input
+                type="number" min={1} step={1}
+                value={rentalWeeks}
+                onChange={e => setRentalWeeks(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="pb-2 text-gray-400 text-sm">=</div>
+            <div className="flex-1">
+              <label className="block text-xs text-gray-500 mb-1">Miesiące</label>
+              <input
+                type="number" min={0.1} step={0.5}
+                value={weeksToMonths(rentalWeeks)}
+                onChange={e => setRentalWeeks(monthsToWeeks(parseFloat(e.target.value) || 0))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            Na ofercie wyświetli się: <strong>{displayUnit === 'weeks' ? `${rentalWeeks} tygodni` : (() => { const m = weeksToMonths(rentalWeeks); if (m === 1) return '1 miesiąc'; if (m % 10 >= 2 && m % 10 <= 4 && (m % 100 < 10 || m % 100 >= 20)) return `${m} miesiące`; return `${m} miesięcy`; })()}</strong>
+          </p>
         </div>
 
         {/* Indywidualna wycena */}
@@ -295,21 +333,10 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
       {/* ── WYNIKI ── */}
       {isValid && (
         <>
-          {/* Przycisk zapisu */}
-          <div className="flex justify-end">
-            <button
-              onClick={() => setShowSaveModal(true)}
-              className="px-5 py-2.5 bg-green-700 hover:bg-green-600 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors"
-            >
-              💾 Zapisz jako ofertę
-            </button>
-          </div>
-
           {/* Dane wynajmu */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Dane wynajmu – łącznie</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <ResultCard label="Całkowita długość" value={formatNumber(totals.totalLengthM, 2)} unit="m" />
               <ResultCard label="Masa całkowita" value={formatNumber(totals.totalMassT, 3)} unit="t" />
               <ResultCard label="Powierzchnia ścianki" value={formatNumber(totals.totalWallAreaM2, 2)} unit="m²" />
             </div>
@@ -343,9 +370,9 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide font-medium">Wybrany okres: {rentalWeeks} tygodni</p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <ResultCard label={`Koszt za ${rentalWeeks} tyg.`} value={formatPLN(rentalCost)} unit="PLN" highlight />
-                  <ResultCard label="Koszt / m²" value={formatPLN(totals.totalWallAreaM2 > 0 ? rentalCost / totals.totalWallAreaM2 : 0)} unit="PLN/m²" />
-                  <ResultCard label="Koszt / tonę" value={formatPLN(totals.totalMassT > 0 ? rentalCost / totals.totalMassT : 0)} unit="PLN/t" />
+                  <ResultCard label={`Koszt za ${rentalWeeks} tyg.`} value={formatPLN(totalCostInclTransport)} unit="PLN" highlight />
+                  <ResultCard label="Koszt / m²" value={formatPLN(totals.totalWallAreaM2 > 0 ? totalCostInclTransport / totals.totalWallAreaM2 : 0)} unit="PLN/m²" />
+                  <ResultCard label="Koszt / tonę" value={formatPLN(totals.totalMassT > 0 ? totalCostInclTransport / totals.totalMassT : 0)} unit="PLN/t" />
                 </div>
               </div>
             )}
@@ -356,14 +383,27 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
             <h2 className="text-lg font-semibold text-gray-800 mb-1">Koszty transportu</h2>
             <p className="text-xs text-gray-400 mb-4">
               Ładowność 1 auta: ~{TRUCK_CAPACITY_T} t &nbsp;·&nbsp;
-              Szacowana liczba aut: <strong className="text-gray-700">{transportCalc?.trucks ?? '—'}</strong>
-              <span className="text-gray-500"> (masa: {formatNumber(totals.totalMassT, 3)} t)</span>
+              Masa: {formatNumber(totals.totalMassT, 3)} t &nbsp;·&nbsp;
+              Szacowana liczba aut: <strong className="text-gray-700">{transportCalc?.autoTrucks ?? '—'}</strong>
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Koszt transportu / auto [PLN]</label>
                 <input type="number" min={0} step={100} value={transportCostPerTruck} placeholder="np. 2500"
                   onChange={e => setTransportCostPerTruck(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value)))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Liczba aut
+                  {typeof customTrucks === 'number' && customTrucks > 0 && (
+                    <span className="ml-1 text-xs text-amber-600 font-normal">(ręcznie)</span>
+                  )}
+                </label>
+                <input type="number" min={1} step={1}
+                  value={customTrucks}
+                  placeholder={String(transportCalc?.autoTrucks ?? '—')}
+                  onChange={e => setCustomTrucks(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
@@ -403,18 +443,34 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
             </div>
             {transportCalc && transportCalc.costPerTruck > 0 && (
               <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-4">
-                <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
-                  <p className="text-blue-200 text-xs mb-0.5">Łączny koszt (wynajem + transport)</p>
-                  <p className="text-2xl font-bold">
-                    {formatPLN(rentalCost + (transportPaidBy === 'intra' ? transportCalc.totalCost : 0))} PLN
-                  </p>
-                  {transportPaidBy === 'klient' && (
-                    <p className="text-blue-300 text-xs mt-0.5">+ {formatPLN(transportCalc.totalCost)} PLN transport (klient)</p>
-                  )}
-                </div>
+                {transportPaidBy === 'intra' ? (
+                  <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
+                    <p className="text-blue-200 text-xs mb-0.5">Łączny koszt dla klienta (wynajem + transport)</p>
+                    <p className="text-2xl font-bold">
+                      {formatPLN(rentalCost + transportCalc.totalCost)} PLN
+                    </p>
+                    <p className="text-blue-300 text-xs mt-0.5">
+                      wynajem {formatPLN(rentalCost)} + transport {formatPLN(transportCalc.totalCost)} PLN
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
+                    <p className="text-blue-200 text-xs mb-0.5">Koszt wynajmu dla klienta</p>
+                    <p className="text-2xl font-bold">{formatPLN(rentalCost)} PLN</p>
+                    <p className="text-orange-300 text-xs mt-0.5">+ {formatPLN(transportCalc.totalCost)} PLN transport (po stronie klienta)</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
+
+          {/* Przycisk zapisu */}
+          <button
+            onClick={() => setShowSaveModal(true)}
+            className="w-full py-3 bg-green-700 hover:bg-green-600 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors"
+          >
+            💾 Zapisz jako ofertę
+          </button>
 
           {/* Tabela kolejnych tygodni */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -469,7 +525,8 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
           clients={clients}
           offerItems={offerItems}
           rentalWeeks={rentalWeeks}
-          totals={{ massT: totals.totalMassT, wallAreaM2: totals.totalWallAreaM2, totalLengthM: totals.totalLengthM, rentalCostPLN: rentalCost, costPerM2: totals.totalWallAreaM2 > 0 ? rentalCost / totals.totalWallAreaM2 : 0, costPerTon: totals.totalMassT > 0 ? rentalCost / totals.totalMassT : 0 }}
+          displayUnit={displayUnit}
+          totals={{ massT: totals.totalMassT, wallAreaM2: totals.totalWallAreaM2, totalLengthM: totals.totalLengthM, rentalCostPLN: rentalCost, costPerM2: totals.totalWallAreaM2 > 0 ? totalCostInclTransport / totals.totalWallAreaM2 : 0, costPerTon: totals.totalMassT > 0 ? totalCostInclTransport / totals.totalMassT : 0 }}
           transport={{ trucks: transportCalc.trucks, costPerTruck: transportCalc.costPerTruck, totalCost: transportCalc.totalCost, paidBy: transportPaidBy, from: transportFrom, to: transportTo }}
           prices={effectivePrices}
           onClientAdded={onClientAdded}
