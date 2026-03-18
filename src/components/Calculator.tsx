@@ -32,6 +32,14 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
 
   // Cena PLN/t wpisywana ręcznie przez handlowca (domyślnie z globalnych ustawień)
   const [pricePerTon, setPricePerTon] = useState<number>(prices.base_price_pln);
+  const [pricePerWeek1, setPricePerWeek1] = useState<number>(prices.price_per_week_1);
+  // Cennik szkód i napraw (override globalnych ustawień dla tej oferty)
+  const [lossPrice, setLossPrice] = useState<number>(prices.loss_price_pln ?? 3950);
+  const [sortingPrice, setSortingPrice] = useState<number>(prices.sorting_price_pln ?? 99);
+  const [grindingPrice, setGrindingPrice] = useState<number>(prices.grinding_price_pln ?? 250);
+  const [weldingPrice, setWeldingPrice] = useState<number>(prices.welding_price_pln ?? 250);
+  const [cuttingPrice, setCuttingPrice] = useState<number>(prices.cutting_price_pln ?? 59);
+  const [repairPrice, setRepairPrice] = useState<number>(prices.repair_price_pln ?? 250);
 
   const [showSaveModal, setShowSaveModal] = useState(false);
 
@@ -131,7 +139,14 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
   const effectivePricesForOffer = useMemo(() => ({
     ...prices,
     base_price_pln: pricePerTon,
-  }), [prices, pricePerTon]);
+    price_per_week_1: pricePerWeek1,
+    loss_price_pln: lossPrice,
+    sorting_price_pln: sortingPrice,
+    grinding_price_pln: grindingPrice,
+    welding_price_pln: weldingPrice,
+    cutting_price_pln: cuttingPrice,
+    repair_price_pln: repairPrice,
+  }), [prices, pricePerTon, pricePerWeek1, lossPrice, sortingPrice, grindingPrice, weldingPrice, cuttingPrice, repairPrice]);
 
   return (
     <div className="space-y-6">
@@ -212,7 +227,7 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
                   {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Masa pozycji</label>}
                   <div className="rounded-lg bg-white border border-gray-200 px-3 py-2 text-sm text-gray-700 min-h-[38px] flex items-center">
                     {r.valid
-                      ? <><span className="font-semibold">{formatNumber(r.massT, 3)} t</span><span className="text-gray-400 ml-2">{formatNumber(r.totalLengthM, 1)} m</span></>
+                      ? <span className="font-semibold">{formatNumber(r.massT, 3)} t</span>
                       : <span className="text-gray-400">—</span>
                     }
                   </div>
@@ -279,21 +294,50 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
 
         {/* Cena wynajmu PLN/t */}
         <div className="mt-4 pt-4 border-t border-gray-100">
-          <div className="max-w-xs">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Cena wynajmu [PLN/t]</label>
-            <input
-              type="number" min={0} step={1}
-              value={pricePerTon}
-              onChange={e => setPricePerTon(parseFloat(e.target.value) || 0)}
-              className="w-full border border-blue-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-blue-50 font-semibold"
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              Stawka globalna: <button
-                type="button"
-                className="text-blue-600 hover:underline"
-                onClick={() => setPricePerTon(prices.base_price_pln)}
-              >{formatPLN(prices.base_price_pln)} PLN/t</button>
-            </p>
+          <div className="grid grid-cols-2 gap-4 max-w-lg">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Cena wynajmu [PLN/t]</label>
+              <input
+                type="number" min={0} step={1}
+                value={pricePerTon}
+                onChange={e => setPricePerTon(parseFloat(e.target.value) || 0)}
+                className="w-full border border-blue-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-blue-50 font-semibold"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 whitespace-nowrap">Każdy kolejny tydzień [PLN/t]</label>
+              <input
+                type="number" min={0} step={1}
+                value={pricePerWeek1}
+                onChange={e => setPricePerWeek1(parseFloat(e.target.value) || 0)}
+                className="w-full border border-blue-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-blue-50 font-semibold"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Cennik szkód i napraw */}
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <p className="text-sm font-medium text-gray-700 mb-3">Cennik szkód i napraw</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {[
+              { label: 'Zagubienie / strata [PLN/t]', value: lossPrice, set: setLossPrice },
+              { label: 'Sortowanie i czyszczenie [PLN/t]', value: sortingPrice, set: setSortingPrice },
+              { label: 'Szlifowanie spawów [PLN/mb]', value: grindingPrice, set: setGrindingPrice },
+              { label: 'Spawanie otworów pod kotwy [PLN/szt]', value: weldingPrice, set: setWeldingPrice },
+              { label: 'Głowica tnąca [PLN/cięcie]', value: cuttingPrice, set: setCuttingPrice },
+              { label: 'Naprawa zamków [PLN/mb]', value: repairPrice, set: setRepairPrice },
+            ].map(({ label, value, set }) => (
+              <div key={label}>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+                <input
+                  type="number" min={0} step={1}
+                  value={value}
+                  onChange={e => set(parseFloat(e.target.value) || 0)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50"
+                />
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -328,9 +372,9 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Koszt dzierżawy</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <ResultCard label="Koszt łączny" value={formatPLN(totalCostInclTransport)} unit="PLN" highlight />
+              <ResultCard label="Każdy kolejny tydzień" value={formatPLN(totals.totalMassT * pricePerWeek1)} unit="PLN/tydz." />
               <ResultCard label="Koszt / m²" value={formatPLN(totals.totalWallAreaM2 > 0 ? totalCostInclTransport / totals.totalWallAreaM2 : 0)} unit="PLN/m²" />
               <ResultCard label="Koszt / tonę" value={formatPLN(totals.totalMassT > 0 ? totalCostInclTransport / totals.totalMassT : 0)} unit="PLN/t" />
-              <ResultCard label="Masa × cena" value={`${formatNumber(totals.totalMassT, 3)} t × ${formatPLN(pricePerTon)}`} unit="PLN/t" />
             </div>
           </div>
 

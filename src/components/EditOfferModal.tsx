@@ -368,7 +368,6 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
                   onChange={e => setCustomBasePricePln(Math.max(0, parseFloat(e.target.value) || 0))}
                   className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
                 />
-                <p className="text-xs text-gray-400 mt-1">Globalnie: {formatPLN(prices.base_price_pln)} PLN/t</p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -380,7 +379,6 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
                   onChange={e => setCustomPricePerWeek1(Math.max(0, parseFloat(e.target.value) || 0))}
                   className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
                 />
-                <p className="text-xs text-gray-400 mt-1">Globalnie: {formatPLN(prices.price_per_week_1)} PLN/t</p>
               </div>
             </div>
             {totals.totalMassT > 0 && (
