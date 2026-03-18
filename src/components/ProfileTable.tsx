@@ -76,11 +76,10 @@ export default function ProfileTable({ profiles, onProfilesChange }: Props) {
       .eq('id', editing.id);
 
     if (error) {
-      // Rollback – functional update żeby nie nadpisać zmian z innych równoległych edycji
-      onProfilesChange(current => current.map(p => {
-        const original = snapshot.find(s => s.id === p.id);
-        return p.id === editing.id && original ? original : p;
-      }));
+      // Rollback – przywróć tylko zmieniony profil, zachowaj resztę z snapshot
+      const editedId = editing.id;
+      const original = snapshot.find(s => s.id === editedId);
+      onProfilesChange(profiles.map(p => p.id === editedId && original ? original : p));
       showToast('Błąd podczas zapisywania: ' + error.message, 'error');
     } else {
       showToast('Zmiana zapisana.');
