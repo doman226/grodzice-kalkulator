@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { Profile, RentalPrices, Client, Offer } from '../types';
 import { calculateRentalCost, formatPLN, formatNumber } from '../lib/calculations';
 import SaveOfferModal, { type OfferItemInput } from './SaveOfferModal';
@@ -40,6 +40,18 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
   const [weldingPrice, setWeldingPrice] = useState<number>(prices.welding_price_pln ?? 250);
   const [cuttingPrice, setCuttingPrice] = useState<number>(prices.cutting_price_pln ?? 59);
   const [repairPrice, setRepairPrice] = useState<number>(prices.repair_price_pln ?? 250);
+
+  // Gdy globalne stawki się zmienią (po zapisie w Ustawieniach cen), resetuj lokalne ceny
+  useEffect(() => {
+    setPricePerTon(prices.base_price_pln);
+    setPricePerWeek1(prices.price_per_week_1);
+    setLossPrice(prices.loss_price_pln ?? 3950);
+    setSortingPrice(prices.sorting_price_pln ?? 99);
+    setGrindingPrice(prices.grinding_price_pln ?? 250);
+    setWeldingPrice(prices.welding_price_pln ?? 250);
+    setCuttingPrice(prices.cutting_price_pln ?? 59);
+    setRepairPrice(prices.repair_price_pln ?? 250);
+  }, [prices.updated_at]);
 
   const [showSaveModal, setShowSaveModal] = useState(false);
 
