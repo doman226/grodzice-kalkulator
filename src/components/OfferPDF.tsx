@@ -454,7 +454,7 @@ export default function OfferPDF({ offer }: Props) {
             </View>
             {/* Okres */}
             <View style={[s.tableBodyRow, { borderBottom: 0 }]}>
-              <Text style={[s.tdLabel, { flex: 3, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>Okres dzierżawy</Text>
+              <Text style={[s.tdLabel, { flex: 3, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>Podstawowy okres dzierżawy</Text>
               <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{rentalPeriodLabel}</Text>
               <Text style={[s.tdLabel, { flex: 1.5 }]}></Text>
               <Text style={[s.tdLabel, { flex: 1.5 }]}></Text>
@@ -474,7 +474,7 @@ export default function OfferPDF({ offer }: Props) {
             <Row label="Łączna długość" value={`${formatNumber(offer.total_length_m, 1)} m`} alt={true} />
             <Row label="Masa całkowita" value={`${formatNumber(offer.mass_t, 3)} t`} alt={false} />
             <Row label="Powierzchnia ścianki" value={`${formatNumber(offer.wall_area_m2, 2)} m²`} alt={true} />
-            <Row label="Okres dzierżawy" value={rentalPeriodLabel} alt={false} />
+            <Row label="Podstawowy okres dzierżawy" value={rentalPeriodLabel} alt={false} />
           </View>
         )}
 
@@ -563,9 +563,8 @@ export default function OfferPDF({ offer }: Props) {
         <Text style={s.sectionTitle} break={offer.transport_cost_per_truck != null}>Warunki dzierżawy:</Text>
         <View style={s.conditionsBox}>
           <Text style={s.conditionItem}>1) Oferowana cena jest ceną z transportami po stronie Intra: magazyn→budowa. Zwrot do magazynu Intra BV (Cieśle 42 k. Wrocławia) jest obowiązkiem i kosztem Klienta.</Text>
-          <Text style={s.conditionItem}>2) Podstawowy okres dzierżawy to 2 miesiące (8 tygodni).</Text>
-          <Text style={s.conditionItem}>3) Na budowie grodzice muszą zostać rozładowane i załadowane na koszt Klienta.</Text>
-          <Text style={[s.conditionItem, { marginBottom: 0 }]}>4) Podane ceny są cenami netto.</Text>
+          <Text style={s.conditionItem}>2) Na budowie grodzice muszą zostać rozładowane i załadowane na koszt Klienta.</Text>
+          <Text style={[s.conditionItem, { marginBottom: 0 }]}>3) Podane ceny są cenami netto.</Text>
         </View>
 
         <Text style={s.paragraph}>
