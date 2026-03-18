@@ -594,7 +594,7 @@ export default function OfferPDF({ offer }: Props) {
         <Text style={s.sectionTitle}>Termin dostawy:</Text>
         <View style={s.conditionsBox}>
           <Text style={[s.conditionItem, { marginBottom: 0 }]}>
-            - z magazynu, dostawa w dniach: {offer.delivery_info ?? '............'}
+            {offer.delivery_info ? `- ${offer.delivery_info}` : '- ............'}
           </Text>
         </View>
 
