@@ -64,6 +64,13 @@ export interface SaleOffer {
   delivery_paid_by?: 'intra' | 'klient';
   delivery_from?: string;
   delivery_to?: string;
+  // Warunki oferty
+  delivery_timeline?: 'huta' | 'magazyn';
+  campaign_weeks?: string;
+  campaign_delivery_weeks?: string;
+  warehouse_delivery_time?: string;
+  delivery_terms?: 'DAP' | 'FCA';
+  fca_location?: string;
   created_at: string;
   updated_at: string;
   items?: SaleOfferItem[];

@@ -231,10 +231,27 @@ export default function SaleOffersTable({ offers, onOffersChange }: Props) {
                           )}
                           {(offer.delivery_from || offer.delivery_to) && (
                             <div className="col-span-2 sm:col-span-4">
-                              <span className="text-gray-500">Trasa dostawy:</span>{' '}
+                              <span className="text-gray-500">Trasa:</span>{' '}
+                              <strong>🚛 {offer.delivery_from}{offer.delivery_to ? ` → ${offer.delivery_to}` : ''}</strong>
+                            </div>
+                          )}
+                          {offer.delivery_terms && (
+                            <div>
+                              <span className="text-gray-500">Incoterms:</span>{' '}
                               <strong>
-                                🚛 {offer.delivery_from}
-                                {offer.delivery_to ? ` → ${offer.delivery_to}` : ''}
+                                {offer.delivery_terms}
+                                {offer.delivery_terms === 'FCA' && offer.fca_location ? ` (${offer.fca_location})` : ''}
+                                {offer.delivery_terms === 'DAP' && offer.delivery_to ? ` (${offer.delivery_to})` : ''}
+                              </strong>
+                            </div>
+                          )}
+                          {offer.delivery_timeline && (
+                            <div className="col-span-2 sm:col-span-2">
+                              <span className="text-gray-500">Termin dostawy:</span>{' '}
+                              <strong>
+                                {offer.delivery_timeline === 'huta'
+                                  ? `huta – kampania tyg. ${offer.campaign_weeks ?? '?'}${offer.campaign_delivery_weeks ? `, dostawy od tyg. ${offer.campaign_delivery_weeks}` : ''}`
+                                  : `magazyn – ${offer.warehouse_delivery_time ?? ''}`}
                               </strong>
                             </div>
                           )}
