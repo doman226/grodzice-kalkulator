@@ -6,11 +6,14 @@ import ProfileTable from './components/ProfileTable';
 import PriceSettings from './components/PriceSettings';
 import ClientsTable from './components/ClientsTable';
 import OffersTable from './components/OffersTable';
+import SalePlaceholder from './components/SalePlaceholder';
 import { formatPLN } from './lib/calculations';
 
+type Mode = 'rental' | 'sale';
 type Tab = 'calculator' | 'profiles' | 'prices' | 'clients' | 'offers';
 
 function App() {
+  const [mode, setMode] = useState<Mode>('rental');
   const [activeTab, setActiveTab] = useState<Tab>('calculator');
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [prices, setPrices] = useState<RentalPrices | null>(null);
@@ -78,47 +81,77 @@ function App() {
       {/* Header */}
       <header className="bg-blue-900 text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold tracking-wide">Intra B.V.</h1>
-              <p className="text-blue-200 text-sm">Kalkulator Wynajmu Grodzic Stalowych</p>
+              <p className="text-blue-200 text-sm">
+                {mode === 'rental' ? 'Kalkulator Wynajmu Grodzic Stalowych' : 'Kalkulator Sprzedaży Grodzic Stalowych'}
+              </p>
             </div>
-            {prices && (
-              <div className="inline-flex items-center bg-blue-800 rounded-full px-4 py-1.5 text-sm font-medium">
-                <span className="text-blue-300 mr-1">Cena minimalna:</span>
-                <span className="text-white font-bold">
-                  {formatPLN(prices.base_price_pln)} PLN/t / {prices.base_weeks} tyg.
-                </span>
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Toggle WYNAJEM / SPRZEDAŻ */}
+              <div className="flex rounded-lg overflow-hidden border border-blue-600 text-sm font-semibold">
+                <button
+                  onClick={() => setMode('rental')}
+                  className={`px-4 py-2 transition-colors ${
+                    mode === 'rental'
+                      ? 'bg-white text-blue-900'
+                      : 'bg-transparent text-blue-200 hover:bg-blue-800'
+                  }`}
+                >
+                  Wynajem
+                </button>
+                <button
+                  onClick={() => setMode('sale')}
+                  className={`px-4 py-2 transition-colors ${
+                    mode === 'sale'
+                      ? 'bg-white text-blue-900'
+                      : 'bg-transparent text-blue-200 hover:bg-blue-800'
+                  }`}
+                >
+                  Sprzedaż
+                </button>
               </div>
-            )}
+              {/* Badge cennika (tylko tryb wynajem) */}
+              {mode === 'rental' && prices && (
+                <div className="inline-flex items-center bg-blue-800 rounded-full px-4 py-1.5 text-sm font-medium">
+                  <span className="text-blue-300 mr-1">Cena minimalna:</span>
+                  <span className="text-white font-bold">
+                    {formatPLN(prices.base_price_pln)} PLN/t / {prices.base_weeks} tyg.
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Navigation */}
-        <div className="max-w-7xl mx-auto px-4">
-          <nav className="flex gap-1 overflow-x-auto">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-5 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${
-                  activeTab === tab.id
-                    ? 'border-white text-white bg-blue-800'
-                    : 'border-transparent text-blue-200 hover:text-white hover:bg-blue-800'
-                }`}
-              >
-                {tab.label}
-                {tab.badge !== undefined && (
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                    activeTab === tab.id ? 'bg-white text-blue-900' : 'bg-blue-700 text-blue-100'
-                  }`}>
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            ))}
-          </nav>
-        </div>
+        {/* Navigation – widoczna tylko w trybie wynajem */}
+        {mode === 'rental' && (
+          <div className="max-w-7xl mx-auto px-4">
+            <nav className="flex gap-1 overflow-x-auto">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-5 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${
+                    activeTab === tab.id
+                      ? 'border-white text-white bg-blue-800'
+                      : 'border-transparent text-blue-200 hover:text-white hover:bg-blue-800'
+                  }`}
+                >
+                  {tab.label}
+                  {tab.badge !== undefined && (
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                      activeTab === tab.id ? 'bg-white text-blue-900' : 'bg-blue-700 text-blue-100'
+                    }`}>
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </nav>
+          </div>
+        )}
       </header>
 
       {/* Main content */}
@@ -137,6 +170,8 @@ function App() {
               Spróbuj ponownie
             </button>
           </div>
+        ) : mode === 'sale' ? (
+          <SalePlaceholder />
         ) : (
           <>
             {activeTab === 'calculator' && prices && (
