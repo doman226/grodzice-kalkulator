@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { Client, SaleOffer, SaleOfferItem, SaleProfile } from '../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
@@ -75,6 +75,14 @@ export default function EditSaleOfferModal({
   offer, clients, saleProfiles, onSaved, onClose,
 }: Props) {
 
+  // ── Gatunki stali (z DB) ──
+  const [steelGrades, setSteelGrades] = useState<string[]>([]);
+  useEffect(() => {
+    supabase.from('sale_steel_grades').select('name').order('sort_order').then(({ data }) => {
+      if (data) setSteelGrades(data.map((r: { name: string }) => r.name));
+    });
+  }, []);
+
   // ── Pozycje ──
   const [editItems, setEditItems] = useState<EditableItem[]>(() => itemsFromOffer(offer));
 
@@ -117,7 +125,7 @@ export default function EditSaleOfferModal({
     setEditItems(prev => [...prev, {
       uid: crypto.randomUUID(),
       profileName: saleProfiles[0]?.name ?? '',
-      steelGrade: '', quantity: 1, lengthM: 12,
+      steelGrade: steelGrades[0] ?? '', quantity: 1, lengthM: 12,
       isPaired: false, warehouseName: '', costEurT: 0, sellEurT: 0,
     }]);
   }
@@ -328,13 +336,18 @@ export default function EditSaleOfferModal({
                       </div>
                       <div className="col-span-2">
                         {idx === 0 && <p className="text-xs text-gray-400 mb-1">Gatunek stali</p>}
-                        <input
-                          type="text"
+                        <select
                           value={item.steelGrade}
                           onChange={e => updateItem(item.uid, { steelGrade: e.target.value })}
-                          placeholder="np. S355GP"
-                          className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                          className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">— wybierz —</option>
+                          {steelGrades.map(g => <option key={g} value={g}>{g}</option>)}
+                          {/* zachowaj oryginalną wartość jeśli nie ma jej na liście */}
+                          {item.steelGrade && !steelGrades.includes(item.steelGrade) && (
+                            <option value={item.steelGrade}>{item.steelGrade}</option>
+                          )}
+                        </select>
                       </div>
                       <div className="col-span-2">
                         {idx === 0 && <p className="text-xs text-gray-400 mb-1">Magazyn</p>}
