@@ -421,8 +421,8 @@ export default function SaleOfferPDF({ offer }: Props) {
                       <Text style={s.transportLabel}>Koszt / auto:</Text>
                       <Text style={s.transportValue}>
                         {isEUR
-                          ? `${formatEUR(offer.delivery_cost_per_truck / exchRate)} EUR netto`
-                          : `${formatPLN(offer.delivery_cost_per_truck)} PLN netto`}
+                          ? `${formatEUR(offer.delivery_cost_per_truck ?? 0)} EUR netto`
+                          : `${formatPLN(offer.delivery_cost_per_truck ?? 0)} PLN netto`}
                       </Text>
                     </View>
                   )}
