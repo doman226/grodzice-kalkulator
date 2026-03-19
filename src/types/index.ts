@@ -39,6 +39,54 @@ export interface PriceHistory {
 
 // ─── Sprzedaż ────────────────────────────────────────────────────────────────
 
+export interface SaleOffer {
+  id: string;
+  offer_number: string;
+  year: number;
+  sequence: number;
+  client_id?: string;
+  client?: Client;
+  status: OfferStatus;
+  notes?: string;
+  valid_days: number;
+  payment_days: number;
+  delivery_info?: string;
+  prepared_by?: string;
+  currency: string;
+  exchange_rate?: number;
+  total_cost_eur?: number;
+  total_sell_eur?: number;
+  total_sell_pln?: number;
+  margin_pct?: number;
+  created_at: string;
+  updated_at: string;
+  items?: SaleOfferItem[];
+}
+
+export interface SaleOfferItem {
+  id: string;
+  offer_id: string;
+  warehouse_id?: string;
+  warehouse_name?: string;
+  profile_name: string;
+  steel_grade: string;
+  quantity: number;
+  length_m: number;
+  is_paired: boolean;
+  total_length_m: number;
+  mass_t: number;
+  wall_area_m2: number;
+  cost_eur_t?: number;
+  sell_eur_t?: number;
+  cost_eur_total?: number;
+  sell_eur_total?: number;
+  sell_pln_total?: number;
+  margin_pct?: number;
+  sort_order: number;
+}
+
+// ─── (sale lookup tables) ────────────────────────────────────────────────────
+
 export interface SaleWarehouse {
   id: string;
   name: string;

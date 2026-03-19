@@ -3,7 +3,9 @@ import { supabase } from '../../lib/supabase';
 import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
 import { fetchNBPRate, formatNBPDate } from '../../lib/nbp';
 import type { NBPRate } from '../../lib/nbp';
-import type { SaleWarehouse, SaleSteeelGrade, SaleProfile, SalePrice } from '../../types';
+import type { Client, SaleOffer, SaleWarehouse, SaleSteeelGrade, SaleProfile, SalePrice } from '../../types';
+import SaveSaleOfferModal from './SaveSaleOfferModal';
+import type { SaleItemSnapshot } from './SaveSaleOfferModal';
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
@@ -49,7 +51,13 @@ function marginLabel(pct: number): string {
 
 // ─── Komponent ────────────────────────────────────────────────────────────────
 
-export default function SaleCalculator() {
+interface Props {
+  clients: Client[];
+  onClientAdded: (c: Client) => void;
+  onOfferSaved: (offer: SaleOffer) => void;
+}
+
+export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }: Props) {
   // --- Dane z bazy ---
   const [warehouses, setWarehouses] = useState<SaleWarehouse[]>([]);
   const [grades,     setGrades]     = useState<SaleSteeelGrade[]>([]);
@@ -66,6 +74,7 @@ export default function SaleCalculator() {
   const [manualRate, setManualRate]     = useState(false);
   const [currency, setCurrency]         = useState<'EUR' | 'PLN'>('EUR');
   const [applyAllSellPrice, setApplyAllSellPrice] = useState<number>(0);
+  const [showSaveModal, setShowSaveModal]         = useState(false);
 
   const exchangeRate = nbpRate.rate;
 
@@ -612,8 +621,62 @@ export default function SaleCalculator() {
               Wpisz ceny sprzedaży dla wszystkich pozycji, aby zobaczyć podsumowanie marży.
             </div>
           )}
+
+          {/* Przycisk zapisu oferty */}
+          <div className="flex justify-end">
+            <button
+              onClick={() => setShowSaveModal(true)}
+              disabled={!hasAllSellPrices}
+              className="px-6 py-2.5 text-sm font-semibold text-white bg-green-700 rounded-xl hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+              title={!hasAllSellPrices ? 'Wpisz ceny sprzedaży dla wszystkich pozycji' : ''}
+            >
+              💾 Zapisz jako ofertę SP
+            </button>
+          </div>
         </div>
       )}
+
+      {/* Modal zapisu */}
+      {showSaveModal && (() => {
+        const snapshot: SaleItemSnapshot[] = items
+          .map((item, idx) => {
+            const r   = itemResults[idx];
+            const wh  = warehouses.find(w => w.id === item.warehouseId);
+            if (!r.valid) return null;
+            return {
+              warehouseId:   item.warehouseId,
+              warehouseName: wh?.name ?? '',
+              profileName:   item.profileName,
+              steelGrade:    item.steelGrade,
+              quantity:      item.quantity,
+              lengthM:       item.lengthM,
+              isPaired:      item.isPaired,
+              totalLengthM:  r.totalLengthM,
+              massT:         r.massT,
+              wallAreaM2:    r.wallAreaM2,
+              costEurT:      item.costPriceEurT,
+              sellEurT:      item.sellPriceEurT,
+              costEurTotal:  r.costEUR,
+              sellEurTotal:  r.sellEUR,
+              marginPct:     r.marginPct,
+            } satisfies SaleItemSnapshot;
+          })
+          .filter((s): s is SaleItemSnapshot => s !== null);
+
+        return (
+          <SaveSaleOfferModal
+            clients={clients}
+            items={snapshot}
+            totals={totals}
+            currency={currency}
+            exchangeRate={exchangeRate}
+            nbpDate={nbpRate.date}
+            onSaved={offer => { onOfferSaved(offer); setShowSaveModal(false); }}
+            onClose={() => setShowSaveModal(false)}
+            onClientAdded={onClientAdded}
+          />
+        );
+      })()}
     </div>
   );
 }

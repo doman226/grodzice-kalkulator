@@ -171,7 +171,10 @@ function App() {
             </button>
           </div>
         ) : mode === 'sale' ? (
-          <SaleSection />
+          <SaleSection
+            clients={clients}
+            onClientAdded={(c) => setClients(prev => [...prev, c])}
+          />
         ) : (
           <>
             {activeTab === 'calculator' && prices && (
