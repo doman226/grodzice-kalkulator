@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { pdf } from '@react-pdf/renderer';
 import { supabase } from '../../lib/supabase';
 import type { SaleOffer, OfferStatus } from '../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
+import SaleOfferPDF from './SaleOfferPDF';
 
 interface Props {
   offers: SaleOffer[];
@@ -31,12 +33,30 @@ export default function SaleOffersTable({ offers, onOffersChange }: Props) {
   const [search, setSearch]         = useState('');
   const [expanded, setExpanded]     = useState<string | null>(null);
   const [statusSaving, setStatusSaving] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState<string | null>(null);
   const [toast, setToast]           = useState('');
   const [error, setError]           = useState('');
 
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(''), 2500);
+  }
+
+  async function handleDownloadPDF(offer: SaleOffer) {
+    setPdfLoading(offer.id);
+    try {
+      const blob = await pdf(<SaleOfferPDF offer={offer} />).toBlob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `${offer.offer_number.replace(/\//g, '-')}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError('Błąd generowania PDF: ' + (err as Error).message);
+    } finally {
+      setPdfLoading(null);
+    }
   }
 
   async function changeStatus(offer: SaleOffer, newStatus: OfferStatus) {
@@ -313,6 +333,32 @@ export default function SaleOffersTable({ offers, onOffersChange }: Props) {
                         {offer.notes && (
                           <p className="text-xs text-gray-600 italic">Notatki: {offer.notes}</p>
                         )}
+
+                        {/* Przycisk PDF */}
+                        <div className="flex justify-end pt-2 border-t border-blue-200">
+                          <button
+                            onClick={() => handleDownloadPDF(offer)}
+                            disabled={pdfLoading === offer.id}
+                            className="inline-flex items-center gap-2 bg-blue-900 hover:bg-blue-800 disabled:bg-blue-300 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+                          >
+                            {pdfLoading === offer.id ? (
+                              <>
+                                <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                                </svg>
+                                Generowanie…
+                              </>
+                            ) : (
+                              <>
+                                <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"/>
+                                </svg>
+                                Pobierz PDF
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </td>
                   </tr>
