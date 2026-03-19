@@ -7,14 +7,16 @@ import PriceSettings from './components/PriceSettings';
 import ClientsTable from './components/ClientsTable';
 import OffersTable from './components/OffersTable';
 import SaleSection from './components/sale/SaleSection';
-import { formatPLN } from './lib/calculations';
 
 type Mode = 'rental' | 'sale';
 type Tab = 'calculator' | 'profiles' | 'prices' | 'clients' | 'offers';
+type SaleTab = 'calculator' | 'offers' | 'prices' | 'profiles';
 
 function App() {
   const [mode, setMode] = useState<Mode>('rental');
-  const [activeTab, setActiveTab] = useState<Tab>('calculator');
+  const [activeTab, setActiveTab]         = useState<Tab>('calculator');
+  const [saleActiveTab, setSaleActiveTab] = useState<SaleTab>('calculator');
+  const [saleOffersCount, setSaleOffersCount] = useState(0);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [prices, setPrices] = useState<RentalPrices | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
@@ -70,10 +72,17 @@ function App() {
 
   const tabs: { id: Tab; label: string; badge?: number }[] = [
     { id: 'calculator', label: 'Kalkulator' },
-    { id: 'clients', label: 'Klienci', badge: clients.length || undefined },
-    { id: 'offers', label: 'Oferty', badge: offers.length || undefined },
-    { id: 'profiles', label: 'Profile grodzic' },
-    { id: 'prices', label: 'Ustawienia cen' },
+    { id: 'clients',    label: 'Klienci',        badge: clients.length || undefined },
+    { id: 'offers',     label: 'Oferty',          badge: offers.length  || undefined },
+    { id: 'profiles',   label: 'Profile grodzic' },
+    { id: 'prices',     label: 'Ustawienia cen' },
+  ];
+
+  const saleTabs: { id: SaleTab; label: string; badge?: number }[] = [
+    { id: 'calculator', label: 'Kalkulator' },
+    { id: 'offers',     label: 'Oferty SP', badge: saleOffersCount || undefined },
+    { id: 'prices',     label: 'Cennik' },
+    { id: 'profiles',   label: 'Profile VL' },
   ];
 
   return (
@@ -112,29 +121,26 @@ function App() {
                   Sprzedaż
                 </button>
               </div>
-              {/* Badge cennika (tylko tryb wynajem) */}
-              {mode === 'rental' && prices && (
-                <div className="inline-flex items-center bg-blue-800 rounded-full px-4 py-1.5 text-sm font-medium">
-                  <span className="text-blue-300 mr-1">Cena minimalna:</span>
-                  <span className="text-white font-bold">
-                    {formatPLN(prices.base_price_pln)} PLN/t / {prices.base_weeks} tyg.
-                  </span>
-                </div>
-              )}
             </div>
           </div>
         </div>
 
-        {/* Navigation – widoczna tylko w trybie wynajem */}
-        {mode === 'rental' && (
-          <div className="max-w-7xl mx-auto px-4">
-            <nav className="flex gap-1 overflow-x-auto">
-              {tabs.map((tab) => (
+        {/* Navigation */}
+        <div className="max-w-7xl mx-auto px-4">
+          <nav className="flex gap-1 overflow-x-auto">
+            {(mode === 'rental' ? tabs : saleTabs).map((tab) => {
+              const isActive = mode === 'rental'
+                ? activeTab === tab.id
+                : saleActiveTab === tab.id;
+              return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => mode === 'rental'
+                    ? setActiveTab(tab.id as Tab)
+                    : setSaleActiveTab(tab.id as SaleTab)
+                  }
                   className={`px-5 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${
-                    activeTab === tab.id
+                    isActive
                       ? 'border-white text-white bg-blue-800'
                       : 'border-transparent text-blue-200 hover:text-white hover:bg-blue-800'
                   }`}
@@ -142,16 +148,16 @@ function App() {
                   {tab.label}
                   {tab.badge !== undefined && (
                     <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                      activeTab === tab.id ? 'bg-white text-blue-900' : 'bg-blue-700 text-blue-100'
+                      isActive ? 'bg-white text-blue-900' : 'bg-blue-700 text-blue-100'
                     }`}>
                       {tab.badge}
                     </span>
                   )}
                 </button>
-              ))}
-            </nav>
-          </div>
-        )}
+              );
+            })}
+          </nav>
+        </div>
       </header>
 
       {/* Main content */}
@@ -174,6 +180,9 @@ function App() {
           <SaleSection
             clients={clients}
             onClientAdded={(c) => setClients(prev => [...prev, c])}
+            activeTab={saleActiveTab}
+            onTabChange={setSaleActiveTab}
+            onOffersCountChange={setSaleOffersCount}
           />
         ) : (
           <>
