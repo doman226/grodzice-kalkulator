@@ -780,16 +780,14 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
           </div>
 
           {/* Przycisk zapisu oferty */}
-          <div className="flex justify-end">
-            <button
-              onClick={() => setShowSaveModal(true)}
-              disabled={!hasAllSellPrices}
-              className="px-6 py-2.5 text-sm font-semibold text-white bg-green-700 rounded-xl hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
-              title={!hasAllSellPrices ? 'Wpisz ceny sprzedaży dla wszystkich pozycji' : ''}
-            >
-              💾 Zapisz jako ofertę SP
-            </button>
-          </div>
+          <button
+            onClick={() => setShowSaveModal(true)}
+            disabled={!hasAllSellPrices}
+            className="w-full py-3 bg-green-700 hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl shadow-sm transition-colors"
+            title={!hasAllSellPrices ? 'Wpisz ceny sprzedaży dla wszystkich pozycji' : ''}
+          >
+            💾 Zapisz jako ofertę SP
+          </button>
         </div>
       )}
 
