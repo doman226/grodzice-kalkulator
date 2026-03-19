@@ -46,6 +46,7 @@ const C = {
   gray700: '#374151',
   gray800: '#1F2937',
   white: '#FFFFFF',
+  orange: '#D97706',
 };
 
 const s = StyleSheet.create({
