@@ -181,14 +181,10 @@ export default function SaleOfferPDF({ offer }: Props) {
   const totalSellEUR = offer.total_sell_eur ?? 0;
   const totalSellPLN = offer.total_sell_pln ?? 0;
   // backward compat: 'intra' (stare) = dap_included
-  const dPaidBy = offer.delivery_paid_by === 'intra' ? 'dap_included'
-                : offer.delivery_paid_by === 'klient' ? 'dap_extra'
+  const dPaidByRaw = offer.delivery_paid_by as string | undefined;
+  const dPaidBy = dPaidByRaw === 'intra' ? 'dap_included'
+                : dPaidByRaw === 'klient' ? 'dap_extra'
                 : offer.delivery_paid_by;
-  const delivCostPLN = (dPaidBy === 'dap_included' && offer.delivery_cost_total)
-    ? offer.delivery_cost_total : 0;
-  const delivCostEUR = delivCostPLN / exchRate;
-  const totalForClientPLN = totalSellPLN + delivCostPLN;
-  const totalForClientEUR = totalSellEUR + delivCostEUR;
 
   // Posortowane pozycje
   const sortedItems = [...(offer.items ?? [])].sort((a, b) => a.sort_order - b.sort_order);

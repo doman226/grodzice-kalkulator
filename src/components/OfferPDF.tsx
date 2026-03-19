@@ -335,8 +335,9 @@ export default function OfferPDF({ offer }: Props) {
 
   // Używamy > 0 zamiast truthy – chroni przed edge case transport_cost_per_truck = 0
   // backward compat: 'intra' (stare) = dap_included
-  const tPaidBy = offer.transport_paid_by === 'intra' ? 'dap_included'
-                : offer.transport_paid_by === 'klient' ? 'dap_extra'
+  const tPaidByRaw = offer.transport_paid_by as string | undefined;
+  const tPaidBy = tPaidByRaw === 'intra' ? 'dap_included'
+                : tPaidByRaw === 'klient' ? 'dap_extra'
                 : offer.transport_paid_by;
   const totalWithTransport =
     offer.transport_cost_per_truck != null && offer.transport_cost_per_truck > 0

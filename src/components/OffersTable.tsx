@@ -348,9 +348,9 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Opcja:</span>
-                      <span className={`font-medium text-xs ${selected.transport_paid_by === 'dap_extra' || selected.transport_paid_by === 'klient' ? 'text-orange-600' : selected.transport_paid_by === 'fca' ? 'text-green-700' : 'text-gray-700'}`}>
-                        {selected.transport_paid_by === 'dap_included' || selected.transport_paid_by === 'intra' ? 'DAP – w cenie'
-                         : selected.transport_paid_by === 'dap_extra' || selected.transport_paid_by === 'klient' ? 'DAP – refaktura'
+                      <span className={`font-medium text-xs ${(selected.transport_paid_by as string) === 'dap_extra' || (selected.transport_paid_by as string) === 'klient' ? 'text-orange-600' : selected.transport_paid_by === 'fca' ? 'text-green-700' : 'text-gray-700'}`}>
+                        {(selected.transport_paid_by as string) === 'dap_included' || (selected.transport_paid_by as string) === 'intra' ? 'DAP – w cenie'
+                         : (selected.transport_paid_by as string) === 'dap_extra' || (selected.transport_paid_by as string) === 'klient' ? 'DAP – refaktura'
                          : 'FCA – odbiór własny'}
                       </span>
                     </div>

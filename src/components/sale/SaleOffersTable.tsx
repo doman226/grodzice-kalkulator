@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { supabase } from '../../lib/supabase';
-import type { SaleOffer, OfferStatus } from '../../types';
+import type { Client, SaleOffer, SaleProfile, OfferStatus } from '../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
 import SaleOfferPDF from './SaleOfferPDF';
+import EditSaleOfferModal from './EditSaleOfferModal';
 
 interface Props {
   offers: SaleOffer[];
   onOffersChange: (offers: SaleOffer[]) => void;
+  clients: Client[];
+  saleProfiles: SaleProfile[];
+  onClientAdded: (c: Client) => void;
 }
 
 const STATUS_LABELS: Record<OfferStatus, string> = {
@@ -29,13 +33,14 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-export default function SaleOffersTable({ offers, onOffersChange }: Props) {
+export default function SaleOffersTable({ offers, onOffersChange, clients, saleProfiles, onClientAdded }: Props) {
   const [search, setSearch]         = useState('');
   const [expanded, setExpanded]     = useState<string | null>(null);
   const [statusSaving, setStatusSaving] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState<string | null>(null);
   const [toast, setToast]           = useState('');
   const [error, setError]           = useState('');
+  const [editOffer, setEditOffer]   = useState<SaleOffer | null>(null);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -57,6 +62,12 @@ export default function SaleOffersTable({ offers, onOffersChange }: Props) {
     } finally {
       setPdfLoading(null);
     }
+  }
+
+  function handleOfferUpdated(updated: SaleOffer) {
+    onOffersChange(offers.map(o => o.id === updated.id ? updated : o));
+    setEditOffer(null);
+    showToast('Oferta zaktualizowana ✓');
   }
 
   async function changeStatus(offer: SaleOffer, newStatus: OfferStatus) {
@@ -83,6 +94,18 @@ export default function SaleOffersTable({ offers, onOffersChange }: Props) {
 
   return (
     <div className="space-y-4">
+
+      {/* Modal edycji */}
+      {editOffer && (
+        <EditSaleOfferModal
+          offer={editOffer}
+          clients={clients}
+          saleProfiles={saleProfiles}
+          onSaved={handleOfferUpdated}
+          onClose={() => setEditOffer(null)}
+          onClientAdded={onClientAdded}
+        />
+      )}
 
       {/* Toast */}
       {toast && (
@@ -244,7 +267,7 @@ export default function SaleOffersTable({ offers, onOffersChange }: Props) {
                             <div>
                               <span className="text-gray-500">Dostawa:</span>{' '}
                               <strong className={
-                                offer.delivery_paid_by === 'dap_extra' || offer.delivery_paid_by === 'klient' ? 'text-orange-600'
+                                (offer.delivery_paid_by as string) === 'dap_extra' || (offer.delivery_paid_by as string) === 'klient' ? 'text-orange-600'
                                 : offer.delivery_paid_by === 'fca' ? 'text-green-700'
                                 : ''
                               }>
@@ -253,8 +276,8 @@ export default function SaleOffersTable({ offers, onOffersChange }: Props) {
                                   : `${formatPLN(offer.delivery_cost_total ?? 0)} PLN`}
                                 {' '}
                                 <span className="font-normal text-xs">(
-                                  {offer.delivery_paid_by === 'dap_included' || offer.delivery_paid_by === 'intra' ? 'DAP – w cenie'
-                                  : offer.delivery_paid_by === 'dap_extra' || offer.delivery_paid_by === 'klient' ? 'DAP – refaktura'
+                                  {(offer.delivery_paid_by as string) === 'dap_included' || (offer.delivery_paid_by as string) === 'intra' ? 'DAP – w cenie'
+                                  : (offer.delivery_paid_by as string) === 'dap_extra' || (offer.delivery_paid_by as string) === 'klient' ? 'DAP – refaktura'
                                   : 'FCA'}
                                 )</span>
                               </strong>
@@ -345,8 +368,17 @@ export default function SaleOffersTable({ offers, onOffersChange }: Props) {
                           <p className="text-xs text-gray-600 italic">Notatki: {offer.notes}</p>
                         )}
 
-                        {/* Przycisk PDF */}
-                        <div className="flex justify-end pt-2 border-t border-blue-200">
+                        {/* Przyciski akcji */}
+                        <div className="flex justify-end gap-2 pt-2 border-t border-blue-200">
+                          <button
+                            onClick={() => setEditOffer(offer)}
+                            className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+                          >
+                            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                            </svg>
+                            Edytuj
+                          </button>
                           <button
                             onClick={() => handleDownloadPDF(offer)}
                             disabled={pdfLoading === offer.id}

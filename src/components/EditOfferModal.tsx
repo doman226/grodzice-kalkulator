@@ -80,10 +80,10 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
     offer.transport_trucks ?? ''
   );
   const [transportPaidBy, setTransportPaidBy] = useState<'dap_included' | 'dap_extra' | 'fca'>(() => {
-    const v = offer.transport_paid_by;
+    const v = offer.transport_paid_by as string | undefined;
     if (v === 'intra') return 'dap_included';
     if (v === 'klient') return 'dap_extra';
-    return v ?? 'dap_included';
+    return (v as 'dap_included' | 'dap_extra' | 'fca') ?? 'dap_included';
   });
   const [transportFrom, setTransportFrom] = useState(offer.transport_from ?? 'Magazyn Intra B.V.');
   const [transportTo, setTransportTo] = useState(offer.transport_to ?? '');

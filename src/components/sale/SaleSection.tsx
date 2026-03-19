@@ -108,7 +108,13 @@ export default function SaleSection({ clients, onClientAdded }: Props) {
                 <SaleProfilesTable profiles={profiles} onProfilesChange={setProfiles} />
               )}
               {activeTab === 'offers'   && (
-                <SaleOffersTable offers={saleOffers} onOffersChange={setSaleOffers} />
+                <SaleOffersTable
+                  offers={saleOffers}
+                  onOffersChange={setSaleOffers}
+                  clients={clients}
+                  saleProfiles={profiles}
+                  onClientAdded={onClientAdded}
+                />
               )}
             </>
           )}
