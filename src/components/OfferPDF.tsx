@@ -487,8 +487,8 @@ export default function OfferPDF({ offer }: Props) {
             <Text style={s.priceSuffix}> PLN netto</Text>
           </Text>
           <View style={s.priceRow}>
-            <Text>{formatPLN(offer.wall_area_m2 > 0 ? totalWithTransport / offer.wall_area_m2 : offer.cost_per_m2)} PLN/m²</Text>
-            <Text>{formatPLN(offer.mass_t > 0 ? totalWithTransport / offer.mass_t : offer.cost_per_ton)} PLN/t</Text>
+            <Text>Koszt dzierżawy za m²: {formatPLN(offer.wall_area_m2 > 0 ? totalWithTransport / offer.wall_area_m2 : offer.cost_per_m2)} PLN/m²</Text>
+            <Text>Koszt dzierżawy za tonę: {formatPLN(offer.mass_t > 0 ? totalWithTransport / offer.mass_t : offer.cost_per_ton)} PLN/t</Text>
           </View>
         </View>
 
@@ -611,7 +611,10 @@ export default function OfferPDF({ offer }: Props) {
         <Text style={s.sectionTitle}>Warunki płatności:</Text>
         <View style={s.conditionsBox}>
           <Text style={[s.conditionItem, { marginBottom: 0 }]}>
-            - {offer.payment_days ?? 30} dni od daty wystawienia faktury, z zastrzeżeniem uzyskania zabezpieczenia wartości zamówienia (Limit kupiecki, gwarancja bankowa, gwarancja płatności publicznego inwestora lub inne zabezpieczenie zaakceptowane przez Intra BV).
+            {offer.payment_days === 0
+              ? '- Przedpłata – płatność wymagana przed realizacją zlecenia.'
+              : `- ${offer.payment_days ?? 30} dni od daty wystawienia faktury, z zastrzeżeniem uzyskania zabezpieczenia wartości zamówienia (Limit kupiecki, gwarancja bankowa, gwarancja płatności publicznego inwestora lub inne zabezpieczenie zaakceptowane przez Intra BV).`
+            }
           </Text>
         </View>
 

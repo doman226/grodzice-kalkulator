@@ -44,9 +44,9 @@ export const COMPARISON_WEEKS = [4, 8, 12, 16, 20, 26];
 
 export function formatPLN(value: number): string {
   return new Intl.NumberFormat('pl-PL', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.ceil(value));
 }
 
 export function formatNumber(value: number, decimals = 3): string {

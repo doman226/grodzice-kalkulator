@@ -369,10 +369,16 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Termin płatności [dni]</label>
-              <input type="number" min={1} value={paymentDays}
-                onChange={e => setPaymentDays(Math.max(1, parseInt(e.target.value) || 30))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Termin płatności</label>
+              <select value={paymentDays} onChange={e => setPaymentDays(parseInt(e.target.value))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value={0}>Przedpłata</option>
+                <option value={7}>7 dni</option>
+                <option value={14}>14 dni</option>
+                <option value={21}>21 dni</option>
+                <option value={30}>30 dni</option>
+                <option value={60}>60 dni</option>
+              </select>
             </div>
           </div>
 

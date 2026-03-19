@@ -82,6 +82,7 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
     const matchSearch =
       o.offer_number.toLowerCase().includes(search.toLowerCase()) ||
       (o.client?.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      (o.client?.nip ?? '').includes(search) ||
       o.profile_name.toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === 'wszystkie' || o.status === filterStatus;
     return matchSearch && matchStatus;
@@ -107,7 +108,7 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
         </div>
         <input
           type="text"
-          placeholder="Szukaj po numerze, kliencie, profilu..."
+          placeholder="Szukaj po numerze, kliencie, NIP, profilu..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -370,7 +371,7 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
                 </div>
                 <div>
                   <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Termin płatności</h4>
-                  <p className="text-sm text-gray-700">{selected.payment_days ?? 30} dni od faktury</p>
+                  <p className="text-sm text-gray-700">{selected.payment_days === 0 ? 'Przedpłata' : `${selected.payment_days ?? 30} dni od faktury`}</p>
                 </div>
               </section>
 
