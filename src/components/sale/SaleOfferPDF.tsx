@@ -303,7 +303,7 @@ export default function SaleOfferPDF({ offer }: Props) {
                   {item.is_paired ? ' ×2' : ''}
                 </Text>
                 <Text style={[s.tdLabel, { flex: 2.0, color: C.gray700 }]}>
-                  {item.steel_grade ?? '—'}
+                  {item.steel_grade?.toUpperCase() ?? '—'}
                 </Text>
                 <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'center' }]}>
                   {item.is_paired
