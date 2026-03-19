@@ -265,9 +265,7 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
     return { trucks, autoTrucks, costPerTruck, totalInCurrency, totalCostPLN };
   }, [isValid, totals.totalMassT, deliveryCostPerTruck, customDeliveryTrucks, currency, exchangeRate]);
 
-  const deliveryCostPLN       = (deliveryPaidBy === 'intra' && deliveryCalc) ? deliveryCalc.totalCostPLN    : 0;
   const deliveryCostCurrency  = (deliveryPaidBy === 'intra' && deliveryCalc) ? deliveryCalc.totalInCurrency : 0;
-  const totalForClientPLN     = totals.totalSellPLN + deliveryCostPLN;
   // Łącznie w wybranej walucie: towary + dostawa (obie w tej samej jednostce)
   const totalForClientInCurrency = (currency === 'EUR' ? totals.totalSellEUR : totals.totalSellPLN) + deliveryCostCurrency;
 
@@ -503,7 +501,7 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
                   {/* Mini wyniki */}
                   {r.valid && (
                     <div className="ml-auto text-right text-xs text-gray-500 space-y-0.5">
-                      <p>{r.isPaired && <span className="text-blue-600 font-medium">×2 parowane · </span>}
+                      <p>{items[idx].isPaired && <span className="text-blue-600 font-medium">×2 parowane · </span>}
                         {formatNumber(r.totalLengthM, 1)} m · {formatNumber(r.massT, 3)} t</p>
                       {item.sellPriceEurT > 0 && (
                         <p className="font-semibold text-gray-800">

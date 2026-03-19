@@ -194,11 +194,9 @@ export default function SaveSaleOfferModal({
     onSaved(savedOffer);
   }
 
-  const deliveryCostPLN       = delivery?.paidBy === 'intra' ? (delivery.totalCostPLN ?? 0) : 0;
-  const deliveryCostCurrency  = delivery?.paidBy === 'intra'
+  const deliveryCostCurrency   = delivery?.paidBy === 'intra'
     ? (currency === 'EUR' ? delivery.totalCostPLN / exchangeRate : delivery.totalCostPLN)
     : 0;
-  const totalForClientPLN     = totals.totalSellPLN + deliveryCostPLN;
   const totalForClientCurrency = (currency === 'EUR' ? totals.totalSellEUR : totals.totalSellPLN) + deliveryCostCurrency;
   const year = new Date().getFullYear();
 
