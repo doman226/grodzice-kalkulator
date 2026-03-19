@@ -10,7 +10,7 @@ import SaleSection from './components/sale/SaleSection';
 
 type Mode = 'rental' | 'sale';
 type Tab = 'calculator' | 'profiles' | 'prices' | 'clients' | 'offers';
-type SaleTab = 'calculator' | 'offers' | 'prices' | 'profiles';
+type SaleTab = 'calculator' | 'offers' | 'clients' | 'prices' | 'profiles';
 
 function App() {
   const [mode, setMode] = useState<Mode>('rental');
@@ -80,7 +80,8 @@ function App() {
 
   const saleTabs: { id: SaleTab; label: string; badge?: number }[] = [
     { id: 'calculator', label: 'Kalkulator' },
-    { id: 'offers',     label: 'Oferty SP', badge: saleOffersCount || undefined },
+    { id: 'offers',     label: 'Oferty SP',  badge: saleOffersCount  || undefined },
+    { id: 'clients',    label: 'Klienci',    badge: clients.length   || undefined },
     { id: 'prices',     label: 'Cennik' },
     { id: 'profiles',   label: 'Profile VL' },
   ];
@@ -180,6 +181,7 @@ function App() {
           <SaleSection
             clients={clients}
             onClientAdded={(c) => setClients(prev => [...prev, c])}
+            onClientsChange={setClients}
             activeTab={saleActiveTab}
             onTabChange={setSaleActiveTab}
             onOffersCountChange={setSaleOffersCount}

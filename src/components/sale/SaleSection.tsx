@@ -5,18 +5,20 @@ import SaleCalculator from './SaleCalculator';
 import SalePriceMatrix from './SalePriceMatrix';
 import SaleProfilesTable from './SaleProfilesTable';
 import SaleOffersTable from './SaleOffersTable';
+import ClientsTable from '../ClientsTable';
 
-type SaleTab = 'calculator' | 'offers' | 'prices' | 'profiles';
+type SaleTab = 'calculator' | 'offers' | 'clients' | 'prices' | 'profiles';
 
 interface Props {
   clients: Client[];
   onClientAdded: (c: Client) => void;
+  onClientsChange: (clients: Client[]) => void;
   activeTab: SaleTab;
   onTabChange: (tab: SaleTab) => void;
   onOffersCountChange: (count: number) => void;
 }
 
-export default function SaleSection({ clients, onClientAdded, activeTab, onTabChange, onOffersCountChange }: Props) {
+export default function SaleSection({ clients, onClientAdded, onClientsChange, activeTab, onTabChange, onOffersCountChange }: Props) {
   const [profiles, setProfiles]     = useState<SaleProfile[]>([]);
   const [saleOffers, setSaleOffers] = useState<SaleOffer[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -88,6 +90,9 @@ export default function SaleSection({ clients, onClientAdded, activeTab, onTabCh
               saleProfiles={profiles}
               onClientAdded={onClientAdded}
             />
+          )}
+          {activeTab === 'clients'  && (
+            <ClientsTable clients={clients} onClientsChange={onClientsChange} />
           )}
           {activeTab === 'prices'   && <SalePriceMatrix />}
           {activeTab === 'profiles' && (
