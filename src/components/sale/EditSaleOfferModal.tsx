@@ -224,13 +224,23 @@ export default function EditSaleOfferModal({
     return { totalMassT, totalCostEUR, totalSellEUR, totalSellPLN, overallMarginPct };
   }, [itemResults]);
 
-  // ── Koszty transportu ──
-  const trucks       = typeof deliveryTrucks       === 'number' ? deliveryTrucks       : 0;
-  const costPerTruck = typeof deliveryCostPerTruck === 'number' ? deliveryCostPerTruck : 0;
-  const deliveryCostInCurrency = trucks * costPerTruck;
-  const deliveryCostTotalPLN   = currency === 'EUR'
-    ? deliveryCostInCurrency * exchangeRate
-    : deliveryCostInCurrency;
+  const isEUR = currency === 'EUR';
+
+  // ── Koszty transportu (identyczna logika jak SaleCalculator) ──
+  const TRUCK_CAPACITY_T = 24.5;
+  const deliveryCalc = useMemo(() => {
+    if (totals.totalMassT <= 0) return null;
+    const autoTrucks   = Math.ceil(totals.totalMassT / TRUCK_CAPACITY_T);
+    const manualTrucks = typeof deliveryTrucks === 'number' && deliveryTrucks > 0 ? deliveryTrucks : null;
+    const trucks       = manualTrucks ?? autoTrucks;
+    const cpt          = typeof deliveryCostPerTruck === 'number' ? deliveryCostPerTruck : 0;
+    const totalInCurrency = trucks * cpt;
+    const totalCostPLN    = currency === 'EUR' ? totalInCurrency * exchangeRate : totalInCurrency;
+    return { trucks, autoTrucks, costPerTruck: cpt, totalInCurrency, totalCostPLN };
+  }, [totals.totalMassT, deliveryTrucks, deliveryCostPerTruck, currency, exchangeRate]);
+
+  const deliveryCostCurrency     = (deliveryPaidBy === 'dap_included' && deliveryCalc) ? deliveryCalc.totalInCurrency : 0;
+  const totalForClientInCurrency = (isEUR ? totals.totalSellEUR : totals.totalSellPLN) + deliveryCostCurrency;
 
   // ── Zapis ──
   async function handleSave() {
@@ -250,7 +260,7 @@ export default function EditSaleOfferModal({
     setSaving(true);
     setError('');
 
-    const hasTransport = deliveryPaidBy !== 'fca' && costPerTruck > 0 && trucks > 0;
+    const hasTransport = deliveryPaidBy !== 'fca' && deliveryCalc !== null && deliveryCalc.costPerTruck > 0;
 
     const { data, error: err } = await supabase
       .from('sale_offers')
@@ -266,9 +276,9 @@ export default function EditSaleOfferModal({
         total_sell_eur:            totals.totalSellEUR,
         total_sell_pln:            totals.totalSellPLN,
         margin_pct:                totals.overallMarginPct,
-        delivery_trucks:           hasTransport ? trucks    : null,
-        delivery_cost_per_truck:   hasTransport ? costPerTruck : null,
-        delivery_cost_total:       hasTransport ? deliveryCostTotalPLN : null,
+        delivery_trucks:           hasTransport ? deliveryCalc!.trucks         : null,
+        delivery_cost_per_truck:   hasTransport ? deliveryCalc!.costPerTruck   : null,
+        delivery_cost_total:       hasTransport ? deliveryCalc!.totalCostPLN   : null,
         delivery_paid_by:          deliveryPaidBy,
         delivery_from:             deliveryFrom.trim() || null,
         delivery_to:               deliveryTo.trim()   || null,
@@ -339,8 +349,6 @@ export default function EditSaleOfferModal({
     updatedOffer.items = (insertedItems ?? []) as SaleOfferItem[];
     onSaved(updatedOffer);
   }
-
-  const isEUR = currency === 'EUR';
 
   return (
     <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
@@ -512,15 +520,27 @@ export default function EditSaleOfferModal({
             {totals.totalMassT > 0 && (
               <div className="mt-3 flex flex-wrap gap-4 text-sm px-1">
                 <span className="text-gray-500">Masa łączna: <strong className="text-gray-800">{formatNumber(totals.totalMassT, 3)} t</strong></span>
-                <span className="text-gray-500">Wartość:
+                <span className="text-gray-500">Towary:
                   <strong className="text-blue-900 ml-1">
                     {isEUR ? `${formatEUR(totals.totalSellEUR)} EUR` : `${formatPLN(totals.totalSellPLN)} PLN`}
                   </strong>
                 </span>
+                {deliveryPaidBy === 'dap_included' && deliveryCostCurrency > 0 && (
+                  <span className="text-gray-500">+ Transport:
+                    <strong className="text-blue-900 ml-1">
+                      {isEUR ? `${formatEUR(deliveryCostCurrency)} EUR` : `${formatPLN(deliveryCostCurrency)} PLN`}
+                    </strong>
+                  </span>
+                )}
+                {deliveryPaidBy === 'dap_included' && deliveryCostCurrency > 0 && (
+                  <span className="font-semibold text-blue-900">
+                    = {isEUR ? `${formatEUR(totalForClientInCurrency)} EUR` : `${formatPLN(totalForClientInCurrency)} PLN`}
+                  </span>
+                )}
                 <span className={`font-semibold ${
                   totals.overallMarginPct < 0 ? 'text-red-600' : totals.overallMarginPct < 5 ? 'text-orange-600' : 'text-green-700'
                 }`}>
-                  Marża łączna: {totals.overallMarginPct.toFixed(1)}%
+                  Marża: {totals.overallMarginPct.toFixed(1)}%
                 </span>
               </div>
             )}
@@ -622,15 +642,15 @@ export default function EditSaleOfferModal({
               {deliveryPaidBy !== 'fca' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">
-                      Liczba aut
-                    </label>
+                    <label className="block text-xs text-gray-500 mb-1">Liczba aut</label>
                     <input type="number" min={1} step={1}
-                      value={deliveryTrucks}
-                      placeholder="np. 2"
-                      onChange={e => setDeliveryTrucks(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1))}
+                      value={deliveryTrucks === '' ? (deliveryCalc?.autoTrucks ?? 1) : deliveryTrucks}
+                      onChange={e => setDeliveryTrucks(Math.max(1, parseInt(e.target.value) || 1))}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Ładowność: 24,5 t · Szacunek: <strong>{deliveryCalc?.autoTrucks ?? '—'}</strong> aut
+                    </p>
                   </div>
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">
@@ -643,18 +663,21 @@ export default function EditSaleOfferModal({
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-                  {costPerTruck > 0 && trucks > 0 && (
+                  {deliveryCalc && deliveryCalc.costPerTruck > 0 && (
                     <div className="col-span-2">
                       <p className={`text-sm font-semibold ${deliveryPaidBy === 'dap_extra' ? 'text-orange-700' : 'text-gray-700'}`}>
                         Łączny koszt transportu:{' '}
                         {isEUR
-                          ? `${formatEUR(deliveryCostInCurrency)} EUR`
-                          : `${formatPLN(deliveryCostInCurrency)} PLN`}
+                          ? `${formatEUR(deliveryCalc.totalInCurrency)} EUR`
+                          : `${formatPLN(deliveryCalc.totalInCurrency)} PLN`}
                         {isEUR && <span className="text-xs font-normal text-gray-400 ml-1">
-                          ({formatPLN(deliveryCostTotalPLN)} PLN)
+                          ({formatPLN(deliveryCalc.totalCostPLN)} PLN)
                         </span>}
                         {deliveryPaidBy === 'dap_extra' && (
                           <span className="ml-2 text-xs text-orange-600 font-normal">– refaktura na klienta</span>
+                        )}
+                        {deliveryPaidBy === 'dap_included' && (
+                          <span className="ml-2 text-xs text-blue-600 font-normal">– wliczony w cenę</span>
                         )}
                       </p>
                     </div>
