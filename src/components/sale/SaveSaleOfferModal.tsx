@@ -33,6 +33,15 @@ interface Totals {
   overallMarginPct: number;
 }
 
+interface DeliveryData {
+  trucks: number;
+  costPerTruck: number;
+  totalCostPLN: number;
+  paidBy: 'intra' | 'klient';
+  from: string;
+  to: string;
+}
+
 interface Props {
   clients: Client[];
   items: SaleItemSnapshot[];
@@ -40,6 +49,7 @@ interface Props {
   currency: 'EUR' | 'PLN';
   exchangeRate: number;
   nbpDate: string;   // YYYY-MM-DD lub '' dla kursu ręcznego
+  delivery: DeliveryData | null;
   onSaved: (offer: SaleOffer) => void;
   onClose: () => void;
   onClientAdded: (c: Client) => void;
@@ -55,7 +65,7 @@ const SALES_REPS = [
 // ─── Komponent ────────────────────────────────────────────────────────────────
 
 export default function SaveSaleOfferModal({
-  clients, items, totals, currency, exchangeRate, nbpDate,
+  clients, items, totals, currency, exchangeRate, nbpDate, delivery,
   onSaved, onClose, onClientAdded,
 }: Props) {
   const [clientId, setClientId]       = useState('');
@@ -127,10 +137,16 @@ export default function SaveSaleOfferModal({
         prepared_by:    preparedBy,
         currency,
         exchange_rate:  exchangeRate,
-        total_cost_eur: totals.totalCostEUR,
-        total_sell_eur: totals.totalSellEUR,
-        total_sell_pln: totals.totalSellPLN,
-        margin_pct:     totals.overallMarginPct,
+        total_cost_eur:          totals.totalCostEUR,
+        total_sell_eur:          totals.totalSellEUR,
+        total_sell_pln:          totals.totalSellPLN,
+        margin_pct:              totals.overallMarginPct,
+        delivery_trucks:         delivery?.trucks          ?? null,
+        delivery_cost_per_truck: delivery?.costPerTruck    ?? null,
+        delivery_cost_total:     delivery?.totalCostPLN    ?? null,
+        delivery_paid_by:        delivery?.paidBy          ?? null,
+        delivery_from:           delivery?.from?.trim()    || null,
+        delivery_to:             delivery?.to?.trim()      || null,
       })
       .select('*, client:clients(*)')
       .single();
@@ -178,6 +194,8 @@ export default function SaveSaleOfferModal({
     onSaved(savedOffer);
   }
 
+  const deliveryCostPLN  = delivery?.paidBy === 'intra' ? (delivery.totalCostPLN ?? 0) : 0;
+  const totalForClientPLN = totals.totalSellPLN + deliveryCostPLN;
   const year = new Date().getFullYear();
 
   return (
@@ -233,6 +251,30 @@ export default function SaveSaleOfferModal({
                   {totals.overallMarginPct.toFixed(1)}%
                 </strong>
               </div>
+              {delivery && delivery.costPerTruck > 0 && (
+                <>
+                  <div className="flex justify-between text-sm pt-1 border-t border-blue-200">
+                    <span className={delivery.paidBy === 'klient' ? 'text-orange-600' : 'text-gray-500'}>
+                      Dostawa ({delivery.trucks} aut{delivery.trucks > 1 ? 'a' : ''})
+                      {delivery.paidBy === 'klient' && <span className="ml-1 font-medium">[klient]</span>}:
+                    </span>
+                    <strong className={delivery.paidBy === 'klient' ? 'text-orange-600' : ''}>
+                      {formatPLN(delivery.totalCostPLN)} PLN
+                    </strong>
+                  </div>
+                  {delivery.paidBy === 'intra' && (
+                    <div className="flex justify-between text-sm font-semibold pt-1 border-t border-blue-200 text-blue-900">
+                      <span>Łącznie dla klienta:</span>
+                      <span>{formatPLN(totalForClientPLN)} PLN</span>
+                    </div>
+                  )}
+                  {(delivery.from || delivery.to) && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      🚛 {delivery.from}{delivery.to ? ` → ${delivery.to}` : ''}
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           </div>
 

@@ -76,6 +76,14 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
   const [applyAllSellPrice, setApplyAllSellPrice] = useState<number>(0);
   const [showSaveModal, setShowSaveModal]         = useState(false);
 
+  // Dostawa
+  const TRUCK_CAPACITY_T = 24.5;
+  const [deliveryCostPerTruck, setDeliveryCostPerTruck] = useState<number | ''>('');
+  const [customDeliveryTrucks, setCustomDeliveryTrucks] = useState<number | ''>('');
+  const [deliveryPaidBy, setDeliveryPaidBy]             = useState<'intra' | 'klient'>('intra');
+  const [deliveryFrom, setDeliveryFrom]                 = useState('Magazyn Intra B.V.');
+  const [deliveryTo, setDeliveryTo]                     = useState('');
+
   const exchangeRate = nbpRate.rate;
 
   useEffect(() => { loadData(); loadNBP(); }, []);
@@ -240,6 +248,20 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
 
   const isValid = totals.totalMassT > 0;
   const hasAllSellPrices = items.every(i => i.sellPriceEurT > 0);
+
+  // Obliczenia dostawy
+  const deliveryCalc = useMemo(() => {
+    if (!isValid) return null;
+    const autoTrucks  = Math.ceil(totals.totalMassT / TRUCK_CAPACITY_T);
+    const trucks      = typeof customDeliveryTrucks === 'number' && customDeliveryTrucks > 0
+      ? customDeliveryTrucks : autoTrucks;
+    const costPerTruck = typeof deliveryCostPerTruck === 'number' ? deliveryCostPerTruck : 0;
+    return { trucks, autoTrucks, costPerTruck, totalCostPLN: trucks * costPerTruck };
+  }, [isValid, totals.totalMassT, deliveryCostPerTruck, customDeliveryTrucks]);
+
+  const deliveryCostPLN = (deliveryPaidBy === 'intra' && deliveryCalc)
+    ? deliveryCalc.totalCostPLN : 0;
+  const totalForClientPLN = totals.totalSellPLN + deliveryCostPLN;
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -622,6 +644,126 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
             </div>
           )}
 
+          {/* ── DOSTAWA ── */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">Koszty dostawy</h2>
+            <p className="text-xs text-gray-400 mb-4">
+              Ładowność auta: 24,5 t · Szacowana liczba aut:{' '}
+              <strong className="text-gray-700">{deliveryCalc?.autoTrucks ?? '—'}</strong>
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Koszt / auto */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Koszt dostawy / auto [PLN]</label>
+                <input
+                  type="number" min={0} step={100}
+                  value={deliveryCostPerTruck}
+                  placeholder="np. 2500"
+                  onChange={e => setDeliveryCostPerTruck(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value)))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Liczba aut */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Liczba aut{' '}
+                  <span className="text-xs text-gray-400 font-normal">
+                    (auto: {deliveryCalc?.autoTrucks ?? '—'})
+                  </span>
+                </label>
+                <input
+                  type="number" min={1} step={1}
+                  value={customDeliveryTrucks}
+                  placeholder={String(deliveryCalc?.autoTrucks ?? '—')}
+                  onChange={e => setCustomDeliveryTrucks(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value)))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Skąd */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Skąd</label>
+                <input
+                  type="text" value={deliveryFrom}
+                  onChange={e => setDeliveryFrom(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Dokąd */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Dokąd</label>
+                <input
+                  type="text" value={deliveryTo}
+                  placeholder="ul. Przykładowa 1, Warszawa"
+                  onChange={e => setDeliveryTo(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Kto płaci + podsumowanie */}
+            <div className="mt-4 flex flex-wrap items-center gap-6">
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-1">Koszt dostawy po stronie:</p>
+                <div className="flex gap-4">
+                  {(['intra', 'klient'] as const).map(val => (
+                    <label key={val} className="flex items-center gap-1.5 cursor-pointer text-sm">
+                      <input type="radio" name="deliveryPaidBy" value={val}
+                        checked={deliveryPaidBy === val}
+                        onChange={() => setDeliveryPaidBy(val)}
+                        className="accent-blue-900" />
+                      <span className="font-medium">{val === 'intra' ? 'Intra B.V.' : 'Klient'}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {deliveryCalc && deliveryCalc.costPerTruck > 0 && (
+                <div className={`ml-auto rounded-lg px-5 py-3 text-right ${
+                  deliveryPaidBy === 'klient' ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-200'
+                }`}>
+                  <p className="text-xs text-gray-500 mb-0.5">
+                    {deliveryCalc.trucks} auto{deliveryCalc.trucks > 1 ? 'a' : ''} × {formatPLN(deliveryCalc.costPerTruck)} PLN
+                  </p>
+                  <p className="text-xl font-bold text-gray-800">{formatPLN(deliveryCalc.totalCostPLN)} PLN</p>
+                  <p className={`text-xs font-medium mt-0.5 ${deliveryPaidBy === 'klient' ? 'text-orange-600' : 'text-gray-500'}`}>
+                    {deliveryPaidBy === 'klient' ? '⚠ Koszt po stronie klienta' : 'Koszt po stronie Intra B.V.'}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Łączna kwota dla klienta */}
+            {deliveryCalc && deliveryCalc.costPerTruck > 0 && hasAllSellPrices && (
+              <div className={`mt-4 rounded-xl p-4 ${
+                deliveryPaidBy === 'intra'
+                  ? 'bg-blue-900 text-white'
+                  : 'bg-orange-50 border border-orange-200'
+              }`}>
+                {deliveryPaidBy === 'intra' ? (
+                  <>
+                    <p className="text-blue-200 text-xs mb-0.5">Łączna kwota dla klienta (towary + dostawa)</p>
+                    <p className="text-2xl font-bold">{formatPLN(totalForClientPLN)} PLN</p>
+                    <p className="text-sm text-blue-300 mt-0.5">
+                      towary {formatEUR(totals.totalSellEUR)} EUR ({formatPLN(totals.totalSellPLN)} PLN)
+                      + dostawa {formatPLN(deliveryCalc.totalCostPLN)} PLN
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-orange-700 text-sm font-medium">Klient sam organizuje dostawę</p>
+                    <p className="text-orange-600 text-xs mt-0.5">
+                      + {formatPLN(deliveryCalc.totalCostPLN)} PLN dostawa (po stronie klienta)
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Przycisk zapisu oferty */}
           <div className="flex justify-end">
             <button
@@ -671,6 +813,14 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
             currency={currency}
             exchangeRate={exchangeRate}
             nbpDate={nbpRate.date}
+            delivery={deliveryCalc && deliveryCalc.costPerTruck > 0 ? {
+              trucks:       deliveryCalc.trucks,
+              costPerTruck: deliveryCalc.costPerTruck,
+              totalCostPLN: deliveryCalc.totalCostPLN,
+              paidBy:       deliveryPaidBy,
+              from:         deliveryFrom,
+              to:           deliveryTo,
+            } : null}
             onSaved={offer => { onOfferSaved(offer); setShowSaveModal(false); }}
             onClose={() => setShowSaveModal(false)}
             onClientAdded={onClientAdded}

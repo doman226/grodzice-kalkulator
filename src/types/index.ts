@@ -58,6 +58,12 @@ export interface SaleOffer {
   total_sell_eur?: number;
   total_sell_pln?: number;
   margin_pct?: number;
+  delivery_trucks?: number;
+  delivery_cost_per_truck?: number;
+  delivery_cost_total?: number;
+  delivery_paid_by?: 'intra' | 'klient';
+  delivery_from?: string;
+  delivery_to?: string;
   created_at: string;
   updated_at: string;
   items?: SaleOfferItem[];

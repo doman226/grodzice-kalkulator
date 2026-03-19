@@ -212,9 +212,6 @@ export default function SaleOffersTable({ offers, onOffersChange }: Props) {
                           {offer.prepared_by && (
                             <div><span className="text-gray-500">Opiekun:</span> <strong>{offer.prepared_by}</strong></div>
                           )}
-                          {offer.delivery_info && (
-                            <div><span className="text-gray-500">Dostawa:</span> <strong>{offer.delivery_info}</strong></div>
-                          )}
                           <div>
                             <span className="text-gray-500">Płatność:</span>{' '}
                             <strong>{offer.payment_days === 0 ? 'Przedpłata' : `${offer.payment_days} dni`}</strong>
@@ -223,6 +220,24 @@ export default function SaleOffersTable({ offers, onOffersChange }: Props) {
                             <span className="text-gray-500">Kurs EUR:</span>{' '}
                             <strong>{offer.exchange_rate?.toFixed(4) ?? '—'} PLN</strong>
                           </div>
+                          {offer.delivery_cost_total != null && offer.delivery_cost_total > 0 && (
+                            <div>
+                              <span className="text-gray-500">Dostawa:</span>{' '}
+                              <strong className={offer.delivery_paid_by === 'klient' ? 'text-orange-600' : ''}>
+                                {formatPLN(offer.delivery_cost_total)} PLN
+                                {' '}({offer.delivery_paid_by === 'klient' ? 'klient' : 'Intra'})
+                              </strong>
+                            </div>
+                          )}
+                          {(offer.delivery_from || offer.delivery_to) && (
+                            <div className="col-span-2 sm:col-span-4">
+                              <span className="text-gray-500">Trasa dostawy:</span>{' '}
+                              <strong>
+                                🚛 {offer.delivery_from}
+                                {offer.delivery_to ? ` → ${offer.delivery_to}` : ''}
+                              </strong>
+                            </div>
+                          )}
                         </div>
 
                         {/* Tabela pozycji */}
