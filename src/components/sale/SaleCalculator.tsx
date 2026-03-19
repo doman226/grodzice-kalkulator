@@ -683,8 +683,8 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
               </div>
             </div>
 
-            {/* Pola kosztów – tylko dla DAP refaktura */}
-            {deliveryPaidBy === 'dap_extra' && (
+            {/* Pola kosztów – ukryte tylko dla FCA */}
+            {deliveryPaidBy !== 'fca' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Liczba aut</label>
@@ -736,10 +736,10 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
               )}
             </div>
 
-            {/* Podsumowanie – tylko dla DAP refaktura z wpisanym kosztem */}
-            {deliveryPaidBy === 'dap_extra' && deliveryCalc && deliveryCalc.costPerTruck > 0 && (
+            {/* Podsumowanie kosztów – dla DAP (obu opcji) gdy wpisano koszt */}
+            {deliveryCalc && deliveryCalc.costPerTruck > 0 && deliveryPaidBy !== 'fca' && (
               <div className="mt-2 pt-4 border-t border-gray-100 flex flex-wrap gap-4">
-                <div className="bg-orange-50 border border-orange-200 rounded-lg px-5 py-3 text-right">
+                <div className={`rounded-lg px-5 py-3 text-right ${deliveryPaidBy === 'dap_extra' ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-200'}`}>
                   <p className="text-xs text-gray-500 mb-0.5">
                     {deliveryCalc.trucks} auto{deliveryCalc.trucks > 1 ? 'a' : ''} ×{' '}
                     {currency === 'EUR' ? `${formatEUR(deliveryCalc.costPerTruck)} EUR` : `${formatPLN(deliveryCalc.costPerTruck)} PLN`}
@@ -747,9 +747,24 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
                   <p className="text-xl font-bold text-gray-800">
                     {currency === 'EUR' ? `${formatEUR(deliveryCalc.totalInCurrency)} EUR` : `${formatPLN(deliveryCalc.totalInCurrency)} PLN`}
                   </p>
-                  <p className="text-xs font-medium mt-0.5 text-orange-600">⚠ Refaktura na klienta</p>
+                  <p className={`text-xs font-medium mt-0.5 ${deliveryPaidBy === 'dap_extra' ? 'text-orange-600' : 'text-gray-500'}`}>
+                    {deliveryPaidBy === 'dap_extra' ? '⚠ Refaktura na klienta' : 'Koszt po stronie Intra B.V.'}
+                  </p>
                 </div>
-                {hasAllSellPrices && (
+                {deliveryPaidBy === 'dap_included' && hasAllSellPrices && (
+                  <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
+                    <p className="text-blue-200 text-xs mb-0.5">Łączna kwota dla klienta (towary + dostawa)</p>
+                    <p className="text-2xl font-bold">
+                      {currency === 'EUR' ? `${formatEUR(totalForClientInCurrency)} EUR` : `${formatPLN(totalForClientInCurrency)} PLN`}
+                    </p>
+                    <p className="text-blue-300 text-xs mt-0.5">
+                      {currency === 'EUR'
+                        ? `towary ${formatEUR(totals.totalSellEUR)} EUR + dostawa ${formatEUR(deliveryCalc.totalInCurrency)} EUR`
+                        : `towary ${formatPLN(totals.totalSellPLN)} PLN + dostawa ${formatPLN(deliveryCalc.totalInCurrency)} PLN`}
+                    </p>
+                  </div>
+                )}
+                {deliveryPaidBy === 'dap_extra' && hasAllSellPrices && (
                   <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
                     <p className="text-blue-200 text-xs mb-0.5">Kwota sprzedaży (na ofercie)</p>
                     <p className="text-2xl font-bold">

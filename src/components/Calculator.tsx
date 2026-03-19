@@ -422,8 +422,8 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
               </div>
             </div>
 
-            {/* Pola kosztów – tylko dla DAP refaktura */}
-            {transportPaidBy === 'dap_extra' && (
+            {/* Pola kosztów – ukryte tylko dla FCA */}
+            {transportPaidBy !== 'fca' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Liczba aut</label>
@@ -461,19 +461,32 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
               )}
             </div>
 
-            {/* Podsumowanie – tylko dla DAP refaktura z wpisanym kosztem */}
-            {transportPaidBy === 'dap_extra' && transportCalc && transportCalc.costPerTruck > 0 && (
+            {/* Podsumowanie kosztów – dla DAP (obu opcji) gdy wpisano koszt */}
+            {transportCalc && transportCalc.costPerTruck > 0 && transportPaidBy !== 'fca' && (
               <div className="mt-2 pt-4 border-t border-gray-100 flex flex-wrap gap-4">
-                <div className="bg-orange-50 border border-orange-200 rounded-lg px-5 py-3 text-right">
+                <div className={`rounded-lg px-5 py-3 text-right ${transportPaidBy === 'dap_extra' ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-200'}`}>
                   <p className="text-xs text-gray-500 mb-0.5">{transportCalc.trucks} auto{transportCalc.trucks > 1 ? 'a' : ''} × {formatPLN(transportCalc.costPerTruck)} PLN</p>
                   <p className="text-xl font-bold text-gray-800">{formatPLN(transportCalc.totalCost)} PLN</p>
-                  <p className="text-xs font-medium mt-0.5 text-orange-600">⚠ Refaktura na klienta</p>
+                  <p className={`text-xs font-medium mt-0.5 ${transportPaidBy === 'dap_extra' ? 'text-orange-600' : 'text-gray-500'}`}>
+                    {transportPaidBy === 'dap_extra' ? '⚠ Refaktura na klienta' : 'Koszt po stronie Intra B.V.'}
+                  </p>
                 </div>
-                <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
-                  <p className="text-blue-200 text-xs mb-0.5">Koszt dzierżawy (na ofercie)</p>
-                  <p className="text-2xl font-bold">{formatPLN(rentalCost)} PLN</p>
-                  <p className="text-orange-300 text-xs mt-0.5">+ {formatPLN(transportCalc.totalCost)} PLN transport (refaktura)</p>
-                </div>
+                {transportPaidBy === 'dap_included' && (
+                  <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
+                    <p className="text-blue-200 text-xs mb-0.5">Łączny koszt dla klienta (dzierżawa + transport)</p>
+                    <p className="text-2xl font-bold">{formatPLN(rentalCost + transportCalc.totalCost)} PLN</p>
+                    <p className="text-blue-300 text-xs mt-0.5">
+                      dzierżawa {formatPLN(rentalCost)} + transport {formatPLN(transportCalc.totalCost)} PLN
+                    </p>
+                  </div>
+                )}
+                {transportPaidBy === 'dap_extra' && (
+                  <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
+                    <p className="text-blue-200 text-xs mb-0.5">Koszt dzierżawy (na ofercie)</p>
+                    <p className="text-2xl font-bold">{formatPLN(rentalCost)} PLN</p>
+                    <p className="text-orange-300 text-xs mt-0.5">+ {formatPLN(transportCalc.totalCost)} PLN transport (refaktura)</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
