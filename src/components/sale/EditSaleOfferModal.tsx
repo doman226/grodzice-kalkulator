@@ -3,6 +3,9 @@ import { supabase } from '../../lib/supabase';
 import type { Client, SaleOffer, SaleOfferItem, SaleProfile } from '../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
 
+interface Warehouse { id: string; name: string; }
+interface SalePrice { warehouse_id: string; profile_name: string; steel_grade: string; price_eur_t: number | null; }
+
 // ─── Stałe ───────────────────────────────────────────────────────────────────
 
 const SALES_REPS = [
@@ -30,7 +33,7 @@ interface EditableItem {
   quantity: number;
   lengthM: number;
   isPaired: boolean;
-  warehouseName: string;
+  warehouseId: string;
   costEurT: number;
   sellEurT: number;
 }
@@ -50,7 +53,7 @@ function itemsFromOffer(offer: SaleOffer): EditableItem[] {
   if (!offer.items || offer.items.length === 0) {
     return [{
       uid: crypto.randomUUID(), profileName: '', steelGrade: '',
-      quantity: 1, lengthM: 12, isPaired: false, warehouseName: '', costEurT: 0, sellEurT: 0,
+      quantity: 1, lengthM: 12, isPaired: false, warehouseId: '', costEurT: 0, sellEurT: 0,
     }];
   }
   return offer.items
@@ -58,14 +61,14 @@ function itemsFromOffer(offer: SaleOffer): EditableItem[] {
     .sort((a, b) => a.sort_order - b.sort_order)
     .map(item => ({
       uid: crypto.randomUUID(),
-      profileName:   item.profile_name,
-      steelGrade:    item.steel_grade,
-      quantity:      item.quantity,
-      lengthM:       item.length_m,
-      isPaired:      item.is_paired,
-      warehouseName: item.warehouse_name ?? '',
-      costEurT:      item.cost_eur_t  ?? 0,
-      sellEurT:      item.sell_eur_t  ?? 0,
+      profileName: item.profile_name,
+      steelGrade:  item.steel_grade,
+      quantity:    item.quantity,
+      lengthM:     item.length_m,
+      isPaired:    item.is_paired,
+      warehouseId: (item as { warehouse_id?: string }).warehouse_id ?? '',
+      costEurT:    item.cost_eur_t  ?? 0,
+      sellEurT:    item.sell_eur_t  ?? 0,
     }));
 }
 
@@ -75,13 +78,48 @@ export default function EditSaleOfferModal({
   offer, clients, saleProfiles, onSaved, onClose,
 }: Props) {
 
-  // ── Gatunki stali (z DB) ──
+  // ── Dane słownikowe (z DB) ──
   const [steelGrades, setSteelGrades] = useState<string[]>([]);
+  const [warehouses,  setWarehouses]  = useState<Warehouse[]>([]);
+  const [prices,      setPrices]      = useState<SalePrice[]>([]);
   useEffect(() => {
-    supabase.from('sale_steel_grades').select('name').order('sort_order').then(({ data }) => {
-      if (data) setSteelGrades(data.map((r: { name: string }) => r.name));
+    Promise.all([
+      supabase.from('sale_steel_grades').select('name').order('sort_order'),
+      supabase.from('sale_warehouses').select('id, name').order('name'),
+      supabase.from('sale_prices').select('warehouse_id, profile_name, steel_grade, price_eur_t'),
+    ]).then(([gradesRes, warehousesRes, pricesRes]) => {
+      if (gradesRes.data)    setSteelGrades(gradesRes.data.map((r: { name: string }) => r.name));
+      if (warehousesRes.data) setWarehouses(warehousesRes.data as Warehouse[]);
+      if (pricesRes.data)    setPrices(pricesRes.data as SalePrice[]);
     });
   }, []);
+
+  // Normalizuj gatunki stali w załadowanych pozycjach (dopasowanie case-insensitive)
+  useEffect(() => {
+    if (steelGrades.length === 0) return;
+    setEditItems(prev => prev.map(item => {
+      if (!item.steelGrade) return { ...item, steelGrade: steelGrades[0] };
+      if (steelGrades.includes(item.steelGrade)) return item;
+      const normalized = steelGrades.find(g => g.toLowerCase() === item.steelGrade.toLowerCase());
+      return normalized ? { ...item, steelGrade: normalized } : item;
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [steelGrades]);
+
+  // ── Mapa cennikowa: warehouseId → profileName → steelGrade → price ──
+  const priceMap = useMemo(() => {
+    const map: Record<string, Record<string, Record<string, number | null>>> = {};
+    for (const p of prices) {
+      if (!map[p.warehouse_id]) map[p.warehouse_id] = {};
+      if (!map[p.warehouse_id][p.profile_name]) map[p.warehouse_id][p.profile_name] = {};
+      map[p.warehouse_id][p.profile_name][p.steel_grade] = p.price_eur_t;
+    }
+    return map;
+  }, [prices]);
+
+  function lookupCostPrice(warehouseId: string, profileName: string, steelGrade: string): number {
+    return priceMap[warehouseId]?.[profileName]?.[steelGrade] ?? 0;
+  }
 
   // ── Pozycje ──
   const [editItems, setEditItems] = useState<EditableItem[]>(() => itemsFromOffer(offer));
@@ -122,18 +160,31 @@ export default function EditSaleOfferModal({
 
   // ── Zarządzanie pozycjami ──
   function addItem() {
+    const wh   = warehouses[0]?.id ?? '';
+    const prof = saleProfiles[0]?.name ?? '';
+    const gr   = steelGrades[0] ?? '';
     setEditItems(prev => [...prev, {
       uid: crypto.randomUUID(),
-      profileName: saleProfiles[0]?.name ?? '',
-      steelGrade: steelGrades[0] ?? '', quantity: 1, lengthM: 12,
-      isPaired: false, warehouseName: '', costEurT: 0, sellEurT: 0,
+      profileName: prof, steelGrade: gr,
+      quantity: 1, lengthM: 12, isPaired: false,
+      warehouseId: wh,
+      costEurT: lookupCostPrice(wh, prof, gr),
+      sellEurT: 0,
     }]);
   }
   function removeItem(uid: string) {
     setEditItems(prev => prev.filter(i => i.uid !== uid));
   }
   function updateItem(uid: string, patch: Partial<EditableItem>) {
-    setEditItems(prev => prev.map(i => i.uid === uid ? { ...i, ...patch } : i));
+    setEditItems(prev => prev.map(i => {
+      if (i.uid !== uid) return i;
+      const next = { ...i, ...patch };
+      // Auto-uzupełnij cenę kosztu gdy zmienia się magazyn, profil lub gatunek
+      if ('warehouseId' in patch || 'profileName' in patch || 'steelGrade' in patch) {
+        next.costEurT = lookupCostPrice(next.warehouseId, next.profileName, next.steelGrade);
+      }
+      return next;
+    }));
   }
 
   // ── Wyliczenia pozycji ──
@@ -181,6 +232,9 @@ export default function EditSaleOfferModal({
     if (editItems.length === 0) return setError('Dodaj przynajmniej jedną pozycję.');
     const hasValidItem = itemResults.some((r, i) => r !== null && editItems[i].profileName);
     if (!hasValidItem) return setError('Brak prawidłowych pozycji. Sprawdź nazwy profili.');
+    const itemsWithProfile = editItems.filter(i => i.profileName);
+    const missingGrade = itemsWithProfile.some(i => !i.steelGrade || !steelGrades.includes(i.steelGrade));
+    if (missingGrade) return setError('Wybierz prawidłowy gatunek stali dla wszystkich pozycji.');
     if (deliveryTimeline === 'huta' && !campaignWeeks.trim())
       return setError('Wpisz numer tygodnia kampanii produkcyjnej.');
     if (deliveryTerms === 'FCA' && !fcaLocation.trim())
@@ -240,10 +294,11 @@ export default function EditSaleOfferModal({
     const newItemsPayload = editItems.flatMap((item, idx) => {
       const r = itemResults[idx];
       if (!r || !item.profileName) return [];
+      const wh = warehouses.find(w => w.id === item.warehouseId);
       return [{
         offer_id:       offer.id,
-        warehouse_name: item.warehouseName.trim() || null,
-        warehouse_id:   null,
+        warehouse_id:   item.warehouseId || null,
+        warehouse_name: wh?.name ?? null,
         profile_name:   item.profileName,
         steel_grade:    item.steelGrade,
         quantity:       item.quantity,
@@ -351,13 +406,16 @@ export default function EditSaleOfferModal({
                       </div>
                       <div className="col-span-2">
                         {idx === 0 && <p className="text-xs text-gray-400 mb-1">Magazyn</p>}
-                        <input
-                          type="text"
-                          value={item.warehouseName}
-                          onChange={e => updateItem(item.uid, { warehouseName: e.target.value })}
-                          placeholder="np. Oleśnica"
-                          className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                        <select
+                          value={item.warehouseId}
+                          onChange={e => updateItem(item.uid, { warehouseId: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">— wybierz —</option>
+                          {warehouses.map(w => (
+                            <option key={w.id} value={w.id}>{w.name}</option>
+                          ))}
+                        </select>
                       </div>
                       <div className="col-span-1">
                         {idx === 0 && <p className="text-xs text-gray-400 mb-1">Ilość</p>}
