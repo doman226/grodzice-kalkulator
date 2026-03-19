@@ -468,8 +468,10 @@ export default function SaleCalculator() {
                         {formatNumber(r.totalLengthM, 1)} m · {formatNumber(r.massT, 3)} t</p>
                       {item.sellPriceEurT > 0 && (
                         <p className="font-semibold text-gray-800">
-                          {formatEUR(r.sellEUR)} EUR
-                          {currency === 'PLN' && <span className="text-gray-500"> · {formatPLN(r.sellEUR * exchangeRate)} PLN</span>}
+                          {currency === 'PLN'
+                            ? <>{formatPLN(r.sellEUR * exchangeRate)} PLN <span className="font-normal text-gray-400">· {formatEUR(r.sellEUR)} EUR</span></>
+                            : <>{formatEUR(r.sellEUR)} EUR</>
+                          }
                         </p>
                       )}
                     </div>
@@ -524,10 +526,16 @@ export default function SaleCalculator() {
                 {/* Koszt */}
                 <div className="rounded-xl border border-gray-200 p-4 bg-gray-50">
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Koszt własny</p>
-                  <p className="text-2xl font-bold text-gray-700">{formatEUR(totals.totalCostEUR)} EUR</p>
-                  {currency === 'PLN' && (
-                    <p className="text-sm text-gray-500 mt-1">≈ {formatPLN(totals.totalCostPLN)} PLN</p>
-                  )}
+                  <p className="text-2xl font-bold text-gray-700">
+                    {currency === 'PLN'
+                      ? `${formatPLN(totals.totalCostPLN)} PLN`
+                      : `${formatEUR(totals.totalCostEUR)} EUR`}
+                  </p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    {currency === 'PLN'
+                      ? `≈ ${formatEUR(totals.totalCostEUR)} EUR`
+                      : `≈ ${formatPLN(totals.totalCostPLN)} PLN`}
+                  </p>
                 </div>
 
                 {/* Sprzedaż */}
@@ -550,7 +558,9 @@ export default function SaleCalculator() {
                   <p className="text-2xl font-bold">{totals.overallMarginPct.toFixed(1)}%</p>
                   <p className="text-sm mt-1 font-medium">{marginLabel(totals.overallMarginPct)}</p>
                   <p className="text-xs mt-1 opacity-70">
-                    zysk: {formatEUR(totals.totalSellEUR - totals.totalCostEUR)} EUR
+                    zysk: {currency === 'PLN'
+                      ? `${formatPLN((totals.totalSellEUR - totals.totalCostEUR) * exchangeRate)} PLN`
+                      : `${formatEUR(totals.totalSellEUR - totals.totalCostEUR)} EUR`}
                   </p>
                 </div>
               </div>
@@ -566,7 +576,7 @@ export default function SaleCalculator() {
                         <th className="text-right px-4 py-2 font-semibold">Koszt EUR/t</th>
                         <th className="text-right px-4 py-2 font-semibold">Sprzedaż EUR/t</th>
                         <th className="text-right px-4 py-2 font-semibold">Marża %</th>
-                        <th className="text-right px-4 py-2 font-semibold">Wartość</th>
+                        <th className="text-right px-4 py-2 font-semibold">Wartość [{currency}]</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -584,7 +594,9 @@ export default function SaleCalculator() {
                             {r.marginPct.toFixed(1)}%
                           </td>
                           <td className="px-4 py-2 text-right font-bold text-gray-800">
-                            {formatEUR(r.sellEUR)} EUR
+                            {currency === 'PLN'
+                              ? `${formatPLN(r.sellEUR * exchangeRate)} PLN`
+                              : `${formatEUR(r.sellEUR)} EUR`}
                           </td>
                         </tr>
                       ))}
