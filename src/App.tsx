@@ -72,8 +72,8 @@ function App() {
 
   const tabs: { id: Tab; label: string; badge?: number }[] = [
     { id: 'calculator', label: 'Kalkulator' },
-    { id: 'clients',    label: 'Klienci',        badge: clients.length || undefined },
     { id: 'offers',     label: 'Oferty',          badge: offers.length  || undefined },
+    { id: 'clients',    label: 'Klienci',        badge: clients.length || undefined },
     { id: 'profiles',   label: 'Profile grodzic' },
     { id: 'prices',     label: 'Ustawienia cen' },
   ];
