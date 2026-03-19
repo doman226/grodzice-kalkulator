@@ -17,7 +17,7 @@ interface EditingCell {
 }
 
 // Profile których wagi wymagają weryfikacji z katalogiem Vitkovice
-const NEEDS_VERIFICATION = new Set(['VL601', 'VL602', 'VL607']);
+const NEEDS_VERIFICATION = new Set<string>([]);
 
 export default function SaleProfilesTable({ profiles, onProfilesChange }: Props) {
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
