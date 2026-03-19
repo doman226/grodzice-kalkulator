@@ -182,7 +182,9 @@ export default function SaleOfferPDF({ offer }: Props) {
   const totalSellPLN = offer.total_sell_pln ?? 0;
   const delivCostPLN = (offer.delivery_paid_by === 'intra' && offer.delivery_cost_total)
     ? offer.delivery_cost_total : 0;
+  const delivCostEUR = delivCostPLN / exchRate;
   const totalForClientPLN = totalSellPLN + delivCostPLN;
+  const totalForClientEUR = totalSellEUR + delivCostEUR;
 
   // Posortowane pozycje
   const sortedItems = [...(offer.items ?? [])].sort((a, b) => a.sort_order - b.sort_order);
@@ -282,61 +284,44 @@ export default function SaleOfferPDF({ offer }: Props) {
         {/* ── TABELA POZYCJI ── */}
         <View style={s.table}>
           <View style={s.tableHeaderRow}>
-            <Text style={[s.thCell, { flex: 2.2 }]}>Profil VL</Text>
-            <Text style={[s.thCell, { flex: 1.3 }]}>Gatunek</Text>
-            <Text style={[s.thCell, { flex: 1.5 }]}>Magazyn</Text>
-            <Text style={[s.thCell, { flex: 0.9, textAlign: 'center' }]}>Ilość</Text>
-            <Text style={[s.thCell, { flex: 0.8, textAlign: 'right' }]}>Dług. [m]</Text>
-            <Text style={[s.thCell, { flex: 1.0, textAlign: 'right' }]}>Masa [t]</Text>
-            <Text style={[s.thCell, { flex: 0.8, textAlign: 'right' }]}>EUR/t</Text>
-            <Text style={[s.thCell, { flex: 1.3, textAlign: 'right' }]}>Wartość EUR</Text>
+            <Text style={[s.thCell, { flex: 3.0 }]}>Profil VL</Text>
+            <Text style={[s.thCell, { flex: 2.0 }]}>Gatunek</Text>
+            <Text style={[s.thCell, { flex: 1.2, textAlign: 'center' }]}>Ilość</Text>
+            <Text style={[s.thCell, { flex: 1.0, textAlign: 'right' }]}>Dług. [m]</Text>
+            <Text style={[s.thCell, { flex: 1.4, textAlign: 'right' }]}>Masa [t]</Text>
           </View>
 
           {sortedItems.map((item, idx) => (
             <View key={item.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
-              <Text style={[s.tdLabel, { flex: 2.2, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+              <Text style={[s.tdLabel, { flex: 3.0, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
                 {item.profile_name}
                 {item.is_paired ? ' ×2' : ''}
               </Text>
-              <Text style={[s.tdLabel, { flex: 1.3, color: C.gray700 }]}>
+              <Text style={[s.tdLabel, { flex: 2.0, color: C.gray700 }]}>
                 {item.steel_grade?.toUpperCase() ?? '—'}
               </Text>
-              <Text style={[s.tdLabel, { flex: 1.5, color: C.gray700 }]}>
-                {item.warehouse_name ?? '—'}
-              </Text>
-              <Text style={[s.tdLabel, { flex: 0.9, textAlign: 'center' }]}>
+              <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'center' }]}>
                 {item.is_paired
                   ? `${item.quantity} par`
                   : `${item.quantity} szt.`}
               </Text>
-              <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'right' }]}>
+              <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right' }]}>
                 {item.length_m != null ? `${item.length_m} m` : '—'}
               </Text>
-              <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+              <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
                 {formatNumber(item.mass_t, 3)}
-              </Text>
-              <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'right', color: C.gray700 }]}>
-                {item.sell_eur_t != null ? item.sell_eur_t : '—'}
-              </Text>
-              <Text style={[s.tdLabel, { flex: 1.3, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
-                {item.sell_eur_total != null ? `${formatEUR(item.sell_eur_total)}` : '—'}
               </Text>
             </View>
           ))}
 
           {/* Wiersz sumy */}
           <View style={[s.tableBodyRow, { backgroundColor: C.gray100 }]}>
-            <Text style={[s.tdLabel, { flex: 2.2, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>Łącznie</Text>
-            <Text style={[s.tdLabel, { flex: 1.3 }]} />
-            <Text style={[s.tdLabel, { flex: 1.5 }]} />
-            <Text style={[s.tdLabel, { flex: 0.9 }]} />
-            <Text style={[s.tdLabel, { flex: 0.8 }]} />
-            <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+            <Text style={[s.tdLabel, { flex: 3.0, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>Łącznie</Text>
+            <Text style={[s.tdLabel, { flex: 2.0 }]} />
+            <Text style={[s.tdLabel, { flex: 1.2 }]} />
+            <Text style={[s.tdLabel, { flex: 1.0 }]} />
+            <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
               {formatNumber(totalMassT, 3)} t
-            </Text>
-            <Text style={[s.tdLabel, { flex: 0.8 }]} />
-            <Text style={[s.tdLabel, { flex: 1.3, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
-              {formatEUR(totalSellEUR)} EUR
             </Text>
           </View>
         </View>
@@ -349,10 +334,18 @@ export default function SaleOfferPDF({ offer }: Props) {
             <Text style={s.priceSuffix}> {currency} netto</Text>
           </Text>
           <View style={s.priceRow}>
-            {isEUR ? (
-              <Text>Równowartość: {formatPLN(totalSellPLN)} PLN (kurs {exchRate.toFixed(4)} PLN/EUR)</Text>
-            ) : (
-              <Text>Równowartość: {formatEUR(totalSellEUR)} EUR (kurs {exchRate.toFixed(4)} PLN/EUR)</Text>
+            {sortedItems
+              .filter(item => item.sell_eur_t != null)
+              .map((item, i) => (
+                <Text key={i}>
+                  {item.profile_name}: {item.sell_eur_t} EUR/t
+                </Text>
+              ))
+            }
+            {!isEUR && (
+              <Text style={{ marginLeft: 'auto' }}>
+                kurs {exchRate.toFixed(4)} PLN/EUR
+              </Text>
             )}
           </View>
         </View>
@@ -387,7 +380,10 @@ export default function SaleOfferPDF({ offer }: Props) {
                   <View style={s.transportRow}>
                     <Text style={s.transportLabel}>Koszt dostawy:</Text>
                     <Text style={[s.transportValue, { color: C.orange }]}>
-                      {formatPLN(offer.delivery_cost_total)} PLN (po stronie Klienta)
+                      {isEUR
+                        ? `${formatEUR(offer.delivery_cost_total! / exchRate)} EUR (po stronie Klienta)`
+                        : `${formatPLN(offer.delivery_cost_total!)} PLN (po stronie Klienta)`
+                      }
                     </Text>
                   </View>
                   {(offer.delivery_from || offer.delivery_to) && (
@@ -407,7 +403,12 @@ export default function SaleOfferPDF({ offer }: Props) {
             {offer.delivery_paid_by === 'intra' && (
               <View style={s.totalRow}>
                 <Text style={s.totalLabel}>Łącznie dla Klienta (netto, towary + dostawa)</Text>
-                <Text style={s.totalValue}>{formatPLN(totalForClientPLN)} PLN</Text>
+                <Text style={s.totalValue}>
+                  {isEUR
+                    ? `${formatEUR(totalForClientEUR)} EUR`
+                    : `${formatPLN(totalForClientPLN)} PLN`
+                  }
+                </Text>
               </View>
             )}
           </>
