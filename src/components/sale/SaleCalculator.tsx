@@ -250,18 +250,26 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
   const hasAllSellPrices = items.every(i => i.sellPriceEurT > 0);
 
   // Obliczenia dostawy
+  // costPerTruck wpisywany jest w aktualnej walucie (EUR lub PLN)
+  // totalCostPLN = zawsze PLN → do zapisu w DB i do totalForClientPLN
   const deliveryCalc = useMemo(() => {
     if (!isValid) return null;
-    const autoTrucks  = Math.ceil(totals.totalMassT / TRUCK_CAPACITY_T);
-    const trucks      = typeof customDeliveryTrucks === 'number' && customDeliveryTrucks > 0
+    const autoTrucks   = Math.ceil(totals.totalMassT / TRUCK_CAPACITY_T);
+    const trucks       = typeof customDeliveryTrucks === 'number' && customDeliveryTrucks > 0
       ? customDeliveryTrucks : autoTrucks;
     const costPerTruck = typeof deliveryCostPerTruck === 'number' ? deliveryCostPerTruck : 0;
-    return { trucks, autoTrucks, costPerTruck, totalCostPLN: trucks * costPerTruck };
-  }, [isValid, totals.totalMassT, deliveryCostPerTruck, customDeliveryTrucks]);
+    const totalInCurrency = trucks * costPerTruck;
+    const totalCostPLN    = currency === 'EUR'
+      ? totalInCurrency * exchangeRate
+      : totalInCurrency;
+    return { trucks, autoTrucks, costPerTruck, totalInCurrency, totalCostPLN };
+  }, [isValid, totals.totalMassT, deliveryCostPerTruck, customDeliveryTrucks, currency, exchangeRate]);
 
-  const deliveryCostPLN = (deliveryPaidBy === 'intra' && deliveryCalc)
-    ? deliveryCalc.totalCostPLN : 0;
-  const totalForClientPLN = totals.totalSellPLN + deliveryCostPLN;
+  const deliveryCostPLN       = (deliveryPaidBy === 'intra' && deliveryCalc) ? deliveryCalc.totalCostPLN    : 0;
+  const deliveryCostCurrency  = (deliveryPaidBy === 'intra' && deliveryCalc) ? deliveryCalc.totalInCurrency : 0;
+  const totalForClientPLN     = totals.totalSellPLN + deliveryCostPLN;
+  // Łącznie w wybranej walucie: towary + dostawa (obie w tej samej jednostce)
+  const totalForClientInCurrency = (currency === 'EUR' ? totals.totalSellEUR : totals.totalSellPLN) + deliveryCostCurrency;
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -655,11 +663,13 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Koszt / auto */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Koszt dostawy / auto [PLN]</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Koszt dostawy / auto [{currency}]
+                </label>
                 <input
-                  type="number" min={0} step={100}
+                  type="number" min={0} step={currency === 'EUR' ? 10 : 100}
                   value={deliveryCostPerTruck}
-                  placeholder="np. 2500"
+                  placeholder={currency === 'EUR' ? 'np. 600' : 'np. 2500'}
                   onChange={e => setDeliveryCostPerTruck(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value)))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -726,9 +736,16 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
                   deliveryPaidBy === 'klient' ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-200'
                 }`}>
                   <p className="text-xs text-gray-500 mb-0.5">
-                    {deliveryCalc.trucks} auto{deliveryCalc.trucks > 1 ? 'a' : ''} × {formatPLN(deliveryCalc.costPerTruck)} PLN
+                    {deliveryCalc.trucks} auto{deliveryCalc.trucks > 1 ? 'a' : ''} ×{' '}
+                    {currency === 'EUR'
+                      ? `${formatEUR(deliveryCalc.costPerTruck)} EUR`
+                      : `${formatPLN(deliveryCalc.costPerTruck)} PLN`}
                   </p>
-                  <p className="text-xl font-bold text-gray-800">{formatPLN(deliveryCalc.totalCostPLN)} PLN</p>
+                  <p className="text-xl font-bold text-gray-800">
+                    {currency === 'EUR'
+                      ? `${formatEUR(deliveryCalc.totalInCurrency)} EUR`
+                      : `${formatPLN(deliveryCalc.totalInCurrency)} PLN`}
+                  </p>
                   <p className={`text-xs font-medium mt-0.5 ${deliveryPaidBy === 'klient' ? 'text-orange-600' : 'text-gray-500'}`}>
                     {deliveryPaidBy === 'klient' ? '⚠ Koszt po stronie klienta' : 'Koszt po stronie Intra B.V.'}
                   </p>
@@ -746,17 +763,28 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
                 {deliveryPaidBy === 'intra' ? (
                   <>
                     <p className="text-blue-200 text-xs mb-0.5">Łączna kwota dla klienta (towary + dostawa)</p>
-                    <p className="text-2xl font-bold">{formatPLN(totalForClientPLN)} PLN</p>
+                    <p className="text-2xl font-bold">
+                      {currency === 'EUR'
+                        ? `${formatEUR(totalForClientInCurrency)} EUR`
+                        : `${formatPLN(totalForClientInCurrency)} PLN`}
+                    </p>
                     <p className="text-sm text-blue-300 mt-0.5">
-                      towary {formatEUR(totals.totalSellEUR)} EUR ({formatPLN(totals.totalSellPLN)} PLN)
-                      + dostawa {formatPLN(deliveryCalc.totalCostPLN)} PLN
+                      {currency === 'EUR' ? (
+                        <>towary {formatEUR(totals.totalSellEUR)} EUR + dostawa {formatEUR(deliveryCalc.totalInCurrency)} EUR</>
+                      ) : (
+                        <>towary {formatPLN(totals.totalSellPLN)} PLN + dostawa {formatPLN(deliveryCalc.totalInCurrency)} PLN</>
+                      )}
                     </p>
                   </>
                 ) : (
                   <>
                     <p className="text-orange-700 text-sm font-medium">Klient sam organizuje dostawę</p>
                     <p className="text-orange-600 text-xs mt-0.5">
-                      + {formatPLN(deliveryCalc.totalCostPLN)} PLN dostawa (po stronie klienta)
+                      +{' '}
+                      {currency === 'EUR'
+                        ? `${formatEUR(deliveryCalc.totalInCurrency)} EUR`
+                        : `${formatPLN(deliveryCalc.totalInCurrency)} PLN`}
+                      {' '}dostawa (po stronie klienta)
                     </p>
                   </>
                 )}

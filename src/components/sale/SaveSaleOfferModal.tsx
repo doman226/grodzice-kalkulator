@@ -194,8 +194,12 @@ export default function SaveSaleOfferModal({
     onSaved(savedOffer);
   }
 
-  const deliveryCostPLN  = delivery?.paidBy === 'intra' ? (delivery.totalCostPLN ?? 0) : 0;
-  const totalForClientPLN = totals.totalSellPLN + deliveryCostPLN;
+  const deliveryCostPLN       = delivery?.paidBy === 'intra' ? (delivery.totalCostPLN ?? 0) : 0;
+  const deliveryCostCurrency  = delivery?.paidBy === 'intra'
+    ? (currency === 'EUR' ? delivery.totalCostPLN / exchangeRate : delivery.totalCostPLN)
+    : 0;
+  const totalForClientPLN     = totals.totalSellPLN + deliveryCostPLN;
+  const totalForClientCurrency = (currency === 'EUR' ? totals.totalSellEUR : totals.totalSellPLN) + deliveryCostCurrency;
   const year = new Date().getFullYear();
 
   return (
@@ -259,13 +263,19 @@ export default function SaveSaleOfferModal({
                       {delivery.paidBy === 'klient' && <span className="ml-1 font-medium">[klient]</span>}:
                     </span>
                     <strong className={delivery.paidBy === 'klient' ? 'text-orange-600' : ''}>
-                      {formatPLN(delivery.totalCostPLN)} PLN
+                      {currency === 'EUR'
+                        ? `${formatEUR(delivery.totalCostPLN / exchangeRate)} EUR`
+                        : `${formatPLN(delivery.totalCostPLN)} PLN`}
                     </strong>
                   </div>
                   {delivery.paidBy === 'intra' && (
                     <div className="flex justify-between text-sm font-semibold pt-1 border-t border-blue-200 text-blue-900">
                       <span>Łącznie dla klienta:</span>
-                      <span>{formatPLN(totalForClientPLN)} PLN</span>
+                      <span>
+                        {currency === 'EUR'
+                          ? `${formatEUR(totalForClientCurrency)} EUR`
+                          : `${formatPLN(totalForClientCurrency)} PLN`}
+                      </span>
                     </div>
                   )}
                   {(delivery.from || delivery.to) && (
