@@ -49,6 +49,13 @@ export function formatPLN(value: number): string {
   }).format(Math.ceil(value));
 }
 
+export function formatEUR(value: number): string {
+  return new Intl.NumberFormat('pl-PL', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.ceil(value));
+}
+
 export function formatNumber(value: number, decimals = 3): string {
   return new Intl.NumberFormat('pl-PL', {
     minimumFractionDigits: decimals,

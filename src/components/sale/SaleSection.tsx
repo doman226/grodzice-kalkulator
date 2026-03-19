@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { SaleProfile } from '../../types';
+import SaleCalculator from './SaleCalculator';
 import SalePriceMatrix from './SalePriceMatrix';
 import SaleProfilesTable from './SaleProfilesTable';
 
-type SaleTab = 'prices' | 'profiles';
+type SaleTab = 'calculator' | 'prices' | 'profiles';
 
 const SALE_TABS: { id: SaleTab; label: string }[] = [
-  { id: 'prices',   label: 'Cennik' },
-  { id: 'profiles', label: 'Profile VL' },
+  { id: 'calculator', label: 'Kalkulator' },
+  { id: 'prices',     label: 'Cennik' },
+  { id: 'profiles',   label: 'Profile VL' },
 ];
 
 export default function SaleSection() {
-  const [activeTab, setActiveTab]   = useState<SaleTab>('prices');
+  const [activeTab, setActiveTab]   = useState<SaleTab>('calculator');
   const [profiles, setProfiles]     = useState<SaleProfile[]>([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState('');
@@ -66,8 +68,9 @@ export default function SaleSection() {
             </div>
           ) : (
             <>
-              {activeTab === 'prices'   && <SalePriceMatrix />}
-              {activeTab === 'profiles' && (
+              {activeTab === 'calculator' && <SaleCalculator />}
+              {activeTab === 'prices'     && <SalePriceMatrix />}
+              {activeTab === 'profiles'   && (
                 <SaleProfilesTable profiles={profiles} onProfilesChange={setProfiles} />
               )}
             </>

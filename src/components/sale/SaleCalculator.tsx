@@ -1,0 +1,562 @@
+import { useState, useEffect, useMemo } from 'react';
+import { supabase } from '../../lib/supabase';
+import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
+import type { SaleWarehouse, SaleSteeelGrade, SaleProfile, SalePrice } from '../../types';
+
+// ─── Typy ────────────────────────────────────────────────────────────────────
+
+interface SaleCalcItem {
+  uid: string;
+  warehouseId: string;
+  profileName: string;
+  steelGrade: string;
+  quantity: number;
+  lengthM: number;
+  isPaired: boolean;
+  costPriceEurT: number;
+  sellPriceEurT: number;
+}
+
+interface ItemResult {
+  valid: boolean;
+  piles: number;
+  totalLengthM: number;
+  massT: number;
+  wallAreaM2: number;
+  costEUR: number;
+  sellEUR: number;
+  marginPct: number;
+  profile: SaleProfile | null;
+}
+
+// ─── Pomocnicze ───────────────────────────────────────────────────────────────
+
+function marginColor(pct: number): string {
+  if (pct < 0)   return 'text-red-600 bg-red-50 border-red-200';
+  if (pct < 5)   return 'text-orange-600 bg-orange-50 border-orange-200';
+  if (pct < 10)  return 'text-yellow-700 bg-yellow-50 border-yellow-200';
+  return 'text-green-700 bg-green-50 border-green-200';
+}
+
+function marginLabel(pct: number): string {
+  if (pct < 0)  return '⚠ poniżej kosztu!';
+  if (pct < 5)  return 'niska marża';
+  if (pct < 10) return 'normalna marża';
+  return 'dobra marża';
+}
+
+// ─── Komponent ────────────────────────────────────────────────────────────────
+
+export default function SaleCalculator() {
+  // --- Dane z bazy ---
+  const [warehouses, setWarehouses] = useState<SaleWarehouse[]>([]);
+  const [grades,     setGrades]     = useState<SaleSteeelGrade[]>([]);
+  const [profiles,   setProfiles]   = useState<SaleProfile[]>([]);
+  const [prices,     setPrices]     = useState<SalePrice[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [dbError,    setDbError]    = useState('');
+
+  // --- Stan kalkulatora ---
+  const [items, setItems] = useState<SaleCalcItem[]>([]);
+  const [exchangeRate, setExchangeRate] = useState<number>(4.25);
+  const [currency, setCurrency] = useState<'EUR' | 'PLN'>('EUR');
+  const [applyAllSellPrice, setApplyAllSellPrice] = useState<number>(0);
+
+  useEffect(() => { loadData(); }, []);
+
+  async function loadData() {
+    setLoading(true);
+    setDbError('');
+    const [whRes, grRes, prRes, spRes] = await Promise.all([
+      supabase.from('sale_warehouses').select('*').eq('active', true).order('id'),
+      supabase.from('sale_steel_grades').select('*').order('sort_order'),
+      supabase.from('sale_profiles').select('*').eq('active', true).order('name'),
+      supabase.from('sale_prices').select('*'),
+    ]);
+    if (whRes.error || grRes.error || prRes.error || spRes.error) {
+      setDbError('Błąd ładowania danych. Odśwież stronę.');
+      setLoading(false);
+      return;
+    }
+    const whs  = whRes.data as SaleWarehouse[];
+    const grs  = grRes.data as SaleSteeelGrade[];
+    const prs  = prRes.data as SaleProfile[];
+    const sps  = spRes.data as SalePrice[];
+    setWarehouses(whs);
+    setGrades(grs);
+    setProfiles(prs);
+    setPrices(sps);
+
+    // Inicjalizuj pierwszą pozycję gdy dane gotowe
+    if (whs.length && prs.length && grs.length) {
+      const defaultWh      = whs[0].id;
+      const defaultProfile = prs[0].name;
+      const defaultGrade   = grs[0].id;
+      const costPrice = sps.find(
+        p => p.warehouse_id === defaultWh && p.profile_name === defaultProfile && p.steel_grade === defaultGrade
+      )?.price_eur_t ?? 0;
+
+      setItems([{
+        uid: crypto.randomUUID(),
+        warehouseId: defaultWh,
+        profileName: defaultProfile,
+        steelGrade: defaultGrade,
+        quantity: 10,
+        lengthM: 12,
+        isPaired: false,
+        costPriceEurT: costPrice ?? 0,
+        sellPriceEurT: 0,
+      }]);
+    }
+    setLoading(false);
+  }
+
+  // Mapa cennikowa: warehouse → profil → gatunek → cena
+  const priceMap = useMemo(() => {
+    const map: Record<string, Record<string, Record<string, number | null>>> = {};
+    for (const p of prices) {
+      if (!map[p.warehouse_id]) map[p.warehouse_id] = {};
+      if (!map[p.warehouse_id][p.profile_name]) map[p.warehouse_id][p.profile_name] = {};
+      map[p.warehouse_id][p.profile_name][p.steel_grade] = p.price_eur_t;
+    }
+    return map;
+  }, [prices]);
+
+  function lookupCostPrice(warehouseId: string, profileName: string, steelGrade: string): number {
+    return priceMap[warehouseId]?.[profileName]?.[steelGrade] ?? 0;
+  }
+
+  // --- Zarządzanie pozycjami ---
+  function addItem() {
+    const wh   = warehouses[0]?.id ?? '';
+    const prof = profiles[0]?.name ?? '';
+    const gr   = grades[0]?.id ?? '';
+    setItems(prev => [...prev, {
+      uid: crypto.randomUUID(),
+      warehouseId: wh, profileName: prof, steelGrade: gr,
+      quantity: 10, lengthM: 12,
+      isPaired: false,
+      costPriceEurT: lookupCostPrice(wh, prof, gr),
+      sellPriceEurT: 0,
+    }]);
+  }
+
+  function removeItem(uid: string) {
+    setItems(prev => prev.filter(i => i.uid !== uid));
+  }
+
+  function updateItem(uid: string, patch: Partial<SaleCalcItem>) {
+    setItems(prev => prev.map(item => {
+      if (item.uid !== uid) return item;
+      const updated = { ...item, ...patch };
+      // Jeśli zmienił się magazyn/profil/gatunek → auto-aktualizuj cenę kosztu
+      if ('warehouseId' in patch || 'profileName' in patch || 'steelGrade' in patch) {
+        updated.costPriceEurT = lookupCostPrice(
+          updated.warehouseId, updated.profileName, updated.steelGrade
+        );
+      }
+      return updated;
+    }));
+  }
+
+  function applyPriceToAll() {
+    if (applyAllSellPrice <= 0) return;
+    setItems(prev => prev.map(i => ({ ...i, sellPriceEurT: applyAllSellPrice })));
+  }
+
+  // --- Obliczenia per pozycja ---
+  const itemResults = useMemo((): ItemResult[] =>
+    items.map(item => {
+      const profile = profiles.find(p => p.name === item.profileName) ?? null;
+      if (!profile || item.quantity <= 0 || item.lengthM <= 0) {
+        return { valid: false, piles: 0, totalLengthM: 0, massT: 0, wallAreaM2: 0, costEUR: 0, sellEUR: 0, marginPct: 0, profile: null };
+      }
+      const piles        = item.isPaired ? item.quantity * 2 : item.quantity;
+      const totalLengthM = piles * item.lengthM;
+      const massT        = (totalLengthM * profile.weight_kg_per_m) / 1000;
+      const wallAreaM2   = totalLengthM * (profile.width_mm / 1000);
+      const costEUR      = massT * (item.costPriceEurT || 0);
+      const sellEUR      = massT * (item.sellPriceEurT || 0);
+      const marginPct    = sellEUR > 0 ? ((sellEUR - costEUR) / sellEUR) * 100 : 0;
+      return { valid: true, piles, totalLengthM, massT, wallAreaM2, costEUR, sellEUR, marginPct, profile };
+    }),
+    [items, profiles]
+  );
+
+  // --- Sumy łączne ---
+  const totals = useMemo(() => {
+    let totalMassT = 0, totalWallAreaM2 = 0, totalCostEUR = 0, totalSellEUR = 0;
+    for (const r of itemResults) {
+      if (!r.valid) continue;
+      totalMassT      += r.massT;
+      totalWallAreaM2 += r.wallAreaM2;
+      totalCostEUR    += r.costEUR;
+      totalSellEUR    += r.sellEUR;
+    }
+    const overallMarginPct  = totalSellEUR > 0 ? ((totalSellEUR - totalCostEUR) / totalSellEUR) * 100 : 0;
+    const totalSellPLN      = totalSellEUR * exchangeRate;
+    const totalCostPLN      = totalCostEUR * exchangeRate;
+    const sellPerTon        = totalMassT > 0 ? totalSellEUR / totalMassT : 0;
+    const sellPerM2         = totalWallAreaM2 > 0 ? totalSellEUR / totalWallAreaM2 : 0;
+    return { totalMassT, totalWallAreaM2, totalCostEUR, totalSellEUR, overallMarginPct, totalSellPLN, totalCostPLN, sellPerTon, sellPerM2 };
+  }, [itemResults, exchangeRate]);
+
+  const isValid = totals.totalMassT > 0;
+  const hasAllSellPrices = items.every(i => i.sellPriceEurT > 0);
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-16">
+      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-900" />
+    </div>
+  );
+
+  if (dbError) return (
+    <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-red-700 text-sm">{dbError}</div>
+  );
+
+  return (
+    <div className="space-y-6">
+
+      {/* ── KURS I WALUTA ── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="flex flex-wrap items-center gap-6">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Kurs EUR/PLN</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number" min={1} step={0.01}
+                value={exchangeRate}
+                onChange={e => setExchangeRate(parseFloat(e.target.value) || 4.25)}
+                className="w-24 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="text-xs text-gray-400">(NBP dostępny od etapu 2.4)</span>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Waluta oferty</label>
+            <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm font-medium">
+              {(['EUR', 'PLN'] as const).map(cur => (
+                <button key={cur} onClick={() => setCurrency(cur)}
+                  className={`px-4 py-1.5 transition-colors ${currency === cur ? 'bg-blue-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                  {cur}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Szybka cena sprzedaży dla wszystkich */}
+          <div className="ml-auto">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Zastosuj cenę do wszystkich pozycji</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number" min={0} step={1}
+                value={applyAllSellPrice || ''}
+                placeholder="EUR/t"
+                onChange={e => setApplyAllSellPrice(parseFloat(e.target.value) || 0)}
+                className="w-28 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button onClick={applyPriceToAll}
+                className="px-3 py-1.5 text-sm bg-blue-700 text-white rounded-lg hover:bg-blue-600 font-medium transition-colors">
+                Zastosuj
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── POZYCJE WYCENY ── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-800">Pozycje wyceny</h2>
+          <button onClick={addItem}
+            className="px-3 py-1.5 text-sm font-medium text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors">
+            + Dodaj pozycję
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {items.map((item, idx) => {
+            const r = itemResults[idx];
+            const warehouse = warehouses.find(w => w.id === item.warehouseId);
+            const costFromMatrix = lookupCostPrice(item.warehouseId, item.profileName, item.steelGrade);
+            const costChanged = item.costPriceEurT !== costFromMatrix && costFromMatrix > 0;
+
+            return (
+              <div key={item.uid} className="border border-gray-200 rounded-xl p-4 bg-gray-50 space-y-3">
+
+                {/* Wiersz 1: Magazyn | Profil | Gatunek | Ilość | Długość | Parowane | [Usuń] */}
+                <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-end">
+
+                  {/* Magazyn */}
+                  <div className="sm:col-span-3">
+                    {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Magazyn</label>}
+                    <select value={item.warehouseId} onChange={e => updateItem(item.uid, { warehouseId: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                      {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Profil */}
+                  <div className="sm:col-span-3">
+                    {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Profil VL</label>}
+                    <select value={item.profileName} onChange={e => updateItem(item.uid, { profileName: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                      {profiles.map(p => <option key={p.id} value={p.name}>{p.name} ({p.weight_kg_per_m} kg/m)</option>)}
+                    </select>
+                  </div>
+
+                  {/* Gatunek */}
+                  <div className="sm:col-span-2">
+                    {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Gatunek</label>}
+                    <select value={item.steelGrade} onChange={e => updateItem(item.uid, { steelGrade: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                      {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Ilość */}
+                  <div className="sm:col-span-1">
+                    {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Ilość</label>}
+                    <input type="number" min={1} step={1} value={item.quantity}
+                      onChange={e => updateItem(item.uid, { quantity: Math.max(1, parseInt(e.target.value) || 1) })}
+                      className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+
+                  {/* Długość */}
+                  <div className="sm:col-span-1">
+                    {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Dług. [m]</label>}
+                    <input type="number" min={0.5} step={0.5} value={item.lengthM}
+                      onChange={e => updateItem(item.uid, { lengthM: Math.max(0.5, parseFloat(e.target.value) || 0.5) })}
+                      className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+
+                  {/* Parowane */}
+                  <div className="sm:col-span-1 flex flex-col items-center">
+                    {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Parowane</label>}
+                    <label className="flex items-center gap-1 cursor-pointer mt-1">
+                      <input type="checkbox" checked={item.isPaired}
+                        onChange={e => updateItem(item.uid, { isPaired: e.target.checked })}
+                        className="w-4 h-4 accent-blue-700 rounded" />
+                      <span className="text-xs text-gray-500">×2</span>
+                    </label>
+                  </div>
+
+                  {/* Masa */}
+                  <div className="sm:col-span-1">
+                    {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Masa [t]</label>}
+                    <div className="bg-white border border-gray-200 rounded-lg px-2 py-2 text-sm text-right font-semibold text-gray-800 min-h-[38px] flex items-center justify-end">
+                      {r.valid ? formatNumber(r.massT, 3) : <span className="text-gray-400">—</span>}
+                    </div>
+                  </div>
+
+                  {/* Usuń */}
+                  <div className="sm:col-span-1 flex justify-end">
+                    {items.length > 1 && (
+                      <button onClick={() => removeItem(item.uid)}
+                        className="w-9 h-9 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200 transition-colors"
+                        title="Usuń pozycję">✕</button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Wiersz 2: Ceny i marża */}
+                <div className="flex flex-wrap items-end gap-4 pt-3 border-t border-gray-200">
+
+                  {/* Cena kosztu */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Cena kosztu [EUR/t]
+                      {costChanged && (
+                        <button onClick={() => updateItem(item.uid, { costPriceEurT: costFromMatrix })}
+                          className="ml-1 text-blue-600 underline font-normal">
+                          (przywróć {costFromMatrix})
+                        </button>
+                      )}
+                    </label>
+                    <input type="number" min={0} step={1} value={item.costPriceEurT || ''}
+                      onChange={e => updateItem(item.uid, { costPriceEurT: parseFloat(e.target.value) || 0 })}
+                      className="w-28 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {costFromMatrix > 0
+                        ? `z cennika: ${costFromMatrix} EUR/t`
+                        : <span className="text-amber-500">⚠ brak w cenniku dla {warehouse?.name}</span>}
+                    </p>
+                  </div>
+
+                  {/* Cena sprzedaży */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Cena sprzedaży [EUR/t]</label>
+                    <input type="number" min={0} step={1} value={item.sellPriceEurT || ''}
+                      placeholder="wpisz..."
+                      onChange={e => updateItem(item.uid, { sellPriceEurT: parseFloat(e.target.value) || 0 })}
+                      className="w-28 border border-blue-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-blue-50 font-semibold" />
+                  </div>
+
+                  {/* Marża */}
+                  {r.valid && item.sellPriceEurT > 0 && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Marża</label>
+                      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-semibold ${marginColor(r.marginPct)}`}>
+                        <span>{r.marginPct.toFixed(1)}%</span>
+                        <span className="text-xs font-normal">{marginLabel(r.marginPct)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mini wyniki */}
+                  {r.valid && (
+                    <div className="ml-auto text-right text-xs text-gray-500 space-y-0.5">
+                      <p>{r.isPaired && <span className="text-blue-600 font-medium">×2 parowane · </span>}
+                        {formatNumber(r.totalLengthM, 1)} m · {formatNumber(r.massT, 3)} t</p>
+                      {item.sellPriceEurT > 0 && (
+                        <p className="font-semibold text-gray-800">
+                          {formatEUR(r.sellEUR)} EUR
+                          {currency === 'PLN' && <span className="text-gray-500"> · {formatPLN(r.sellEUR * exchangeRate)} PLN</span>}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── WYNIKI ŁĄCZNE ── */}
+      {isValid && (
+        <div className="space-y-4">
+
+          {/* Dane fizyczne */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Dane łączne</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <StatCard label="Masa łączna" value={formatNumber(totals.totalMassT, 3)} unit="t" />
+              <StatCard label="Powierzchnia ścianki" value={formatNumber(totals.totalWallAreaM2, 2)} unit="m²" />
+              <StatCard label="Cena sprzedaży / t" value={totals.sellPerTon > 0 ? formatEUR(totals.sellPerTon) : '—'} unit="EUR/t" />
+              <StatCard label="Cena sprzedaży / m²" value={totals.sellPerM2 > 0 ? formatEUR(totals.sellPerM2) : '—'} unit="EUR/m²" />
+            </div>
+            {items.length > 1 && (
+              <div className="mt-4 pt-4 border-t border-gray-100 space-y-1">
+                <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-2">Rozkład pozycji</p>
+                {itemResults.map((r, idx) => r.valid && (
+                  <div key={items[idx].uid} className="flex justify-between text-sm text-gray-600">
+                    <span>
+                      {items[idx].profileName}
+                      {items[idx].isPaired && <span className="text-blue-600 text-xs ml-1">(×2)</span>}
+                      {' '}– {items[idx].quantity} szt. × {items[idx].lengthM} m
+                      <span className="text-gray-400 ml-1">({items[idx].steelGrade.toUpperCase()})</span>
+                    </span>
+                    <span className="font-medium">{formatNumber(r.massT, 3)} t</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Koszt vs Sprzedaż vs Marża */}
+          {hasAllSellPrices && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">
+                Koszt własny vs Sprzedaż
+                <span className="ml-2 text-xs text-gray-400 font-normal">(marża widoczna tylko wewnętrznie)</span>
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                {/* Koszt */}
+                <div className="rounded-xl border border-gray-200 p-4 bg-gray-50">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Koszt własny</p>
+                  <p className="text-2xl font-bold text-gray-700">{formatEUR(totals.totalCostEUR)} EUR</p>
+                  {currency === 'PLN' && (
+                    <p className="text-sm text-gray-500 mt-1">≈ {formatPLN(totals.totalCostPLN)} PLN</p>
+                  )}
+                </div>
+
+                {/* Sprzedaż */}
+                <div className="rounded-xl border border-blue-200 p-4 bg-blue-900 text-white">
+                  <p className="text-xs font-medium text-blue-300 uppercase tracking-wide mb-2">Cena sprzedaży</p>
+                  <p className="text-2xl font-bold">
+                    {currency === 'EUR'
+                      ? `${formatEUR(totals.totalSellEUR)} EUR`
+                      : `${formatPLN(totals.totalSellPLN)} PLN`}
+                  </p>
+                  {currency === 'EUR'
+                    ? <p className="text-sm text-blue-300 mt-1">≈ {formatPLN(totals.totalSellPLN)} PLN</p>
+                    : <p className="text-sm text-blue-300 mt-1">= {formatEUR(totals.totalSellEUR)} EUR</p>
+                  }
+                </div>
+
+                {/* Marża */}
+                <div className={`rounded-xl border p-4 ${marginColor(totals.overallMarginPct)}`}>
+                  <p className="text-xs font-medium uppercase tracking-wide mb-2 opacity-70">Marża łączna</p>
+                  <p className="text-2xl font-bold">{totals.overallMarginPct.toFixed(1)}%</p>
+                  <p className="text-sm mt-1 font-medium">{marginLabel(totals.overallMarginPct)}</p>
+                  <p className="text-xs mt-1 opacity-70">
+                    zysk: {formatEUR(totals.totalSellEUR - totals.totalCostEUR)} EUR
+                  </p>
+                </div>
+              </div>
+
+              {/* Tabelka per pozycja jeśli wiele */}
+              {items.length > 1 && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-100 text-gray-600 text-xs uppercase tracking-wide">
+                        <th className="text-left px-4 py-2 font-semibold">Pozycja</th>
+                        <th className="text-right px-4 py-2 font-semibold">Masa [t]</th>
+                        <th className="text-right px-4 py-2 font-semibold">Koszt EUR/t</th>
+                        <th className="text-right px-4 py-2 font-semibold">Sprzedaż EUR/t</th>
+                        <th className="text-right px-4 py-2 font-semibold">Marża %</th>
+                        <th className="text-right px-4 py-2 font-semibold">Wartość</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {itemResults.map((r, idx) => r.valid && (
+                        <tr key={items[idx].uid} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="px-4 py-2 font-medium text-gray-800">
+                            {items[idx].profileName}
+                            {items[idx].isPaired && <span className="text-blue-600 text-xs ml-1">×2</span>}
+                            <span className="text-gray-400 text-xs ml-1">{items[idx].steelGrade.toUpperCase()}</span>
+                          </td>
+                          <td className="px-4 py-2 text-right text-gray-600">{formatNumber(r.massT, 3)}</td>
+                          <td className="px-4 py-2 text-right text-gray-500">{items[idx].costPriceEurT}</td>
+                          <td className="px-4 py-2 text-right font-semibold text-gray-800">{items[idx].sellPriceEurT}</td>
+                          <td className={`px-4 py-2 text-right font-semibold ${r.marginPct < 0 ? 'text-red-600' : r.marginPct < 5 ? 'text-orange-600' : 'text-green-700'}`}>
+                            {r.marginPct.toFixed(1)}%
+                          </td>
+                          <td className="px-4 py-2 text-right font-bold text-gray-800">
+                            {formatEUR(r.sellEUR)} EUR
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!hasAllSellPrices && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-yellow-700 text-sm text-center">
+              Wpisz ceny sprzedaży dla wszystkich pozycji, aby zobaczyć podsumowanie marży.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Helper component ─────────────────────────────────────────────────────────
+
+function StatCard({ label, value, unit }: { label: string; value: string; unit: string }) {
+  return (
+    <div className="rounded-lg p-4 bg-gray-50 border border-gray-200">
+      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{label}</p>
+      <p className="text-xl font-bold text-gray-900">{value}</p>
+      <p className="text-xs text-gray-400 mt-0.5">{unit}</p>
+    </div>
+  );
+}
