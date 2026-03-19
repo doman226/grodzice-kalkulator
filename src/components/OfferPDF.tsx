@@ -333,9 +333,13 @@ export default function OfferPDF({ offer }: Props) {
   const dateStr = new Intl.DateTimeFormat('pl-PL', { dateStyle: 'long' }).format(new Date(offer.created_at));
 
   // Używamy > 0 zamiast truthy – chroni przed edge case transport_cost_per_truck = 0
+  // backward compat: 'intra' (stare) = dap_included
+  const tPaidBy = offer.transport_paid_by === 'intra' ? 'dap_included'
+                : offer.transport_paid_by === 'klient' ? 'dap_extra'
+                : offer.transport_paid_by;
   const totalWithTransport =
     offer.transport_cost_per_truck != null && offer.transport_cost_per_truck > 0
-      ? offer.rental_cost_pln + (offer.transport_paid_by === 'intra' ? (offer.transport_cost_total ?? 0) : 0)
+      ? offer.rental_cost_pln + (tPaidBy === 'dap_included' ? (offer.transport_cost_total ?? 0) : 0)
       : offer.rental_cost_pln;
 
   function formatMonths(n: number): string {
@@ -507,16 +511,16 @@ export default function OfferPDF({ offer }: Props) {
         )}
 
         {/* ── TRANSPORT ── */}
-        {offer.transport_cost_per_truck != null && (
+        {(offer.transport_cost_per_truck != null || tPaidBy === 'fca') && (
           <>
             <Text style={s.sectionTitle}>Transport:</Text>
             <View style={s.transportBox}>
-              {offer.transport_paid_by === 'intra' ? (
-                // Transport Intra – nie pokazujemy cen klientowi
+              {tPaidBy === 'dap_included' && (
+                // DAP w cenie – brak kwot dla klienta
                 <>
                   <View style={s.transportRow}>
-                    <Text style={s.transportLabel}>Transport:</Text>
-                    <Text style={[s.transportValue, { color: C.navy }]}>W cenie / Intra B.V.</Text>
+                    <Text style={s.transportLabel}>Dostawa:</Text>
+                    <Text style={[s.transportValue, { color: C.navy }]}>DAP – w cenie / Intra B.V.</Text>
                   </View>
                   {offer.transport_from && (
                     <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}`, alignItems: 'flex-end' }]}>
@@ -526,32 +530,41 @@ export default function OfferPDF({ offer }: Props) {
                     </View>
                   )}
                 </>
-              ) : (
-                // Transport klient – pokazujemy pełne szczegóły
+              )}
+              {tPaidBy === 'dap_extra' && (
+                // DAP refaktura – Intra organizuje, klient płaci osobno
                 <>
                   <View style={s.transportRow}>
-                    <Text style={s.transportLabel}>Liczba aut:</Text>
-                    <Text style={s.transportValue}>{offer.transport_trucks}</Text>
-                  </View>
-                  <View style={s.transportRow}>
-                    <Text style={s.transportLabel}>Koszt / auto:</Text>
-                    <Text style={s.transportValue}>{formatPLN(offer.transport_cost_per_truck)} PLN</Text>
-                  </View>
-                  <View style={s.transportRow}>
-                    <Text style={s.transportLabel}>Łączny koszt transportu:</Text>
-                    <Text style={[s.transportValue, { color: '#D97706' }]}>
-                      {formatPLN(offer.transport_cost_total ?? 0)} PLN
-                    </Text>
-                  </View>
-                  <View style={s.transportRow}>
-                    <Text style={s.transportLabel}>Koszt transportu pokrywa:</Text>
-                    <Text style={[s.transportValue, { color: '#D97706' }]}>Klient</Text>
+                    <Text style={s.transportLabel}>Dostawa:</Text>
+                    <Text style={[s.transportValue, { color: C.navy }]}>DAP / Intra B.V.</Text>
                   </View>
                   {offer.transport_from && (
-                    <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}`, alignItems: 'flex-end' }]}>
+                    <View style={[s.transportRow, { alignItems: 'flex-end' }]}>
                       <Text style={s.transportLabel}>Trasa:</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
                       <Text style={s.transportValue}>{offer.transport_from}{offer.transport_to ? ` — ${offer.transport_to}` : ''}</Text>
+                    </View>
+                  )}
+                  <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}` }]}>
+                    <Text style={s.transportLabel}>Koszt transportu:</Text>
+                    <Text style={[s.transportValue, { color: C.orange }]}>
+                      {formatPLN(offer.transport_cost_total ?? 0)} PLN netto (osobna pozycja)
+                    </Text>
+                  </View>
+                </>
+              )}
+              {tPaidBy === 'fca' && (
+                // FCA – klient organizuje odbiór własny
+                <>
+                  <View style={s.transportRow}>
+                    <Text style={s.transportLabel}>Dostawa:</Text>
+                    <Text style={[s.transportValue, { color: C.navy }]}>FCA – odbiór własny</Text>
+                  </View>
+                  {offer.transport_from && (
+                    <View style={[s.transportRow, { alignItems: 'flex-end' }]}>
+                      <Text style={s.transportLabel}>Odbiór z:</Text>
+                      <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
+                      <Text style={s.transportValue}>{offer.transport_from}</Text>
                     </View>
                   )}
                 </>

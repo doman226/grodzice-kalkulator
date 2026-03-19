@@ -347,9 +347,11 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
                       <strong>{formatPLN(selected.transport_cost_total ?? 0)} PLN</strong>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Płaci:</span>
-                      <span className={`font-medium ${selected.transport_paid_by === 'klient' ? 'text-orange-600' : 'text-gray-700'}`}>
-                        {selected.transport_paid_by === 'klient' ? 'Klient' : 'Intra B.V.'}
+                      <span className="text-gray-500">Opcja:</span>
+                      <span className={`font-medium text-xs ${selected.transport_paid_by === 'dap_extra' || selected.transport_paid_by === 'klient' ? 'text-orange-600' : selected.transport_paid_by === 'fca' ? 'text-green-700' : 'text-gray-700'}`}>
+                        {selected.transport_paid_by === 'dap_included' || selected.transport_paid_by === 'intra' ? 'DAP – w cenie'
+                         : selected.transport_paid_by === 'dap_extra' || selected.transport_paid_by === 'klient' ? 'DAP – refaktura'
+                         : 'FCA – odbiór własny'}
                       </span>
                     </div>
                     {selected.transport_from && (

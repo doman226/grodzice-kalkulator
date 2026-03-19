@@ -79,9 +79,12 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
   const [customTrucks, setCustomTrucks] = useState<number | ''>(
     offer.transport_trucks ?? ''
   );
-  const [transportPaidBy, setTransportPaidBy] = useState<'intra' | 'klient'>(
-    offer.transport_paid_by ?? 'intra'
-  );
+  const [transportPaidBy, setTransportPaidBy] = useState<'dap_included' | 'dap_extra' | 'fca'>(() => {
+    const v = offer.transport_paid_by;
+    if (v === 'intra') return 'dap_included';
+    if (v === 'klient') return 'dap_extra';
+    return v ?? 'dap_included';
+  });
   const [transportFrom, setTransportFrom] = useState(offer.transport_from ?? 'Magazyn Intra B.V.');
   const [transportTo, setTransportTo] = useState(offer.transport_to ?? '');
   const [preparedBy, setPreparedBy] = useState(offer.prepared_by ?? SALES_REPS[0].name);
@@ -469,18 +472,26 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             </div>
-            <div className="flex gap-4 items-center">
-              <p className="text-xs text-gray-600 font-medium">Transport po stronie:</p>
-              {(['intra', 'klient'] as const).map(val => (
-                <label key={val} className="flex items-center gap-1.5 cursor-pointer text-sm">
-                  <input type="radio" name="editTransportPaidBy" value={val} checked={transportPaidBy === val}
-                    onChange={() => setTransportPaidBy(val)} className="accent-blue-900" />
-                  {val === 'intra' ? 'Intra B.V.' : 'Klienta'}
-                </label>
-              ))}
-              {transportCalc.costPerTruck > 0 && (
-                <span className="ml-auto text-sm font-semibold text-gray-700">{formatPLN(transportCalc.totalCost)} PLN</span>
-              )}
+            <div className="flex flex-col gap-2">
+              <p className="text-xs text-gray-600 font-medium">Opcja transportu:</p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                {([
+                  { val: 'dap_included', label: 'DAP – w cenie' },
+                  { val: 'dap_extra',    label: 'DAP – refaktura' },
+                  { val: 'fca',          label: 'FCA – odbiór własny' },
+                ] as const).map(({ val, label }) => (
+                  <label key={val} className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 cursor-pointer text-sm transition-colors ${
+                    transportPaidBy === val ? 'border-blue-700 bg-blue-50 font-semibold' : 'border-gray-200 hover:border-gray-300'
+                  }`}>
+                    <input type="radio" name="editTransportPaidBy" value={val} checked={transportPaidBy === val}
+                      onChange={() => setTransportPaidBy(val)} className="accent-blue-900" />
+                    {label}
+                  </label>
+                ))}
+                {transportCalc.costPerTruck > 0 && transportPaidBy !== 'fca' && (
+                  <span className="ml-auto self-center text-sm font-semibold text-gray-700">{formatPLN(transportCalc.totalCost)} PLN</span>
+                )}
+              </div>
             </div>
           </div>
 

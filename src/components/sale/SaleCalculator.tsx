@@ -80,7 +80,7 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
   const TRUCK_CAPACITY_T = 24.5;
   const [deliveryCostPerTruck, setDeliveryCostPerTruck] = useState<number | ''>('');
   const [customDeliveryTrucks, setCustomDeliveryTrucks] = useState<number | ''>('');
-  const [deliveryPaidBy, setDeliveryPaidBy]             = useState<'intra' | 'klient'>('intra');
+  const [deliveryPaidBy, setDeliveryPaidBy]             = useState<'dap_included' | 'dap_extra' | 'fca'>('dap_included');
   const [deliveryFrom, setDeliveryFrom]                 = useState('Magazyn Intra B.V.');
   const [deliveryTo, setDeliveryTo]                     = useState('');
 
@@ -265,7 +265,7 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
     return { trucks, autoTrucks, costPerTruck, totalInCurrency, totalCostPLN };
   }, [isValid, totals.totalMassT, deliveryCostPerTruck, customDeliveryTrucks, currency, exchangeRate]);
 
-  const deliveryCostCurrency  = (deliveryPaidBy === 'intra' && deliveryCalc) ? deliveryCalc.totalInCurrency : 0;
+  const deliveryCostCurrency  = (deliveryPaidBy === 'dap_included' && deliveryCalc) ? deliveryCalc.totalInCurrency : 0;
   // Łącznie w wybranej walucie: towary + dostawa (obie w tej samej jednostce)
   const totalForClientInCurrency = (currency === 'EUR' ? totals.totalSellEUR : totals.totalSellPLN) + deliveryCostCurrency;
 
@@ -658,133 +658,127 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
               <strong className="text-gray-700">{deliveryCalc?.autoTrucks ?? '—'}</strong>
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Koszt / auto */}
+            {/* Opcja dostawy – 3 przyciski */}
+            <div className="mb-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Opcja dostawy:</p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                {([
+                  { val: 'dap_included', label: 'DAP – dostawa w cenie',      desc: 'Intra organizuje i pokrywa koszt' },
+                  { val: 'dap_extra',    label: 'DAP – refaktura na klienta',  desc: 'Intra organizuje, klient płaci osobno' },
+                  { val: 'fca',          label: 'FCA – odbiór własny',         desc: 'Klient podstawia własne auto' },
+                ] as const).map(({ val, label, desc }) => (
+                  <label key={val} className={`flex-1 flex items-start gap-2.5 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                    deliveryPaidBy === val ? 'border-blue-700 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}>
+                    <input type="radio" name="deliveryPaidBy" value={val}
+                      checked={deliveryPaidBy === val}
+                      onChange={() => setDeliveryPaidBy(val)}
+                      className="accent-blue-900 mt-0.5" />
+                    <span>
+                      <span className="block text-sm font-semibold text-gray-800">{label}</span>
+                      <span className="block text-xs text-gray-400 mt-0.5">{desc}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Pola kosztów – ukryte dla FCA */}
+            {deliveryPaidBy !== 'fca' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Koszt dostawy / auto [{currency}]
+                  </label>
+                  <input
+                    type="number" min={0} step={currency === 'EUR' ? 10 : 100}
+                    value={deliveryCostPerTruck}
+                    placeholder={currency === 'EUR' ? 'np. 600' : 'np. 2500'}
+                    onChange={e => setDeliveryCostPerTruck(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value)))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Liczba aut{' '}
+                    <span className="text-xs text-gray-400 font-normal">(auto: {deliveryCalc?.autoTrucks ?? '—'})</span>
+                  </label>
+                  <input
+                    type="number" min={1} step={1}
+                    value={customDeliveryTrucks}
+                    placeholder={String(deliveryCalc?.autoTrucks ?? '—')}
+                    onChange={e => setCustomDeliveryTrucks(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value)))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Trasa */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Koszt dostawy / auto [{currency}]
+                  {deliveryPaidBy === 'fca' ? 'Odbiór z (magazyn)' : 'Skąd'}
                 </label>
-                <input
-                  type="number" min={0} step={currency === 'EUR' ? 10 : 100}
-                  value={deliveryCostPerTruck}
-                  placeholder={currency === 'EUR' ? 'np. 600' : 'np. 2500'}
-                  onChange={e => setDeliveryCostPerTruck(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value)))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Liczba aut */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Liczba aut{' '}
-                  <span className="text-xs text-gray-400 font-normal">
-                    (auto: {deliveryCalc?.autoTrucks ?? '—'})
-                  </span>
-                </label>
-                <input
-                  type="number" min={1} step={1}
-                  value={customDeliveryTrucks}
-                  placeholder={String(deliveryCalc?.autoTrucks ?? '—')}
-                  onChange={e => setCustomDeliveryTrucks(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value)))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Skąd */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Skąd</label>
                 <input
                   type="text" value={deliveryFrom}
                   onChange={e => setDeliveryFrom(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-
-              {/* Dokąd */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Dokąd</label>
-                <input
-                  type="text" value={deliveryTo}
-                  placeholder="ul. Przykładowa 1, Warszawa"
-                  onChange={e => setDeliveryTo(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            {/* Kto płaci + podsumowanie */}
-            <div className="mt-4 flex flex-wrap items-center gap-6">
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-1">Koszt dostawy po stronie:</p>
-                <div className="flex gap-4">
-                  {(['intra', 'klient'] as const).map(val => (
-                    <label key={val} className="flex items-center gap-1.5 cursor-pointer text-sm">
-                      <input type="radio" name="deliveryPaidBy" value={val}
-                        checked={deliveryPaidBy === val}
-                        onChange={() => setDeliveryPaidBy(val)}
-                        className="accent-blue-900" />
-                      <span className="font-medium">{val === 'intra' ? 'Intra B.V.' : 'Klient'}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {deliveryCalc && deliveryCalc.costPerTruck > 0 && (
-                <div className={`ml-auto rounded-lg px-5 py-3 text-right ${
-                  deliveryPaidBy === 'klient' ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-200'
-                }`}>
-                  <p className="text-xs text-gray-500 mb-0.5">
-                    {deliveryCalc.trucks} auto{deliveryCalc.trucks > 1 ? 'a' : ''} ×{' '}
-                    {currency === 'EUR'
-                      ? `${formatEUR(deliveryCalc.costPerTruck)} EUR`
-                      : `${formatPLN(deliveryCalc.costPerTruck)} PLN`}
-                  </p>
-                  <p className="text-xl font-bold text-gray-800">
-                    {currency === 'EUR'
-                      ? `${formatEUR(deliveryCalc.totalInCurrency)} EUR`
-                      : `${formatPLN(deliveryCalc.totalInCurrency)} PLN`}
-                  </p>
-                  <p className={`text-xs font-medium mt-0.5 ${deliveryPaidBy === 'klient' ? 'text-orange-600' : 'text-gray-500'}`}>
-                    {deliveryPaidBy === 'klient' ? '⚠ Koszt po stronie klienta' : 'Koszt po stronie Intra B.V.'}
-                  </p>
+              {deliveryPaidBy !== 'fca' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Dokąd</label>
+                  <input
+                    type="text" value={deliveryTo}
+                    placeholder="ul. Przykładowa 1, Warszawa"
+                    onChange={e => setDeliveryTo(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
               )}
             </div>
 
-            {/* Łączna kwota dla klienta */}
-            {deliveryCalc && deliveryCalc.costPerTruck > 0 && hasAllSellPrices && (
-              <div className={`mt-4 rounded-xl p-4 ${
-                deliveryPaidBy === 'intra'
-                  ? 'bg-blue-900 text-white'
-                  : 'bg-orange-50 border border-orange-200'
-              }`}>
-                {deliveryPaidBy === 'intra' ? (
-                  <>
+            {/* Podsumowanie kosztów */}
+            {deliveryCalc && deliveryCalc.costPerTruck > 0 && deliveryPaidBy !== 'fca' && (
+              <div className="mt-2 pt-4 border-t border-gray-100 flex flex-wrap gap-4">
+                <div className={`rounded-lg px-5 py-3 text-right ${
+                  deliveryPaidBy === 'dap_extra' ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-200'
+                }`}>
+                  <p className="text-xs text-gray-500 mb-0.5">
+                    {deliveryCalc.trucks} auto{deliveryCalc.trucks > 1 ? 'a' : ''} ×{' '}
+                    {currency === 'EUR' ? `${formatEUR(deliveryCalc.costPerTruck)} EUR` : `${formatPLN(deliveryCalc.costPerTruck)} PLN`}
+                  </p>
+                  <p className="text-xl font-bold text-gray-800">
+                    {currency === 'EUR' ? `${formatEUR(deliveryCalc.totalInCurrency)} EUR` : `${formatPLN(deliveryCalc.totalInCurrency)} PLN`}
+                  </p>
+                  <p className={`text-xs font-medium mt-0.5 ${deliveryPaidBy === 'dap_extra' ? 'text-orange-600' : 'text-gray-500'}`}>
+                    {deliveryPaidBy === 'dap_extra' ? '⚠ Refaktura na klienta' : 'Koszt po stronie Intra B.V.'}
+                  </p>
+                </div>
+                {deliveryPaidBy === 'dap_included' && hasAllSellPrices && (
+                  <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
                     <p className="text-blue-200 text-xs mb-0.5">Łączna kwota dla klienta (towary + dostawa)</p>
                     <p className="text-2xl font-bold">
+                      {currency === 'EUR' ? `${formatEUR(totalForClientInCurrency)} EUR` : `${formatPLN(totalForClientInCurrency)} PLN`}
+                    </p>
+                    <p className="text-blue-300 text-xs mt-0.5">
                       {currency === 'EUR'
-                        ? `${formatEUR(totalForClientInCurrency)} EUR`
-                        : `${formatPLN(totalForClientInCurrency)} PLN`}
+                        ? `towary ${formatEUR(totals.totalSellEUR)} EUR + dostawa ${formatEUR(deliveryCalc.totalInCurrency)} EUR`
+                        : `towary ${formatPLN(totals.totalSellPLN)} PLN + dostawa ${formatPLN(deliveryCalc.totalInCurrency)} PLN`}
                     </p>
-                    <p className="text-sm text-blue-300 mt-0.5">
-                      {currency === 'EUR' ? (
-                        <>towary {formatEUR(totals.totalSellEUR)} EUR + dostawa {formatEUR(deliveryCalc.totalInCurrency)} EUR</>
-                      ) : (
-                        <>towary {formatPLN(totals.totalSellPLN)} PLN + dostawa {formatPLN(deliveryCalc.totalInCurrency)} PLN</>
-                      )}
+                  </div>
+                )}
+                {deliveryPaidBy === 'dap_extra' && hasAllSellPrices && (
+                  <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
+                    <p className="text-blue-200 text-xs mb-0.5">Kwota sprzedaży (na ofercie)</p>
+                    <p className="text-2xl font-bold">
+                      {currency === 'EUR' ? `${formatEUR(totals.totalSellEUR)} EUR` : `${formatPLN(totals.totalSellPLN)} PLN`}
                     </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-orange-700 text-sm font-medium">Klient sam organizuje dostawę</p>
-                    <p className="text-orange-600 text-xs mt-0.5">
-                      +{' '}
-                      {currency === 'EUR'
-                        ? `${formatEUR(deliveryCalc.totalInCurrency)} EUR`
-                        : `${formatPLN(deliveryCalc.totalInCurrency)} PLN`}
-                      {' '}dostawa (po stronie klienta)
+                    <p className="text-orange-300 text-xs mt-0.5">
+                      + {currency === 'EUR' ? `${formatEUR(deliveryCalc.totalInCurrency)} EUR` : `${formatPLN(deliveryCalc.totalInCurrency)} PLN`} dostawa (osobna faktura)
                     </p>
-                  </>
+                  </div>
                 )}
               </div>
             )}

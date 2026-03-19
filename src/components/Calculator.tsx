@@ -59,7 +59,7 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
   const TRUCK_CAPACITY_T = 24.5;
   const [transportCostPerTruck, setTransportCostPerTruck] = useState<number | ''>('');
   const [customTrucks, setCustomTrucks] = useState<number | ''>('');
-  const [transportPaidBy, setTransportPaidBy] = useState<'intra' | 'klient'>('intra');
+  const [transportPaidBy, setTransportPaidBy] = useState<'dap_included' | 'dap_extra' | 'fca'>('dap_included');
   const [transportFrom, setTransportFrom] = useState('Magazyn Intra B.V.');
   const [transportTo, setTransportTo] = useState('');
 
@@ -123,7 +123,7 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
   }, [isValid, totals.totalMassT, transportCostPerTruck, customTrucks]);
 
   const totalCostInclTransport = useMemo(() => {
-    const transportAdd = (transportPaidBy === 'intra' && transportCalc) ? transportCalc.totalCost : 0;
+    const transportAdd = (transportPaidBy === 'dap_included' && transportCalc) ? transportCalc.totalCost : 0;
     return rentalCost + transportAdd;
   }, [rentalCost, transportCalc, transportPaidBy]);
 
@@ -398,78 +398,98 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
               Masa: {formatNumber(totals.totalMassT, 3)} t &nbsp;·&nbsp;
               Szacowana liczba aut: <strong className="text-gray-700">{transportCalc?.autoTrucks ?? '—'}</strong>
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Koszt transportu / auto [PLN]</label>
-                <input type="number" min={0} step={100} value={transportCostPerTruck} placeholder="np. 2500"
-                  onChange={e => setTransportCostPerTruck(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value)))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+
+            {/* Opcja transportu – 3 przyciski */}
+            <div className="mb-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Opcja transportu:</p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                {([
+                  { val: 'dap_included', label: 'DAP – transport w cenie', desc: 'Intra organizuje i pokrywa koszt' },
+                  { val: 'dap_extra',    label: 'DAP – refaktura na klienta', desc: 'Intra organizuje, klient płaci osobno' },
+                  { val: 'fca',          label: 'FCA – odbiór własny',        desc: 'Klient podstawia swoje auto' },
+                ] as const).map(({ val, label, desc }) => (
+                  <label key={val} className={`flex-1 flex items-start gap-2.5 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                    transportPaidBy === val ? 'border-blue-700 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}>
+                    <input type="radio" name="transportPaidBy" value={val} checked={transportPaidBy === val}
+                      onChange={() => setTransportPaidBy(val)} className="accent-blue-900 mt-0.5" />
+                    <span>
+                      <span className="block text-sm font-semibold text-gray-800">{label}</span>
+                      <span className="block text-xs text-gray-400 mt-0.5">{desc}</span>
+                    </span>
+                  </label>
+                ))}
               </div>
+            </div>
+
+            {/* Pola kosztów – ukryte dla FCA */}
+            {transportPaidBy !== 'fca' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Koszt transportu / auto [PLN]</label>
+                  <input type="number" min={0} step={100} value={transportCostPerTruck} placeholder="np. 2500"
+                    onChange={e => setTransportCostPerTruck(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value)))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Liczba aut
+                    {typeof customTrucks === 'number' && customTrucks > 0 && (
+                      <span className="ml-1 text-xs text-amber-600 font-normal">(ręcznie)</span>
+                    )}
+                  </label>
+                  <input type="number" min={1} step={1}
+                    value={customTrucks}
+                    placeholder={String(transportCalc?.autoTrucks ?? '—')}
+                    onChange={e => setCustomTrucks(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+            )}
+
+            {/* Trasa – zawsze widoczna */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Liczba aut
-                  {typeof customTrucks === 'number' && customTrucks > 0 && (
-                    <span className="ml-1 text-xs text-amber-600 font-normal">(ręcznie)</span>
-                  )}
+                  {transportPaidBy === 'fca' ? 'Odbiór z (magazyn)' : 'Załadunek (magazyn)'}
                 </label>
-                <input type="number" min={1} step={1}
-                  value={customTrucks}
-                  placeholder={String(transportCalc?.autoTrucks ?? '—')}
-                  onChange={e => setCustomTrucks(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Załadunek (magazyn)</label>
                 <input type="text" value={transportFrom} onChange={e => setTransportFrom(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Dostawa (adres budowy)</label>
-                <input type="text" value={transportTo} placeholder="ul. Przykładowa 1, Warszawa"
-                  onChange={e => setTransportTo(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-1">Koszt transportu po stronie:</p>
-                <div className="flex gap-3">
-                  {(['intra', 'klient'] as const).map(val => (
-                    <label key={val} className="flex items-center gap-1.5 cursor-pointer">
-                      <input type="radio" name="transportPaidBy" value={val} checked={transportPaidBy === val}
-                        onChange={() => setTransportPaidBy(val)} className="accent-blue-900" />
-                      <span className="text-sm text-gray-700">{val === 'intra' ? 'Intra B.V.' : 'Klienta'}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              {transportCalc && transportCalc.costPerTruck > 0 && (
-                <div className={`ml-auto rounded-lg px-5 py-3 text-right ${transportPaidBy === 'klient' ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-200'}`}>
-                  <p className="text-xs text-gray-500 mb-0.5">{transportCalc.trucks} auto{transportCalc.trucks > 1 ? 'a' : ''} × {formatPLN(transportCalc.costPerTruck)} PLN</p>
-                  <p className="text-xl font-bold text-gray-800">{formatPLN(transportCalc.totalCost)} PLN</p>
-                  <p className={`text-xs font-medium mt-0.5 ${transportPaidBy === 'klient' ? 'text-orange-600' : 'text-gray-500'}`}>
-                    {transportPaidBy === 'klient' ? '⚠ Koszt po stronie klienta' : 'Koszt po stronie Intra B.V.'}
-                  </p>
+              {transportPaidBy !== 'fca' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Dostawa (adres budowy)</label>
+                  <input type="text" value={transportTo} placeholder="ul. Przykładowa 1, Warszawa"
+                    onChange={e => setTransportTo(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               )}
             </div>
-            {transportCalc && transportCalc.costPerTruck > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-4">
-                {transportPaidBy === 'intra' ? (
+
+            {/* Podsumowanie kosztów */}
+            {transportCalc && transportCalc.costPerTruck > 0 && transportPaidBy !== 'fca' && (
+              <div className="mt-2 pt-4 border-t border-gray-100 flex flex-wrap gap-4">
+                <div className={`rounded-lg px-5 py-3 text-right ${transportPaidBy === 'dap_extra' ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-200'}`}>
+                  <p className="text-xs text-gray-500 mb-0.5">{transportCalc.trucks} auto{transportCalc.trucks > 1 ? 'a' : ''} × {formatPLN(transportCalc.costPerTruck)} PLN</p>
+                  <p className="text-xl font-bold text-gray-800">{formatPLN(transportCalc.totalCost)} PLN</p>
+                  <p className={`text-xs font-medium mt-0.5 ${transportPaidBy === 'dap_extra' ? 'text-orange-600' : 'text-gray-500'}`}>
+                    {transportPaidBy === 'dap_extra' ? '⚠ Refaktura na klienta' : 'Koszt po stronie Intra B.V.'}
+                  </p>
+                </div>
+                {transportPaidBy === 'dap_included' && (
                   <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
                     <p className="text-blue-200 text-xs mb-0.5">Łączny koszt dla klienta (dzierżawa + transport)</p>
-                    <p className="text-2xl font-bold">
-                      {formatPLN(rentalCost + transportCalc.totalCost)} PLN
-                    </p>
+                    <p className="text-2xl font-bold">{formatPLN(rentalCost + transportCalc.totalCost)} PLN</p>
                     <p className="text-blue-300 text-xs mt-0.5">
                       dzierżawa {formatPLN(rentalCost)} + transport {formatPLN(transportCalc.totalCost)} PLN
                     </p>
                   </div>
-                ) : (
+                )}
+                {transportPaidBy === 'dap_extra' && (
                   <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
-                    <p className="text-blue-200 text-xs mb-0.5">Koszt dzierżawy dla klienta</p>
+                    <p className="text-blue-200 text-xs mb-0.5">Koszt dzierżawy (na ofercie)</p>
                     <p className="text-2xl font-bold">{formatPLN(rentalCost)} PLN</p>
-                    <p className="text-orange-300 text-xs mt-0.5">+ {formatPLN(transportCalc.totalCost)} PLN transport (po stronie klienta)</p>
+                    <p className="text-orange-300 text-xs mt-0.5">+ {formatPLN(transportCalc.totalCost)} PLN transport (osobna faktura)</p>
                   </div>
                 )}
               </div>

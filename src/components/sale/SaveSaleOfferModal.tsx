@@ -37,7 +37,7 @@ interface DeliveryData {
   trucks: number;
   costPerTruck: number;
   totalCostPLN: number;
-  paidBy: 'intra' | 'klient';
+  paidBy: 'dap_included' | 'dap_extra' | 'fca';
   from: string;
   to: string;
 }
@@ -93,9 +93,9 @@ export default function SaveSaleOfferModal({
   const [warehouseDeliveryTime, setWarehouseDeliveryTime] = useState('5–7 dni roboczych');
 
   // ── Warunki dostawy ──
-  // domyślnie DAP jeśli dostawa po stronie Intra, FCA jeśli klient
+  // domyślnie FCA gdy opcja fca, DAP w pozostałych przypadkach
   const [deliveryTerms, setDeliveryTerms] = useState<'DAP' | 'FCA'>(
-    delivery?.paidBy === 'klient' ? 'FCA' : 'DAP'
+    delivery?.paidBy === 'fca' ? 'FCA' : 'DAP'
   );
   const [fcaLocation, setFcaLocation] = useState('');
 
@@ -223,7 +223,7 @@ export default function SaveSaleOfferModal({
     onSaved(savedOffer);
   }
 
-  const deliveryCostCurrency   = delivery?.paidBy === 'intra'
+  const deliveryCostCurrency   = delivery?.paidBy === 'dap_included'
     ? (currency === 'EUR' ? delivery.totalCostPLN / exchangeRate : delivery.totalCostPLN)
     : 0;
   const totalForClientCurrency = (currency === 'EUR' ? totals.totalSellEUR : totals.totalSellPLN) + deliveryCostCurrency;
@@ -278,20 +278,28 @@ export default function SaveSaleOfferModal({
                   {totals.overallMarginPct.toFixed(1)}%
                 </strong>
               </div>
-              {delivery && delivery.costPerTruck > 0 && (
+              {delivery && (
                 <>
-                  <div className="flex justify-between text-sm pt-1 border-t border-blue-200">
-                    <span className={delivery.paidBy === 'klient' ? 'text-orange-600' : 'text-gray-500'}>
-                      Dostawa ({delivery.trucks} aut{delivery.trucks > 1 ? 'a' : ''})
-                      {delivery.paidBy === 'klient' && <span className="ml-1 font-medium">[klient]</span>}:
-                    </span>
-                    <strong className={delivery.paidBy === 'klient' ? 'text-orange-600' : ''}>
-                      {currency === 'EUR'
-                        ? `${formatEUR(delivery.totalCostPLN / exchangeRate)} EUR`
-                        : `${formatPLN(delivery.totalCostPLN)} PLN`}
-                    </strong>
-                  </div>
-                  {delivery.paidBy === 'intra' && (
+                  {delivery.costPerTruck > 0 && delivery.paidBy !== 'fca' && (
+                    <div className="flex justify-between text-sm pt-1 border-t border-blue-200">
+                      <span className={delivery.paidBy === 'dap_extra' ? 'text-orange-600' : 'text-gray-500'}>
+                        Dostawa ({delivery.trucks} aut{delivery.trucks > 1 ? 'a' : ''})
+                        {delivery.paidBy === 'dap_extra' && <span className="ml-1 font-medium">[refaktura]</span>}:
+                      </span>
+                      <strong className={delivery.paidBy === 'dap_extra' ? 'text-orange-600' : ''}>
+                        {currency === 'EUR'
+                          ? `${formatEUR(delivery.totalCostPLN / exchangeRate)} EUR`
+                          : `${formatPLN(delivery.totalCostPLN)} PLN`}
+                      </strong>
+                    </div>
+                  )}
+                  {delivery.paidBy === 'fca' && (
+                    <div className="flex justify-between text-sm pt-1 border-t border-blue-200">
+                      <span className="text-gray-500">Dostawa:</span>
+                      <strong className="text-green-700">FCA – odbiór własny</strong>
+                    </div>
+                  )}
+                  {delivery.paidBy === 'dap_included' && delivery.costPerTruck > 0 && (
                     <div className="flex justify-between text-sm font-semibold pt-1 border-t border-blue-200 text-blue-900">
                       <span>Łącznie dla klienta:</span>
                       <span>
@@ -301,9 +309,14 @@ export default function SaveSaleOfferModal({
                       </span>
                     </div>
                   )}
-                  {(delivery.from || delivery.to) && (
+                  {(delivery.from || delivery.to) && delivery.paidBy !== 'fca' && (
                     <p className="text-xs text-gray-500 mt-1">
                       🚛 {delivery.from}{delivery.to ? ` → ${delivery.to}` : ''}
+                    </p>
+                  )}
+                  {delivery.paidBy === 'fca' && delivery.from && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      📦 Odbiór z: {delivery.from}
                     </p>
                   )}
                 </>

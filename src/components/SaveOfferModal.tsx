@@ -7,7 +7,7 @@ interface TransportData {
   trucks: number;
   costPerTruck: number;
   totalCost: number;
-  paidBy: 'intra' | 'klient';
+  paidBy: 'dap_included' | 'dap_extra' | 'fca';
   from: string;
   to: string;
 }
@@ -85,8 +85,8 @@ export default function SaveOfferModal({
     setNipLookupLoading(false);
   }
 
-  const totalWithTransport = transport.costPerTruck > 0
-    ? totals.rentalCostPLN + (transport.paidBy === 'intra' ? transport.totalCost : 0)
+  const totalWithTransport = transport.costPerTruck > 0 && transport.paidBy === 'dap_included'
+    ? totals.rentalCostPLN + transport.totalCost
     : totals.rentalCostPLN;
 
   // Nazwa profilu do wyświetlenia w liście ofert (1 pozycja → nazwa profilu, wiele → "Wiele profili")
@@ -236,15 +236,21 @@ export default function SaveOfferModal({
                 <span className="text-gray-500">Wynajem:</span>
                 <strong>{formatPLN(totals.rentalCostPLN)} PLN</strong>
               </div>
-              {transport.costPerTruck > 0 && (
+              {transport.costPerTruck > 0 && transport.paidBy !== 'fca' && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">
                     Transport ({transport.trucks} aut{transport.trucks > 1 ? 'a' : ''})
-                    {transport.paidBy === 'klient' && <span className="text-orange-600 ml-1">[klient]</span>}:
+                    {transport.paidBy === 'dap_extra' && <span className="text-orange-600 ml-1">[refaktura]</span>}:
                   </span>
-                  <strong className={transport.paidBy === 'klient' ? 'text-orange-600' : ''}>
+                  <strong className={transport.paidBy === 'dap_extra' ? 'text-orange-600' : ''}>
                     {formatPLN(transport.totalCost)} PLN
                   </strong>
+                </div>
+              )}
+              {transport.paidBy === 'fca' && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Transport:</span>
+                  <strong className="text-green-700">FCA – klient</strong>
                 </div>
               )}
               <div className="flex justify-between pt-1 border-t border-blue-200 text-sm">

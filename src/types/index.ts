@@ -61,7 +61,7 @@ export interface SaleOffer {
   delivery_trucks?: number;
   delivery_cost_per_truck?: number;
   delivery_cost_total?: number;
-  delivery_paid_by?: 'intra' | 'klient';
+  delivery_paid_by?: 'dap_included' | 'dap_extra' | 'fca';
   delivery_from?: string;
   delivery_to?: string;
   // Warunki oferty
@@ -223,7 +223,7 @@ export interface Offer {
   transport_trucks?: number;
   transport_cost_per_truck?: number;
   transport_cost_total?: number;
-  transport_paid_by?: 'intra' | 'klient';
+  transport_paid_by?: 'dap_included' | 'dap_extra' | 'fca';
   transport_from?: string;
   transport_to?: string;
   prepared_by?: string;

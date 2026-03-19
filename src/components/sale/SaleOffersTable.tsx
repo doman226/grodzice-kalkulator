@@ -240,12 +240,23 @@ export default function SaleOffersTable({ offers, onOffersChange }: Props) {
                             <span className="text-gray-500">Kurs EUR:</span>{' '}
                             <strong>{offer.exchange_rate?.toFixed(4) ?? '—'} PLN</strong>
                           </div>
-                          {offer.delivery_cost_total != null && offer.delivery_cost_total > 0 && (
+                          {(offer.delivery_cost_total != null && offer.delivery_cost_total > 0 || offer.delivery_paid_by === 'fca') && (
                             <div>
                               <span className="text-gray-500">Dostawa:</span>{' '}
-                              <strong className={offer.delivery_paid_by === 'klient' ? 'text-orange-600' : ''}>
-                                {formatPLN(offer.delivery_cost_total)} PLN
-                                {' '}({offer.delivery_paid_by === 'klient' ? 'klient' : 'Intra'})
+                              <strong className={
+                                offer.delivery_paid_by === 'dap_extra' || offer.delivery_paid_by === 'klient' ? 'text-orange-600'
+                                : offer.delivery_paid_by === 'fca' ? 'text-green-700'
+                                : ''
+                              }>
+                                {offer.delivery_paid_by === 'fca'
+                                  ? 'FCA – odbiór własny'
+                                  : `${formatPLN(offer.delivery_cost_total ?? 0)} PLN`}
+                                {' '}
+                                <span className="font-normal text-xs">(
+                                  {offer.delivery_paid_by === 'dap_included' || offer.delivery_paid_by === 'intra' ? 'DAP – w cenie'
+                                  : offer.delivery_paid_by === 'dap_extra' || offer.delivery_paid_by === 'klient' ? 'DAP – refaktura'
+                                  : 'FCA'}
+                                )</span>
                               </strong>
                             </div>
                           )}

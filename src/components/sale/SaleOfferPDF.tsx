@@ -180,7 +180,11 @@ export default function SaleOfferPDF({ offer }: Props) {
 
   const totalSellEUR = offer.total_sell_eur ?? 0;
   const totalSellPLN = offer.total_sell_pln ?? 0;
-  const delivCostPLN = (offer.delivery_paid_by === 'intra' && offer.delivery_cost_total)
+  // backward compat: 'intra' (stare) = dap_included
+  const dPaidBy = offer.delivery_paid_by === 'intra' ? 'dap_included'
+                : offer.delivery_paid_by === 'klient' ? 'dap_extra'
+                : offer.delivery_paid_by;
+  const delivCostPLN = (dPaidBy === 'dap_included' && offer.delivery_cost_total)
     ? offer.delivery_cost_total : 0;
   const delivCostEUR = delivCostPLN / exchRate;
   const totalForClientPLN = totalSellPLN + delivCostPLN;
@@ -366,33 +370,74 @@ export default function SaleOfferPDF({ offer }: Props) {
           </View>
         </View>
 
-        {/* ── TRANSPORT (tylko gdy FCA = klient płaci) ── */}
-        {offer.delivery_paid_by === 'klient' && offer.delivery_cost_total != null && offer.delivery_cost_total > 0 && (
+        {/* ── TRANSPORT ── */}
+        {(dPaidBy === 'dap_extra' || dPaidBy === 'fca' ||
+          (dPaidBy === 'dap_included' && offer.delivery_cost_total != null && offer.delivery_cost_total > 0)) && (
           <>
             <Text style={s.sectionTitle}>Transport:</Text>
             <View style={s.transportBox}>
-              <View style={s.transportRow}>
-                <Text style={s.transportLabel}>Dostawa:</Text>
-                <Text style={[s.transportValue, { color: C.orange }]}>FCA / Klient</Text>
-              </View>
-              {(offer.delivery_from || offer.delivery_to) && (
-                <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}`, alignItems: 'flex-end' }]}>
-                  <Text style={s.transportLabel}>Trasa:</Text>
-                  <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
-                  <Text style={s.transportValue}>
-                    {offer.delivery_from}{offer.delivery_to ? ` — ${offer.delivery_to}` : ''}
-                  </Text>
-                </View>
+              {dPaidBy === 'dap_included' && (
+                // DAP w cenie – klient nie widzi kosztu
+                <>
+                  <View style={s.transportRow}>
+                    <Text style={s.transportLabel}>Dostawa:</Text>
+                    <Text style={[s.transportValue, { color: C.navy }]}>DAP – w cenie / Intra B.V.</Text>
+                  </View>
+                  {(offer.delivery_from || offer.delivery_to) && (
+                    <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}`, alignItems: 'flex-end' }]}>
+                      <Text style={s.transportLabel}>Trasa:</Text>
+                      <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
+                      <Text style={s.transportValue}>
+                        {offer.delivery_from}{offer.delivery_to ? ` — ${offer.delivery_to}` : ''}
+                      </Text>
+                    </View>
+                  )}
+                </>
               )}
-              <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}` }]}>
-                <Text style={s.transportLabel}>Szacowany koszt transportu:</Text>
-                <Text style={[s.transportValue, { color: C.orange }]}>
-                  {isEUR
-                    ? `${formatEUR(offer.delivery_cost_total / exchRate)} EUR`
-                    : `${formatPLN(offer.delivery_cost_total)} PLN`
-                  }
-                </Text>
-              </View>
+              {dPaidBy === 'dap_extra' && (
+                // DAP refaktura – Intra organizuje, klient płaci osobno
+                <>
+                  <View style={s.transportRow}>
+                    <Text style={s.transportLabel}>Dostawa:</Text>
+                    <Text style={[s.transportValue, { color: C.navy }]}>DAP / Intra B.V.</Text>
+                  </View>
+                  {(offer.delivery_from || offer.delivery_to) && (
+                    <View style={[s.transportRow, { alignItems: 'flex-end' }]}>
+                      <Text style={s.transportLabel}>Trasa:</Text>
+                      <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
+                      <Text style={s.transportValue}>
+                        {offer.delivery_from}{offer.delivery_to ? ` — ${offer.delivery_to}` : ''}
+                      </Text>
+                    </View>
+                  )}
+                  {offer.delivery_cost_total != null && offer.delivery_cost_total > 0 && (
+                    <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}` }]}>
+                      <Text style={s.transportLabel}>Koszt dostawy:</Text>
+                      <Text style={[s.transportValue, { color: C.orange }]}>
+                        {isEUR
+                          ? `${formatEUR(offer.delivery_cost_total / exchRate)} EUR netto (osobna pozycja)`
+                          : `${formatPLN(offer.delivery_cost_total)} PLN netto (osobna pozycja)`}
+                      </Text>
+                    </View>
+                  )}
+                </>
+              )}
+              {dPaidBy === 'fca' && (
+                // FCA – odbiór własny klienta
+                <>
+                  <View style={s.transportRow}>
+                    <Text style={s.transportLabel}>Dostawa:</Text>
+                    <Text style={[s.transportValue, { color: C.navy }]}>FCA – odbiór własny</Text>
+                  </View>
+                  {offer.delivery_from && (
+                    <View style={[s.transportRow, { alignItems: 'flex-end' }]}>
+                      <Text style={s.transportLabel}>Odbiór z:</Text>
+                      <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
+                      <Text style={s.transportValue}>{offer.delivery_from}</Text>
+                    </View>
+                  )}
+                </>
+              )}
             </View>
           </>
         )}
