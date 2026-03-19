@@ -37,6 +37,42 @@ export interface PriceHistory {
   changed_at: string;
 }
 
+// ─── Sprzedaż ────────────────────────────────────────────────────────────────
+
+export interface SaleWarehouse {
+  id: string;
+  name: string;
+  active: boolean;
+}
+
+export interface SaleSteeelGrade {
+  id: string;
+  name: string;
+  sort_order: number;
+}
+
+export interface SaleProfile {
+  id: string;
+  name: string;
+  series: string;
+  width_mm: number;
+  weight_kg_per_m: number;
+  wall_kg_per_m2: number;
+  active: boolean;
+}
+
+export interface SalePrice {
+  id: string;
+  warehouse_id: string;
+  profile_name: string;
+  steel_grade: string;
+  price_eur_t: number | null;
+  available: boolean;
+  updated_at: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface CalculatorInput {
   profileId: string;
   quantity: number;

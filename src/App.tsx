@@ -6,7 +6,7 @@ import ProfileTable from './components/ProfileTable';
 import PriceSettings from './components/PriceSettings';
 import ClientsTable from './components/ClientsTable';
 import OffersTable from './components/OffersTable';
-import SalePlaceholder from './components/SalePlaceholder';
+import SaleSection from './components/sale/SaleSection';
 import { formatPLN } from './lib/calculations';
 
 type Mode = 'rental' | 'sale';
@@ -171,7 +171,7 @@ function App() {
             </button>
           </div>
         ) : mode === 'sale' ? (
-          <SalePlaceholder />
+          <SaleSection />
         ) : (
           <>
             {activeTab === 'calculator' && prices && (
