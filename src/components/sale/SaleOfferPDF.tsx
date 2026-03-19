@@ -284,43 +284,53 @@ export default function SaleOfferPDF({ offer }: Props) {
         {/* ── TABELA POZYCJI ── */}
         <View style={s.table}>
           <View style={s.tableHeaderRow}>
-            <Text style={[s.thCell, { flex: 3.0 }]}>Profil VL</Text>
-            <Text style={[s.thCell, { flex: 2.0 }]}>Gatunek</Text>
-            <Text style={[s.thCell, { flex: 1.2, textAlign: 'center' }]}>Ilość</Text>
+            <Text style={[s.thCell, { flex: 2.6 }]}>Profil</Text>
+            <Text style={[s.thCell, { flex: 2.0 }]}>Gatunek stali</Text>
+            <Text style={[s.thCell, { flex: 1.0, textAlign: 'center' }]}>Ilość</Text>
             <Text style={[s.thCell, { flex: 1.0, textAlign: 'right' }]}>Dług. [m]</Text>
-            <Text style={[s.thCell, { flex: 1.4, textAlign: 'right' }]}>Masa [t]</Text>
+            <Text style={[s.thCell, { flex: 0.8, textAlign: 'right' }]}>kg/m</Text>
+            <Text style={[s.thCell, { flex: 1.2, textAlign: 'right' }]}>Masa [t]</Text>
           </View>
 
-          {sortedItems.map((item, idx) => (
-            <View key={item.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
-              <Text style={[s.tdLabel, { flex: 3.0, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
-                {item.profile_name}
-                {item.is_paired ? ' ×2' : ''}
-              </Text>
-              <Text style={[s.tdLabel, { flex: 2.0, color: C.gray700 }]}>
-                {item.steel_grade?.toUpperCase() ?? '—'}
-              </Text>
-              <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'center' }]}>
-                {item.is_paired
-                  ? `${item.quantity} par`
-                  : `${item.quantity} szt.`}
-              </Text>
-              <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right' }]}>
-                {item.length_m != null ? `${item.length_m} m` : '—'}
-              </Text>
-              <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
-                {formatNumber(item.mass_t, 3)}
-              </Text>
-            </View>
-          ))}
+          {sortedItems.map((item, idx) => {
+            const kgPerM = item.total_length_m > 0
+              ? (item.mass_t * 1000) / item.total_length_m
+              : 0;
+            return (
+              <View key={item.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
+                <Text style={[s.tdLabel, { flex: 2.6, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                  {item.profile_name}
+                  {item.is_paired ? ' ×2' : ''}
+                </Text>
+                <Text style={[s.tdLabel, { flex: 2.0, color: C.gray700 }]}>
+                  {item.steel_grade ?? '—'}
+                </Text>
+                <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'center' }]}>
+                  {item.is_paired
+                    ? `${item.quantity} par`
+                    : `${item.quantity} szt.`}
+                </Text>
+                <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right' }]}>
+                  {item.length_m != null ? `${item.length_m} m` : '—'}
+                </Text>
+                <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'right', color: C.gray700 }]}>
+                  {formatNumber(kgPerM, 1)}
+                </Text>
+                <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                  {formatNumber(item.mass_t, 3)} t
+                </Text>
+              </View>
+            );
+          })}
 
           {/* Wiersz sumy */}
           <View style={[s.tableBodyRow, { backgroundColor: C.gray100 }]}>
-            <Text style={[s.tdLabel, { flex: 3.0, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>Łącznie</Text>
+            <Text style={[s.tdLabel, { flex: 2.6, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>Łącznie</Text>
             <Text style={[s.tdLabel, { flex: 2.0 }]} />
-            <Text style={[s.tdLabel, { flex: 1.2 }]} />
             <Text style={[s.tdLabel, { flex: 1.0 }]} />
-            <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+            <Text style={[s.tdLabel, { flex: 1.0 }]} />
+            <Text style={[s.tdLabel, { flex: 0.8 }]} />
+            <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
               {formatNumber(totalMassT, 3)} t
             </Text>
           </View>
@@ -334,14 +344,20 @@ export default function SaleOfferPDF({ offer }: Props) {
             <Text style={s.priceSuffix}> {currency} netto</Text>
           </Text>
           <View style={s.priceRow}>
-            {sortedItems
-              .filter(item => item.sell_eur_t != null)
-              .map((item, i) => (
+            {(() => {
+              const priced = sortedItems.filter(item => item.sell_eur_t != null);
+              const allSame = priced.length > 0 && priced.every(i => i.sell_eur_t === priced[0].sell_eur_t);
+              if (allSame) {
+                return (
+                  <Text>Cena sprzedaży za tonę: {priced[0].sell_eur_t} EUR/t</Text>
+                );
+              }
+              return priced.map((item, i) => (
                 <Text key={i}>
                   {item.profile_name}: {item.sell_eur_t} EUR/t
                 </Text>
-              ))
-            }
+              ));
+            })()}
             {!isEUR && (
               <Text style={{ marginLeft: 'auto' }}>
                 kurs {exchRate.toFixed(4)} PLN/EUR
