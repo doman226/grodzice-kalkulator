@@ -79,29 +79,35 @@ export default function EditSaleOfferModal({
 }: Props) {
 
   // ── Dane słownikowe (z DB) ──
-  const [steelGrades, setSteelGrades] = useState<string[]>([]);
+  const [steelGrades, setSteelGrades] = useState<{ id: string; name: string }[]>([]);
   const [warehouses,  setWarehouses]  = useState<Warehouse[]>([]);
   const [prices,      setPrices]      = useState<SalePrice[]>([]);
   useEffect(() => {
     Promise.all([
-      supabase.from('sale_steel_grades').select('name').order('sort_order'),
+      supabase.from('sale_steel_grades').select('id, name').order('sort_order'),
       supabase.from('sale_warehouses').select('id, name').order('name'),
       supabase.from('sale_prices').select('warehouse_id, profile_name, steel_grade, price_eur_t'),
     ]).then(([gradesRes, warehousesRes, pricesRes]) => {
-      if (gradesRes.data)    setSteelGrades(gradesRes.data.map((r: { name: string }) => r.name));
+      if (gradesRes.data)     setSteelGrades(gradesRes.data as { id: string; name: string }[]);
       if (warehousesRes.data) setWarehouses(warehousesRes.data as Warehouse[]);
-      if (pricesRes.data)    setPrices(pricesRes.data as SalePrice[]);
+      if (pricesRes.data)     setPrices(pricesRes.data as SalePrice[]);
     });
   }, []);
 
-  // Normalizuj gatunki stali w załadowanych pozycjach (dopasowanie case-insensitive)
+  // Normalizuj gatunki stali: mapuj legacy wartości (nazwy/lowercase) na poprawne id
   useEffect(() => {
     if (steelGrades.length === 0) return;
     setEditItems(prev => prev.map(item => {
-      if (!item.steelGrade) return { ...item, steelGrade: steelGrades[0] };
-      if (steelGrades.includes(item.steelGrade)) return item;
-      const normalized = steelGrades.find(g => g.toLowerCase() === item.steelGrade.toLowerCase());
-      return normalized ? { ...item, steelGrade: normalized } : item;
+      if (!item.steelGrade) return { ...item, steelGrade: steelGrades[0].id };
+      // Jeśli dokładnie pasuje do id – zostawia
+      if (steelGrades.some(g => g.id === item.steelGrade)) return item;
+      // Szuka po id case-insensitive (np. "s270gp" → "S270GP")
+      const byId = steelGrades.find(g => g.id.toLowerCase() === item.steelGrade.toLowerCase());
+      if (byId) return { ...item, steelGrade: byId.id };
+      // Szuka po name case-insensitive (legacy: wartość była name zamiast id)
+      const byName = steelGrades.find(g => g.name.toLowerCase() === item.steelGrade.toLowerCase());
+      if (byName) return { ...item, steelGrade: byName.id };
+      return item;
     }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [steelGrades]);
@@ -162,7 +168,7 @@ export default function EditSaleOfferModal({
   function addItem() {
     const wh   = warehouses[0]?.id ?? '';
     const prof = saleProfiles[0]?.name ?? '';
-    const gr   = steelGrades[0] ?? '';
+    const gr   = steelGrades[0]?.id ?? '';
     setEditItems(prev => [...prev, {
       uid: crypto.randomUUID(),
       profileName: prof, steelGrade: gr,
@@ -233,7 +239,8 @@ export default function EditSaleOfferModal({
     const hasValidItem = itemResults.some((r, i) => r !== null && editItems[i].profileName);
     if (!hasValidItem) return setError('Brak prawidłowych pozycji. Sprawdź nazwy profili.');
     const itemsWithProfile = editItems.filter(i => i.profileName);
-    const missingGrade = itemsWithProfile.some(i => !i.steelGrade || !steelGrades.includes(i.steelGrade));
+    const validGradeIds = steelGrades.map(g => g.id);
+    const missingGrade = steelGrades.length > 0 && itemsWithProfile.some(i => !i.steelGrade || !validGradeIds.includes(i.steelGrade));
     if (missingGrade) return setError('Wybierz prawidłowy gatunek stali dla wszystkich pozycji.');
     if (deliveryTimeline === 'huta' && !campaignWeeks.trim())
       return setError('Wpisz numer tygodnia kampanii produkcyjnej.');
@@ -397,9 +404,9 @@ export default function EditSaleOfferModal({
                           className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                           <option value="">— wybierz —</option>
-                          {steelGrades.map(g => <option key={g} value={g}>{g}</option>)}
-                          {/* zachowaj oryginalną wartość jeśli nie ma jej na liście */}
-                          {item.steelGrade && !steelGrades.includes(item.steelGrade) && (
+                          {steelGrades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                          {/* zachowaj oryginalną wartość jeśli nie ma jej na liście (legacy) */}
+                          {item.steelGrade && !steelGrades.some(g => g.id === item.steelGrade) && (
                             <option value={item.steelGrade}>{item.steelGrade}</option>
                           )}
                         </select>
