@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
+import { fetchNBPRate, formatNBPDate } from '../../lib/nbp';
+import type { NBPRate } from '../../lib/nbp';
 import type { SaleWarehouse, SaleSteeelGrade, SaleProfile, SalePrice } from '../../types';
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
@@ -58,11 +60,37 @@ export default function SaleCalculator() {
 
   // --- Stan kalkulatora ---
   const [items, setItems] = useState<SaleCalcItem[]>([]);
-  const [exchangeRate, setExchangeRate] = useState<number>(4.25);
-  const [currency, setCurrency] = useState<'EUR' | 'PLN'>('EUR');
+  const [nbpRate, setNbpRate]           = useState<NBPRate>({ rate: 4.25, date: '', source: 'ręczny' });
+  const [nbpLoading, setNbpLoading]     = useState(false);
+  const [nbpError, setNbpError]         = useState('');
+  const [manualRate, setManualRate]     = useState(false);
+  const [currency, setCurrency]         = useState<'EUR' | 'PLN'>('EUR');
   const [applyAllSellPrice, setApplyAllSellPrice] = useState<number>(0);
 
-  useEffect(() => { loadData(); }, []);
+  const exchangeRate = nbpRate.rate;
+
+  useEffect(() => { loadData(); loadNBP(); }, []);
+
+  async function loadNBP() {
+    setNbpLoading(true);
+    setNbpError('');
+    try {
+      const result = await fetchNBPRate();
+      setNbpRate(result);
+      setManualRate(false);
+    } catch {
+      setNbpError('Nie udało się pobrać kursu NBP. Wpisz ręcznie.');
+    }
+    setNbpLoading(false);
+  }
+
+  function handleManualRateChange(val: string) {
+    const parsed = parseFloat(val.replace(',', '.'));
+    if (!isNaN(parsed) && parsed > 0) {
+      setNbpRate({ rate: parsed, date: '', source: 'ręczny' });
+      setManualRate(true);
+    }
+  }
 
   async function loadData() {
     setLoading(true);
@@ -222,17 +250,46 @@ export default function SaleCalculator() {
       {/* ── KURS I WALUTA ── */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
         <div className="flex flex-wrap items-center gap-6">
+          {/* Kurs EUR/PLN z NBP */}
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Kurs EUR/PLN</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="number" min={1} step={0.01}
-                value={exchangeRate}
-                onChange={e => setExchangeRate(parseFloat(e.target.value) || 4.25)}
-                className="w-24 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <span className="text-xs text-gray-400">(NBP dostępny od etapu 2.4)</span>
-            </div>
+            {nbpLoading ? (
+              <div className="flex items-center gap-2 text-sm text-gray-400">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600" />
+                Pobieranie kursu NBP...
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="text"
+                  value={nbpRate.rate.toFixed(4)}
+                  onChange={e => handleManualRateChange(e.target.value)}
+                  className={`w-24 border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono ${
+                    manualRate ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'
+                  }`}
+                />
+                <div className="text-xs">
+                  {manualRate ? (
+                    <span className="text-amber-600 font-medium">ręczny</span>
+                  ) : (
+                    <span className="text-green-600 font-medium">
+                      NBP {nbpRate.date ? `· ${formatNBPDate(nbpRate.date)}` : ''}
+                    </span>
+                  )}
+                  {(manualRate || nbpError) && (
+                    <button
+                      onClick={loadNBP}
+                      className="ml-2 text-blue-600 hover:underline"
+                    >
+                      ↺ pobierz NBP
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            {nbpError && (
+              <p className="text-xs text-amber-600 mt-1">{nbpError}</p>
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Waluta oferty</label>
