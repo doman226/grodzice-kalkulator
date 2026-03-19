@@ -186,6 +186,14 @@ export default function SaleOfferPDF({ offer }: Props) {
                 : dPaidByRaw === 'klient' ? 'dap_extra'
                 : offer.delivery_paid_by;
 
+  // delivery_cost_total zawsze w PLN → przelicz na EUR jeśli potrzeba
+  const deliveryCostPLN = (dPaidBy === 'dap_included' && (offer.delivery_cost_total ?? 0) > 0)
+    ? (offer.delivery_cost_total ?? 0) : 0;
+  const deliveryCostEUR = exchRate > 0 ? deliveryCostPLN / exchRate : 0;
+  // Cena dla klienta = towary + transport (gdy DAP w cenie)
+  const totalForClientEUR = totalSellEUR + deliveryCostEUR;
+  const totalForClientPLN = totalSellPLN + deliveryCostPLN;
+
   // Posortowane pozycje
   const sortedItems = [...(offer.items ?? [])].sort((a, b) => a.sort_order - b.sort_order);
 
@@ -338,9 +346,11 @@ export default function SaleOfferPDF({ offer }: Props) {
 
         {/* ── CENA SPRZEDAŻY ── */}
         <View style={s.priceBox}>
-          <Text style={s.priceLabel}>Cena sprzedaży</Text>
+          <Text style={s.priceLabel}>
+            {dPaidBy === 'dap_included' && deliveryCostPLN > 0 ? 'Cena sprzedaży (towary + dostawa DAP)' : 'Cena sprzedaży'}
+          </Text>
           <Text style={s.priceValue}>
-            {isEUR ? formatEUR(totalSellEUR) : formatPLN(totalSellPLN)}
+            {isEUR ? formatEUR(totalForClientEUR) : formatPLN(totalForClientPLN)}
             <Text style={s.priceSuffix}> {currency} netto</Text>
           </Text>
           <View style={s.priceRow}>
