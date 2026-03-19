@@ -410,16 +410,36 @@ export default function SaleOfferPDF({ offer }: Props) {
                       </Text>
                     </View>
                   )}
-                  {offer.delivery_cost_total != null && offer.delivery_cost_total > 0 && (
-                    <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}` }]}>
-                      <Text style={s.transportLabel}>Koszt dostawy:</Text>
-                      <Text style={[s.transportValue, { color: C.orange }]}>
+                  {offer.delivery_trucks != null && (
+                    <View style={s.transportRow}>
+                      <Text style={s.transportLabel}>Liczba aut:</Text>
+                      <Text style={s.transportValue}>{offer.delivery_trucks}</Text>
+                    </View>
+                  )}
+                  {offer.delivery_cost_per_truck != null && offer.delivery_cost_per_truck > 0 && (
+                    <View style={s.transportRow}>
+                      <Text style={s.transportLabel}>Koszt / auto:</Text>
+                      <Text style={s.transportValue}>
                         {isEUR
-                          ? `${formatEUR(offer.delivery_cost_total / exchRate)} EUR netto (osobna pozycja)`
-                          : `${formatPLN(offer.delivery_cost_total)} PLN netto (osobna pozycja)`}
+                          ? `${formatEUR(offer.delivery_cost_per_truck / exchRate)} EUR netto`
+                          : `${formatPLN(offer.delivery_cost_per_truck)} PLN netto`}
                       </Text>
                     </View>
                   )}
+                  {offer.delivery_cost_total != null && offer.delivery_cost_total > 0 && (
+                    <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}` }]}>
+                      <Text style={s.transportLabel}>Łączny koszt dostawy:</Text>
+                      <Text style={[s.transportValue, { color: C.orange }]}>
+                        {isEUR
+                          ? `${formatEUR(offer.delivery_cost_total / exchRate)} EUR netto`
+                          : `${formatPLN(offer.delivery_cost_total)} PLN netto`}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={s.transportRow}>
+                    <Text style={s.transportLabel}>Rozliczenie:</Text>
+                    <Text style={[s.transportValue, { color: C.orange }]}>Refaktura kosztów dostawy na klienta</Text>
+                  </View>
                 </>
               )}
               {dPaidBy === 'fca' && (

@@ -422,26 +422,21 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
               </div>
             </div>
 
-            {/* Pola kosztów – ukryte dla FCA */}
-            {transportPaidBy !== 'fca' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            {/* Pola kosztów – tylko dla DAP refaktura */}
+            {transportPaidBy === 'dap_extra' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Koszt transportu / auto [PLN]</label>
-                  <input type="number" min={0} step={100} value={transportCostPerTruck} placeholder="np. 2500"
-                    onChange={e => setTransportCostPerTruck(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value)))}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Liczba aut</label>
+                  <input type="number" min={1} step={1}
+                    value={customTrucks === '' ? 1 : customTrucks}
+                    onChange={e => setCustomTrucks(Math.max(1, parseInt(e.target.value) || 1))}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <p className="text-xs text-gray-400 mt-1">Szacunek: {transportCalc?.autoTrucks ?? '—'} aut</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Liczba aut
-                    {typeof customTrucks === 'number' && customTrucks > 0 && (
-                      <span className="ml-1 text-xs text-amber-600 font-normal">(ręcznie)</span>
-                    )}
-                  </label>
-                  <input type="number" min={1} step={1}
-                    value={customTrucks}
-                    placeholder={String(transportCalc?.autoTrucks ?? '—')}
-                    onChange={e => setCustomTrucks(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1))}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Koszt / auto [PLN]</label>
+                  <input type="number" min={0} step={100} value={transportCostPerTruck} placeholder="np. 2500"
+                    onChange={e => setTransportCostPerTruck(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value)))}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               </div>
@@ -466,32 +461,19 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
               )}
             </div>
 
-            {/* Podsumowanie kosztów */}
-            {transportCalc && transportCalc.costPerTruck > 0 && transportPaidBy !== 'fca' && (
+            {/* Podsumowanie – tylko dla DAP refaktura z wpisanym kosztem */}
+            {transportPaidBy === 'dap_extra' && transportCalc && transportCalc.costPerTruck > 0 && (
               <div className="mt-2 pt-4 border-t border-gray-100 flex flex-wrap gap-4">
-                <div className={`rounded-lg px-5 py-3 text-right ${transportPaidBy === 'dap_extra' ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-200'}`}>
+                <div className="bg-orange-50 border border-orange-200 rounded-lg px-5 py-3 text-right">
                   <p className="text-xs text-gray-500 mb-0.5">{transportCalc.trucks} auto{transportCalc.trucks > 1 ? 'a' : ''} × {formatPLN(transportCalc.costPerTruck)} PLN</p>
                   <p className="text-xl font-bold text-gray-800">{formatPLN(transportCalc.totalCost)} PLN</p>
-                  <p className={`text-xs font-medium mt-0.5 ${transportPaidBy === 'dap_extra' ? 'text-orange-600' : 'text-gray-500'}`}>
-                    {transportPaidBy === 'dap_extra' ? '⚠ Refaktura na klienta' : 'Koszt po stronie Intra B.V.'}
-                  </p>
+                  <p className="text-xs font-medium mt-0.5 text-orange-600">⚠ Refaktura na klienta</p>
                 </div>
-                {transportPaidBy === 'dap_included' && (
-                  <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
-                    <p className="text-blue-200 text-xs mb-0.5">Łączny koszt dla klienta (dzierżawa + transport)</p>
-                    <p className="text-2xl font-bold">{formatPLN(rentalCost + transportCalc.totalCost)} PLN</p>
-                    <p className="text-blue-300 text-xs mt-0.5">
-                      dzierżawa {formatPLN(rentalCost)} + transport {formatPLN(transportCalc.totalCost)} PLN
-                    </p>
-                  </div>
-                )}
-                {transportPaidBy === 'dap_extra' && (
-                  <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
-                    <p className="text-blue-200 text-xs mb-0.5">Koszt dzierżawy (na ofercie)</p>
-                    <p className="text-2xl font-bold">{formatPLN(rentalCost)} PLN</p>
-                    <p className="text-orange-300 text-xs mt-0.5">+ {formatPLN(transportCalc.totalCost)} PLN transport (osobna faktura)</p>
-                  </div>
-                )}
+                <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
+                  <p className="text-blue-200 text-xs mb-0.5">Koszt dzierżawy (na ofercie)</p>
+                  <p className="text-2xl font-bold">{formatPLN(rentalCost)} PLN</p>
+                  <p className="text-orange-300 text-xs mt-0.5">+ {formatPLN(transportCalc.totalCost)} PLN transport (refaktura)</p>
+                </div>
               </div>
             )}
           </div>

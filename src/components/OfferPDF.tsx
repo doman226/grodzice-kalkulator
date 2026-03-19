@@ -545,11 +545,29 @@ export default function OfferPDF({ offer }: Props) {
                       <Text style={s.transportValue}>{offer.transport_from}{offer.transport_to ? ` — ${offer.transport_to}` : ''}</Text>
                     </View>
                   )}
-                  <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}` }]}>
-                    <Text style={s.transportLabel}>Koszt transportu:</Text>
-                    <Text style={[s.transportValue, { color: C.orange }]}>
-                      {formatPLN(offer.transport_cost_total ?? 0)} PLN netto (osobna pozycja)
-                    </Text>
+                  {offer.transport_trucks != null && (
+                    <View style={s.transportRow}>
+                      <Text style={s.transportLabel}>Liczba aut:</Text>
+                      <Text style={s.transportValue}>{offer.transport_trucks}</Text>
+                    </View>
+                  )}
+                  {offer.transport_cost_per_truck != null && offer.transport_cost_per_truck > 0 && (
+                    <View style={s.transportRow}>
+                      <Text style={s.transportLabel}>Koszt / auto:</Text>
+                      <Text style={s.transportValue}>{formatPLN(offer.transport_cost_per_truck)} PLN netto</Text>
+                    </View>
+                  )}
+                  {offer.transport_cost_total != null && offer.transport_cost_total > 0 && (
+                    <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}` }]}>
+                      <Text style={s.transportLabel}>Łączny koszt transportu:</Text>
+                      <Text style={[s.transportValue, { color: C.orange }]}>
+                        {formatPLN(offer.transport_cost_total)} PLN netto
+                      </Text>
+                    </View>
+                  )}
+                  <View style={s.transportRow}>
+                    <Text style={s.transportLabel}>Rozliczenie:</Text>
+                    <Text style={[s.transportValue, { color: C.orange }]}>Refaktura kosztów transportu na klienta</Text>
                   </View>
                 </>
               )}
