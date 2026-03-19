@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { supabase } from '../lib/supabase';
 import type { Offer, OfferStatus, Profile, RentalPrices, Client } from '../types';
-import { formatPLN } from '../lib/calculations';
+import { formatPLN, formatNumber } from '../lib/calculations';
 import OfferPDF from './OfferPDF';
 import EditOfferModal from './EditOfferModal';
 
@@ -15,399 +15,382 @@ interface Props {
 }
 
 const STATUS_LABELS: Record<OfferStatus, string> = {
-  szkic: 'Szkic',
-  wysłana: 'Wysłana',
-  przyjęta: 'Przyjęta',
+  szkic:     'Szkic',
+  wysłana:   'Wysłana',
+  przyjęta:  'Przyjęta',
   odrzucona: 'Odrzucona',
 };
 
 const STATUS_COLORS: Record<OfferStatus, string> = {
-  szkic: 'bg-gray-100 text-gray-600',
-  wysłana: 'bg-blue-100 text-blue-700',
-  przyjęta: 'bg-green-100 text-green-700',
+  szkic:     'bg-gray-100 text-gray-600',
+  wysłana:   'bg-blue-100 text-blue-700',
+  przyjęta:  'bg-green-100 text-green-700',
   odrzucona: 'bg-red-100 text-red-600',
 };
 
+function formatDate(iso: string) {
+  return new Intl.DateTimeFormat('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso));
+}
+
 export default function OffersTable({ offers, onOffersChange, profiles, prices, clients }: Props) {
-  const [selected, setSelected] = useState<Offer | null>(null);
-  const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch]             = useState('');
   const [filterStatus, setFilterStatus] = useState<OfferStatus | 'wszystkie'>('wszystkie');
-  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
-  const [pdfLoading, setPdfLoading] = useState<string | null>(null);
+  const [expanded, setExpanded]         = useState<string | null>(null);
+  const [statusSaving, setStatusSaving] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading]     = useState<string | null>(null);
+  const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
+  const [toast, setToast]               = useState('');
+  const [error, setError]               = useState('');
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(''), 2500);
+  }
 
   async function handleDownloadPDF(offer: Offer) {
     setPdfLoading(offer.id);
     try {
       const blob = await pdf(<OfferPDF offer={offer} />).toBlob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
       a.download = `${offer.offer_number.replace(/\//g, '-')}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      showToast('Błąd generowania PDF: ' + (err as Error).message, 'error');
+      setError('Błąd generowania PDF: ' + (err as Error).message);
     } finally {
       setPdfLoading(null);
     }
   }
 
-  function showToast(msg: string, type: 'success' | 'error' = 'success') {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
-  }
-
-  async function changeStatus(offer: Offer, status: OfferStatus) {
-    const { error } = await supabase.from('offers').update({ status, updated_at: new Date().toISOString() }).eq('id', offer.id);
-    if (error) return showToast('Błąd: ' + error.message, 'error');
-    const updated = { ...offer, status };
-    onOffersChange(offers.map(o => o.id === offer.id ? updated : o));
-    if (selected?.id === offer.id) setSelected(updated);
-    showToast('Status zaktualizowany.');
+  async function changeStatus(offer: Offer, newStatus: OfferStatus) {
+    setStatusSaving(offer.id);
+    const { error: err } = await supabase
+      .from('offers')
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq('id', offer.id);
+    setStatusSaving(null);
+    if (err) { setError('Błąd: ' + err.message); return; }
+    onOffersChange(offers.map(o => o.id === offer.id ? { ...o, status: newStatus } : o));
+    showToast('Status zaktualizowany ✓');
   }
 
   async function handleDelete(offer: Offer) {
-    if (!confirm(`Przenieść ofertę ${offer.offer_number} do kosza?\n\nOferta zostanie ukryta, ale dane pozostaną w bazie.`)) return;
-    const { error } = await supabase.rpc('soft_delete_offer', { p_offer_id: offer.id });
-    if (error) return showToast('Błąd: ' + error.message, 'error');
+    if (!confirm(`Przenieść ofertę ${offer.offer_number} do kosza?`)) return;
+    const { error: err } = await supabase.rpc('soft_delete_offer', { p_offer_id: offer.id });
+    if (err) { setError('Błąd: ' + err.message); return; }
     onOffersChange(offers.filter(o => o.id !== offer.id));
-    if (selected?.id === offer.id) setSelected(null);
-    showToast('Oferta przeniesiona do kosza.');
+    if (expanded === offer.id) setExpanded(null);
+    showToast('Oferta przeniesiona do kosza ✓');
   }
 
   const filtered = offers.filter(o => {
-    const matchSearch =
-      o.offer_number.toLowerCase().includes(search.toLowerCase()) ||
-      (o.client?.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
-      (o.client?.nip ?? '').includes(search) ||
-      o.profile_name.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    const matchSearch = !search.trim() ||
+      o.offer_number.toLowerCase().includes(q) ||
+      (o.client?.name ?? '').toLowerCase().includes(q) ||
+      o.profile_name.toLowerCase().includes(q);
     const matchStatus = filterStatus === 'wszystkie' || o.status === filterStatus;
     return matchSearch && matchStatus;
   });
 
-  function formatDate(iso: string) {
-    return new Intl.DateTimeFormat('pl-PL', { dateStyle: 'short' }).format(new Date(iso));
-  }
-
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+
+      {/* Toast */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-lg shadow-lg text-white text-sm font-medium ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
-          {toast.msg}
+        <div className="fixed top-4 right-4 z-50 bg-green-700 text-white text-sm px-4 py-2 rounded-lg shadow-lg">
+          {toast}
         </div>
       )}
 
       {/* Nagłówek + filtry */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
-        <div className="flex-1">
-          <h2 className="text-lg font-semibold text-gray-800">Oferty</h2>
-          <p className="text-xs text-gray-400">{offers.length} ofert łącznie</p>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-800">Oferty wynajmu</h2>
+          <p className="text-xs text-gray-400 mt-0.5">{offers.length} ofert w bazie</p>
         </div>
-        <input
-          type="text"
-          placeholder="Szukaj po numerze, kliencie, NIP, profilu..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <select
-          value={filterStatus}
-          onChange={e => setFilterStatus(e.target.value as OfferStatus | 'wszystkie')}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="wszystkie">Wszystkie statusy</option>
-          {(Object.keys(STATUS_LABELS) as OfferStatus[]).map(s => (
-            <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-          ))}
-        </select>
+        <div className="sm:ml-auto flex gap-2 flex-wrap">
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Szukaj po numerze, kliencie, profilu..."
+            className="w-full sm:w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <select
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value as OfferStatus | 'wszystkie')}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="wszystkie">Wszystkie statusy</option>
+            {(Object.keys(STATUS_LABELS) as OfferStatus[]).map(s => (
+              <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      <div className="flex gap-5">
-        {/* Lista ofert */}
-        <div className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden ${selected ? 'hidden lg:block lg:w-1/2' : 'w-full'}`}>
-          {filtered.length === 0 ? (
-            <div className="text-center py-12 text-gray-400 text-sm">
-              {search || filterStatus !== 'wszystkie' ? 'Brak wyników.' : 'Brak ofert. Utwórz pierwszą ofertę z kalkulatora.'}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-left border-b border-gray-200">
-                    <th className="px-4 py-3 font-medium text-gray-600">Nr oferty</th>
-                    <th className="px-4 py-3 font-medium text-gray-600">Klient</th>
-                    <th className="px-4 py-3 font-medium text-gray-600">Profil</th>
-                    <th className="px-4 py-3 font-medium text-gray-600 text-right">Kwota</th>
-                    <th className="px-4 py-3 font-medium text-gray-600">Status</th>
-                    <th className="px-4 py-3 font-medium text-gray-600">Data</th>
-                    <th className="px-4 py-3 font-medium text-gray-600 text-right">Akcje</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(o => (
-                    <tr
-                      key={o.id}
-                      className={`border-t border-gray-100 cursor-pointer transition-colors ${selected?.id === o.id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
-                      onClick={() => setSelected(o)}
-                    >
-                      <td className="px-4 py-3 font-mono text-xs font-semibold text-blue-900">{o.offer_number}</td>
-                      <td className="px-4 py-3 text-gray-700 max-w-[140px] truncate">{o.client?.name ?? <span className="text-gray-400 italic">Brak klienta</span>}</td>
-                      <td className="px-4 py-3 text-gray-600">{o.profile_name}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-800">{formatPLN(o.rental_cost_pln)}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[o.status]}`}>
-                          {STATUS_LABELS[o.status]}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(o.created_at)}</td>
-                      <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => handleDelete(o)} className="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50">
-                          Usuń
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-red-700 text-sm">{error}</div>
+      )}
 
-        {/* Podgląd oferty */}
-        {selected && (
-          <div className="w-full lg:w-1/2 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="p-5 border-b border-gray-100 flex items-start justify-between">
-              <div>
-                <p className="font-mono text-sm font-bold text-blue-900">{selected.offer_number}</p>
-                <p className="text-xs text-gray-400 mt-0.5">Utworzona {formatDate(selected.created_at)}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setEditingOffer(selected)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+      {/* Tabela */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-blue-900 text-white">
+              <th className="text-left px-4 py-3 text-xs uppercase tracking-wide font-semibold">Numer</th>
+              <th className="text-left px-4 py-3 text-xs uppercase tracking-wide font-semibold">Klient</th>
+              <th className="text-left px-4 py-3 text-xs uppercase tracking-wide font-semibold">Data</th>
+              <th className="text-left px-4 py-3 text-xs uppercase tracking-wide font-semibold">Profil</th>
+              <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Masa [t]</th>
+              <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Okres</th>
+              <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Kwota [PLN]</th>
+              <th className="text-center px-4 py-3 text-xs uppercase tracking-wide font-semibold">Status</th>
+              <th className="text-center px-4 py-3 text-xs uppercase tracking-wide font-semibold">Szczegóły</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="text-center py-12 text-gray-400 text-sm">
+                  {search || filterStatus !== 'wszystkie'
+                    ? 'Brak wyników dla podanych filtrów.'
+                    : 'Brak ofert. Utwórz pierwszą ofertę z kalkulatora.'}
+                </td>
+              </tr>
+            ) : filtered.map((offer, idx) => (
+              <>
+                <tr
+                  key={offer.id}
+                  className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                  Edytuj
-                </button>
-                <button
-                  onClick={() => handleDownloadPDF(selected)}
-                  disabled={pdfLoading === selected.id}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-900 rounded-lg hover:bg-blue-800 disabled:opacity-50"
-                >
-                  {pdfLoading === selected.id ? (
-                    <>
-                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                      </svg>
-                      Generowanie...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      Pobierz PDF
-                    </>
-                  )}
-                </button>
-                <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none ml-1">×</button>
-              </div>
-            </div>
+                  {/* Numer */}
+                  <td className="px-4 py-3 font-mono font-semibold text-blue-900">
+                    {offer.offer_number}
+                  </td>
 
-            <div className="p-5 space-y-5 overflow-y-auto max-h-[70vh]">
-              {/* Klient */}
-              <section>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Klient</h4>
-                {selected.client ? (
-                  <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
-                    <p className="font-semibold text-gray-800">{selected.client.name}</p>
-                    <p className="text-gray-500">
-                      {selected.client.country === 'PL' ? `NIP: ${selected.client.nip}` : `VAT: ${selected.client.vat_number}`}
-                      {' · '}{selected.client.country}
-                    </p>
-                    {selected.client.address && <p className="text-gray-500">{selected.client.address}, {selected.client.postal_code} {selected.client.city}</p>}
-                    {selected.client.email && <p className="text-gray-500">{selected.client.email}</p>}
-                    {selected.client.phone && <p className="text-gray-500">{selected.client.phone}</p>}
-                  </div>
-                ) : (
-                  <p className="text-gray-400 italic text-sm">Brak przypisanego klienta</p>
-                )}
-              </section>
+                  {/* Klient */}
+                  <td className="px-4 py-3">
+                    <span className="font-medium text-gray-800">{offer.client?.name ?? <span className="text-gray-400 italic">—</span>}</span>
+                  </td>
 
-              {/* Pozycje oferty */}
-              <section>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                  Pozycje oferty {selected.items && selected.items.length > 0 ? `(${selected.items.length})` : ''}
-                </h4>
-                {selected.items && selected.items.length > 0 ? (
-                  <div className="border border-gray-200 rounded-lg overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-gray-50 text-left">
-                          <th className="px-3 py-2 font-medium text-gray-500 text-xs">Profil</th>
-                          <th className="px-3 py-2 font-medium text-gray-500 text-xs text-right">Ilość</th>
-                          <th className="px-3 py-2 font-medium text-gray-500 text-xs text-right">Dług. [m]</th>
-                          <th className="px-3 py-2 font-medium text-gray-500 text-xs text-right">Masa [t]</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[...selected.items].sort((a, b) => a.sort_order - b.sort_order).map((item, idx) => (
-                          <tr key={item.id || idx} className={idx % 2 === 1 ? 'bg-gray-50' : ''}>
-                            <td className="px-3 py-2 font-medium text-gray-800">{item.profile_name}</td>
-                            <td className="px-3 py-2 text-right text-gray-600">{item.quantity} szt.</td>
-                            <td className="px-3 py-2 text-right text-gray-600">{item.length_m} m</td>
-                            <td className="px-3 py-2 text-right font-semibold text-gray-800">{item.mass_t.toFixed(3)} t</td>
-                          </tr>
+                  {/* Data */}
+                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                    {formatDate(offer.created_at)}
+                  </td>
+
+                  {/* Profil */}
+                  <td className="px-4 py-3 text-gray-700">
+                    {offer.items && offer.items.length > 1
+                      ? <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">{offer.items.length} profili</span>
+                      : offer.profile_name}
+                  </td>
+
+                  {/* Masa */}
+                  <td className="px-4 py-3 text-right text-gray-600">
+                    {formatNumber(offer.mass_t, 3)}
+                  </td>
+
+                  {/* Okres */}
+                  <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
+                    {offer.rental_weeks} tyg.
+                  </td>
+
+                  {/* Kwota */}
+                  <td className="px-4 py-3 text-right font-semibold text-gray-800">
+                    {formatPLN(offer.rental_cost_pln)} PLN
+                  </td>
+
+                  {/* Status */}
+                  <td className="px-4 py-3 text-center">
+                    {statusSaving === offer.id ? (
+                      <span className="text-xs text-blue-400">...</span>
+                    ) : (
+                      <select
+                        value={offer.status}
+                        onChange={e => changeStatus(offer, e.target.value as OfferStatus)}
+                        className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${STATUS_COLORS[offer.status]}`}
+                      >
+                        {(Object.keys(STATUS_LABELS) as OfferStatus[]).map(s => (
+                          <option key={s} value={s}>{STATUS_LABELS[s]}</option>
                         ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t border-gray-200 bg-gray-100">
-                          <td className="px-3 py-2 font-semibold text-gray-700 text-xs" colSpan={3}>Łącznie</td>
-                          <td className="px-3 py-2 text-right font-bold text-gray-900 text-xs">{selected.mass_t.toFixed(3)} t</td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                ) : (
-                  // Fallback dla starych ofert bez offer_items
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    {[
-                      ['Profil', `${selected.profile_name} (${selected.profile_type})`],
-                      ['Ilość', `${selected.quantity} szt.`],
-                      ['Długość', `${selected.length_m ? selected.length_m + ' m / szt.' : '—'}`],
-                      ['Okres', `${selected.rental_weeks} tygodnie`],
-                      ['Łączna długość', `${selected.total_length_m} m`],
-                      ['Masa', `${selected.mass_t} t`],
-                      ['Powierzchnia', `${selected.wall_area_m2} m²`],
-                    ].map(([label, value]) => (
-                      <div key={label} className="bg-gray-50 rounded p-2">
-                        <p className="text-xs text-gray-400">{label}</p>
-                        <p className="font-medium text-gray-800">{value}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="grid grid-cols-3 gap-2 text-sm mt-2">
-                  {[
-                    ['Okres', `${selected.rental_weeks} tyg.`],
-                    ['Pow. ścianki', `${selected.wall_area_m2} m²`],
-                    ['Dług. łączna', `${selected.total_length_m} m`],
-                  ].map(([label, value]) => (
-                    <div key={label} className="bg-gray-50 rounded p-2">
-                      <p className="text-xs text-gray-400">{label}</p>
-                      <p className="font-medium text-gray-800">{value}</p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* Wycena */}
-              <section>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Wycena</h4>
-                <div className="bg-blue-900 rounded-lg p-4 text-white">
-                  <p className="text-blue-200 text-xs mb-1">Koszt wynajmu</p>
-                  <p className="text-3xl font-bold">{formatPLN(selected.rental_cost_pln)} <span className="text-lg font-normal">PLN</span></p>
-                  <div className="mt-2 pt-2 border-t border-blue-800 grid grid-cols-2 gap-2 text-xs text-blue-200">
-                    <span>{formatPLN(selected.cost_per_m2)} PLN/m²</span>
-                    <span>{formatPLN(selected.cost_per_ton)} PLN/t</span>
-                  </div>
-                </div>
-                {selected.weekly_cost_pln != null && (
-                  <div className="bg-blue-900 rounded-lg p-4 text-white">
-                    <p className="text-blue-200 text-xs mb-1">Koszt / kolejny tydzień</p>
-                    <p className="text-3xl font-bold">{formatPLN(selected.weekly_cost_pln)} <span className="text-lg font-normal">PLN</span></p>
-                    <div className="mt-2 pt-2 border-t border-blue-800 text-xs text-blue-200">
-                      {selected.price_per_week_1 != null && <span>Stawka: {formatPLN(selected.price_per_week_1)} PLN/t/tydz.</span>}
-                    </div>
-                  </div>
-                )}
-              </section>
-
-              {/* Transport */}
-              <section>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Transport</h4>
-                {selected.transport_cost_per_truck ? (
-                  <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Liczba aut:</span>
-                      <strong>{selected.transport_trucks}</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Koszt / auto:</span>
-                      <strong>{formatPLN(selected.transport_cost_per_truck)} PLN</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Koszt łączny:</span>
-                      <strong>{formatPLN(selected.transport_cost_total ?? 0)} PLN</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Opcja:</span>
-                      <span className={`font-medium text-xs ${(selected.transport_paid_by as string) === 'dap_extra' || (selected.transport_paid_by as string) === 'klient' ? 'text-orange-600' : selected.transport_paid_by === 'fca' ? 'text-green-700' : 'text-gray-700'}`}>
-                        {(selected.transport_paid_by as string) === 'dap_included' || (selected.transport_paid_by as string) === 'intra' ? 'DAP – w cenie'
-                         : (selected.transport_paid_by as string) === 'dap_extra' || (selected.transport_paid_by as string) === 'klient' ? 'DAP – refaktura'
-                         : 'FCA – odbiór własny'}
-                      </span>
-                    </div>
-                    {selected.transport_from && (
-                      <div className="pt-1 border-t border-gray-200 text-gray-500 text-xs">
-                        🚛 {selected.transport_from}{selected.transport_to ? ` — ${selected.transport_to}` : ''}
-                      </div>
+                      </select>
                     )}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400 italic">Brak kosztów transportu</p>
-                )}
-              </section>
+                  </td>
 
-              {/* Ważność + Termin płatności */}
-              <section className="grid grid-cols-2 gap-4">
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Ważność oferty</h4>
-                  <p className="text-sm text-gray-700">{selected.valid_days} dni od daty wystawienia</p>
-                </div>
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Termin płatności</h4>
-                  <p className="text-sm text-gray-700">{selected.payment_days === 0 ? 'Przedpłata' : `${selected.payment_days ?? 30} dni od faktury`}</p>
-                </div>
-              </section>
-
-              {/* Notatki */}
-              {selected.notes && (
-                <section>
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Notatki</h4>
-                  <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">{selected.notes}</p>
-                </section>
-              )}
-
-              {/* Status */}
-              <section>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Status oferty</h4>
-                <div className="flex flex-wrap gap-2">
-                  {(Object.keys(STATUS_LABELS) as OfferStatus[]).map(s => (
+                  {/* Szczegóły */}
+                  <td className="px-4 py-3 text-center">
                     <button
-                      key={s}
-                      onClick={() => changeStatus(selected, s)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        selected.status === s
-                          ? STATUS_COLORS[s] + ' ring-2 ring-offset-1 ring-current'
-                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                      }`}
+                      onClick={() => setExpanded(expanded === offer.id ? null : offer.id)}
+                      className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
                     >
-                      {STATUS_LABELS[s]}
+                      {expanded === offer.id ? '▲ ukryj' : '▼ pozycje'}
                     </button>
-                  ))}
-                </div>
-              </section>
-            </div>
-          </div>
-        )}
+                  </td>
+                </tr>
+
+                {/* Rozwinięty widok */}
+                {expanded === offer.id && (
+                  <tr key={offer.id + '-expanded'}>
+                    <td colSpan={9} className="px-6 py-4 bg-blue-50 border-t border-blue-100">
+                      <div className="space-y-3">
+                        <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide">
+                          Szczegóły oferty {offer.offer_number}
+                        </p>
+
+                        {/* Metadane */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                          {offer.prepared_by && (
+                            <div><span className="text-gray-500">Opiekun:</span> <strong>{offer.prepared_by}</strong></div>
+                          )}
+                          <div>
+                            <span className="text-gray-500">Płatność:</span>{' '}
+                            <strong>{offer.payment_days === 0 ? 'Przedpłata' : `${offer.payment_days ?? 30} dni`}</strong>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Ważność:</span>{' '}
+                            <strong>{offer.valid_days} dni</strong>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Pow. ścianki:</span>{' '}
+                            <strong>{formatNumber(offer.wall_area_m2, 1)} m²</strong>
+                          </div>
+                          {offer.transport_cost_per_truck && (
+                            <div>
+                              <span className="text-gray-500">Transport:</span>{' '}
+                              <strong className={
+                                (offer.transport_paid_by as string) === 'dap_extra' || (offer.transport_paid_by as string) === 'klient'
+                                  ? 'text-orange-600' : ''
+                              }>
+                                {formatPLN(offer.transport_cost_total ?? 0)} PLN
+                                {' '}
+                                <span className="font-normal">(
+                                  {(offer.transport_paid_by as string) === 'dap_included' || (offer.transport_paid_by as string) === 'intra' ? 'DAP – w cenie'
+                                   : (offer.transport_paid_by as string) === 'dap_extra' || (offer.transport_paid_by as string) === 'klient' ? 'DAP – refaktura'
+                                   : 'FCA – odbiór własny'}
+                                )</span>
+                              </strong>
+                            </div>
+                          )}
+                          {(offer.transport_from || offer.transport_to) && (
+                            <div className="col-span-2">
+                              <span className="text-gray-500">Trasa:</span>{' '}
+                              <strong>🚛 {offer.transport_from}{offer.transport_to ? ` → ${offer.transport_to}` : ''}</strong>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Tabela pozycji */}
+                        {offer.items && offer.items.length > 0 && (
+                          <div className="rounded-lg overflow-hidden border border-blue-200">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="bg-blue-800 text-white">
+                                  <th className="text-left px-3 py-2 font-semibold">Profil</th>
+                                  <th className="text-left px-3 py-2 font-semibold">Gatunek stali</th>
+                                  <th className="text-right px-3 py-2 font-semibold">Szt.</th>
+                                  <th className="text-right px-3 py-2 font-semibold">Dług. [m]</th>
+                                  <th className="text-right px-3 py-2 font-semibold">Masa [t]</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {[...offer.items]
+                                  .sort((a, b) => a.sort_order - b.sort_order)
+                                  .map((item, i) => (
+                                  <tr key={item.id || i} className={i % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
+                                    <td className="px-3 py-2 font-semibold text-gray-800">{item.profile_name}</td>
+                                    <td className="px-3 py-2 text-gray-600">{item.steel_grade?.toUpperCase() ?? '—'}</td>
+                                    <td className="px-3 py-2 text-right text-gray-600">{item.quantity}</td>
+                                    <td className="px-3 py-2 text-right text-gray-600">{item.length_m} m</td>
+                                    <td className="px-3 py-2 text-right font-bold text-gray-900">{formatNumber(item.mass_t, 3)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+
+                        {/* Wycena */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                          <div className="bg-blue-900 rounded-lg px-3 py-2 text-white">
+                            <p className="text-blue-300 mb-0.5">Koszt wynajmu</p>
+                            <p className="font-bold text-base">{formatPLN(offer.rental_cost_pln)} PLN</p>
+                          </div>
+                          <div className="bg-white border border-blue-200 rounded-lg px-3 py-2">
+                            <p className="text-gray-400 mb-0.5">Koszt / m²</p>
+                            <p className="font-semibold text-gray-800">{formatPLN(offer.cost_per_m2)} PLN</p>
+                          </div>
+                          <div className="bg-white border border-blue-200 rounded-lg px-3 py-2">
+                            <p className="text-gray-400 mb-0.5">Koszt / t</p>
+                            <p className="font-semibold text-gray-800">{formatPLN(offer.cost_per_ton)} PLN</p>
+                          </div>
+                        </div>
+
+                        {offer.notes && (
+                          <p className="text-xs text-gray-600 italic">Notatki: {offer.notes}</p>
+                        )}
+
+                        {/* Przyciski akcji */}
+                        <div className="flex justify-end gap-2 pt-2 border-t border-blue-200">
+                          <button
+                            onClick={() => handleDelete(offer)}
+                            className="inline-flex items-center gap-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 text-xs font-medium px-3 py-2 rounded-lg border border-red-200 transition-colors"
+                          >
+                            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"/>
+                            </svg>
+                            Usuń
+                          </button>
+                          <button
+                            onClick={() => setEditingOffer(offer)}
+                            className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+                          >
+                            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                            </svg>
+                            Edytuj
+                          </button>
+                          <button
+                            onClick={() => handleDownloadPDF(offer)}
+                            disabled={pdfLoading === offer.id}
+                            className="inline-flex items-center gap-2 bg-blue-900 hover:bg-blue-800 disabled:bg-blue-300 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+                          >
+                            {pdfLoading === offer.id ? (
+                              <>
+                                <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                                </svg>
+                                Generowanie…
+                              </>
+                            ) : (
+                              <>
+                                <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"/>
+                                </svg>
+                                Pobierz PDF
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </>
+            ))}
+          </tbody>
+        </table>
       </div>
+
+      <p className="text-xs text-gray-400">
+        {filtered.length} z {offers.length} ofert · kliknij „pozycje" aby zobaczyć szczegóły
+      </p>
 
       {editingOffer && (
         <EditOfferModal
@@ -417,9 +400,8 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
           clients={clients}
           onSaved={(updated) => {
             onOffersChange(offers.map(o => o.id === updated.id ? updated : o));
-            if (selected?.id === updated.id) setSelected(updated);
             setEditingOffer(null);
-            showToast('Oferta zaktualizowana.');
+            showToast('Oferta zaktualizowana ✓');
           }}
           onClose={() => setEditingOffer(null)}
         />
