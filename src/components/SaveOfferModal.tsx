@@ -167,7 +167,7 @@ export default function SaveOfferModal({
     const savedOffer = data as Offer;
 
     // 2. Zapisz pozycje oferty (offer_items)
-    const { error: itemsErr } = await supabase.from('offer_items').insert(
+    const { data: insertedItems, error: itemsErr } = await supabase.from('offer_items').insert(
       offerItems.map((item, idx) => ({
         offer_id: savedOffer.id,
         profile_name: item.profileName,
@@ -180,7 +180,7 @@ export default function SaveOfferModal({
         wall_area_m2: item.wallAreaM2,
         sort_order: idx,
       }))
-    );
+    ).select();
 
     if (itemsErr) {
       // Rollback: usuń ofertę żeby nie zostały puste rekordy
@@ -193,19 +193,8 @@ export default function SaveOfferModal({
     }
     setSaving(false);
 
-    // Dołącz items do obiektu (żeby PDF od razu działał)
-    savedOffer.items = offerItems.map((item, idx) => ({
-      id: '',
-      offer_id: savedOffer.id,
-      profile_name: item.profileName,
-      profile_type: item.profileType,
-      quantity: item.quantity,
-      length_m: item.lengthM,
-      total_length_m: item.totalLengthM,
-      mass_t: item.massT,
-      wall_area_m2: item.wallAreaM2,
-      sort_order: idx,
-    }));
+    // Użyj rzeczywistych wierszy z DB (mają prawdziwe UUID z triggera)
+    savedOffer.items = (insertedItems ?? []) as typeof savedOffer.items;
 
     onSaved(savedOffer);
   }

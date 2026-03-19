@@ -34,10 +34,10 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<OfferStatus | 'wszystkie'>('wszystkie');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
-  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState<string | null>(null);
 
   async function handleDownloadPDF(offer: Offer) {
-    setPdfLoading(true);
+    setPdfLoading(offer.id);
     try {
       const blob = await pdf(<OfferPDF offer={offer} />).toBlob();
       const url = URL.createObjectURL(blob);
@@ -51,7 +51,7 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
     } catch (err) {
       showToast('Błąd generowania PDF: ' + (err as Error).message, 'error');
     } finally {
-      setPdfLoading(false);
+      setPdfLoading(null);
     }
   }
 
@@ -195,10 +195,10 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
                 </button>
                 <button
                   onClick={() => handleDownloadPDF(selected)}
-                  disabled={pdfLoading}
+                  disabled={pdfLoading === selected.id}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-900 rounded-lg hover:bg-blue-800 disabled:opacity-50"
                 >
-                  {pdfLoading ? (
+                  {pdfLoading === selected.id ? (
                     <>
                       <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>

@@ -440,7 +440,7 @@ export default function OfferPDF({ offer }: Props) {
                 <Text style={[s.tdLabel, { flex: 3, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{item.profile_name} ({item.profile_type})</Text>
                 <Text style={[s.tdLabel, { flex: 2, color: C.gray700 }]}>{item.steel_grade ?? '—'}</Text>
                 <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'center' }]}>{item.quantity} szt.</Text>
-                <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'right' }]}>{item.length_m} m</Text>
+                <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'right' }]}>{item.length_m != null ? `${item.length_m} m` : '–'}</Text>
                 <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'right' }]}>{formatNumber(item.total_length_m > 0 ? item.mass_t * 1000 / item.total_length_m : 0, 1)}</Text>
                 <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{formatNumber(item.mass_t, 3)} t</Text>
               </View>
@@ -471,7 +471,7 @@ export default function OfferPDF({ offer }: Props) {
             </View>
             <Row label="Profil grodzicy" value={`${offer.profile_name} (${offer.profile_type})`} alt={false} />
             <Row label="Ilość" value={`${offer.quantity} szt.`} alt={true} />
-            <Row label="Długość jednej grodzicy" value={`${offer.length_m} m`} alt={false} />
+            <Row label="Długość jednej grodzicy" value={offer.length_m != null ? `${offer.length_m} m` : '–'} alt={false} />
             <Row label="Łączna długość" value={`${formatNumber(offer.total_length_m, 1)} m`} alt={true} />
             <Row label="Masa całkowita" value={`${formatNumber(offer.mass_t, 3)} t`} alt={false} />
             <Row label="Powierzchnia ścianki" value={`${formatNumber(offer.wall_area_m2, 2)} m²`} alt={true} />
