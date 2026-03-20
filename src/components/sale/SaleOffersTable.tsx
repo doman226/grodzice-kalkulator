@@ -82,6 +82,15 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
     showToast('Status zaktualizowany ✓');
   }
 
+  async function handleDelete(offer: SaleOffer) {
+    if (!confirm(`Przenieść ofertę ${offer.offer_number} do kosza?`)) return;
+    const { error: err } = await supabase.rpc('soft_delete_sale_offer', { p_offer_id: offer.id });
+    if (err) { setError('Błąd: ' + err.message); return; }
+    onOffersChange(offers.filter(o => o.id !== offer.id));
+    if (expanded === offer.id) setExpanded(null);
+    showToast('Oferta przeniesiona do kosza ✓');
+  }
+
   // Filtrowanie
   const filtered = offers.filter(o => {
     if (!search.trim()) return true;
@@ -384,7 +393,17 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                         )}
 
                         {/* Przyciski akcji */}
-                        <div className="flex justify-end gap-2 pt-2 border-t border-blue-200">
+                        <div className="flex justify-between pt-2 border-t border-blue-200">
+                          <button
+                            onClick={() => handleDelete(offer)}
+                            className="inline-flex items-center gap-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 text-xs font-medium px-3 py-2 rounded-lg border border-red-200 transition-colors"
+                          >
+                            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"/>
+                            </svg>
+                            Usuń
+                          </button>
+                          <div className="flex gap-2">
                           <button
                             onClick={() => setEditOffer(offer)}
                             className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
@@ -416,6 +435,7 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                               </>
                             )}
                           </button>
+                          </div>
                         </div>
                       </div>
                     </td>

@@ -34,6 +34,7 @@ export default function SaleSection({ clients, onClientAdded, onClientsChange, a
       supabase
         .from('sale_offers')
         .select('*, client:clients(*), items:sale_offer_items(*)')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false }),
     ]);
 
