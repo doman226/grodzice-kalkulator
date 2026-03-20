@@ -221,8 +221,9 @@ function App() {
         )}
       </main>
 
-      <footer className="mt-12 border-t border-gray-200 py-6 text-center text-xs text-gray-400">
-        © {new Date().getFullYear()} Intra B.V. – Dane techniczne wg Katalogu Intra BV 2025
+      <footer className="mt-12 border-t border-gray-200 py-6 text-center text-xs text-gray-400 space-y-1">
+        <p>© {new Date().getFullYear()} Intra B.V. – Dane techniczne wg Katalogu Intra BV 2025</p>
+        <p>wszelkie prawa zastrzeżone · autor: piotr domański</p>
       </footer>
     </div>
   );
