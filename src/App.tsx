@@ -92,8 +92,10 @@ function App() {
       <header className="bg-blue-900 text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h1 className="text-xl font-bold tracking-wide">Intra B.V.</h1>
+            <div className="flex items-center gap-3">
+              <div className="bg-white rounded-md px-2 py-1 shadow-sm">
+                <img src="/header-logo.png" alt="Intra B.V." className="h-10 w-auto" />
+              </div>
               <p className="text-blue-200 text-sm">
                 {mode === 'rental' ? 'Kalkulator Wynajmu Grodzic Stalowych' : 'Kalkulator Sprzedaży Grodzic Stalowych'}
               </p>
