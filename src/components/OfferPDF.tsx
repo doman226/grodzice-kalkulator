@@ -372,7 +372,7 @@ export default function OfferPDF({ offer }: Props) {
         <Image fixed style={s.footerImg} src={footerUrl} />
 
         {/* ── TYTUŁ ── */}
-        <Text style={s.title}>OFERTA</Text>
+        <Text style={s.title}>OFERTA WYNAJMU</Text>
 
         {/* ── META + KLIENT ── */}
         <View style={s.metaRow}>
