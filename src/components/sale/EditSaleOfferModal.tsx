@@ -237,6 +237,25 @@ export default function EditSaleOfferModal({
 
   const isEUR = currency === 'EUR';
 
+  // ── Zmiana waluty – konwertuje ceny pozycji (identyczna logika jak SaleCalculator) ──
+  function handleCurrencyChange(newCurrency: 'EUR' | 'PLN') {
+    if (newCurrency === currency) return;
+    setEditItems(prev => prev.map(item => ({
+      ...item,
+      costEurT: item.costEurT
+        ? newCurrency === 'PLN'
+          ? Math.round(item.costEurT * exchangeRate)
+          : Math.round((item.costEurT / exchangeRate) * 100) / 100
+        : 0,
+      sellEurT: item.sellEurT
+        ? newCurrency === 'PLN'
+          ? Math.round(item.sellEurT * exchangeRate)
+          : Math.round((item.sellEurT / exchangeRate) * 100) / 100
+        : 0,
+    })));
+    setCurrency(newCurrency);
+  }
+
   // ── Koszty transportu (identyczna logika jak SaleCalculator) ──
   const TRUCK_CAPACITY_T = 24.5;
   const deliveryCalc = useMemo(() => {
@@ -567,7 +586,7 @@ export default function EditSaleOfferModal({
                 <label className="block text-sm font-medium text-gray-700 mb-1">Waluta</label>
                 <div className="flex gap-2">
                   {(['EUR', 'PLN'] as const).map(c => (
-                    <button key={c} onClick={() => setCurrency(c)}
+                    <button key={c} onClick={() => handleCurrencyChange(c)}
                       className={`flex-1 py-2 text-sm rounded-lg border-2 font-medium transition-colors ${
                         currency === c ? 'border-blue-700 bg-blue-700 text-white' : 'border-gray-300 text-gray-600 hover:border-gray-400'
                       }`}>
