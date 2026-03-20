@@ -105,7 +105,7 @@ export default function SaveOfferModal({
       vat_number: newClient.country !== 'PL' ? newClient.vat_number.trim() : null,
     }).select().single();
     setSavingClient(false);
-    if (err) return setError('Błąd: ' + err.message);
+    if (err) return setError('Błąd zapisu klienta – spróbuj ponownie.');
     const c = data as Client;
     onClientAdded(c);
     setClientId(c.id);
@@ -162,7 +162,7 @@ export default function SaveOfferModal({
       status: 'szkic',
     }).select('*, client:clients(*)').single();
 
-    if (err) { setSaving(false); return setError('Błąd zapisu: ' + err.message); }
+    if (err) { setSaving(false); return setError('Błąd zapisu oferty – spróbuj ponownie.'); }
 
     const savedOffer = data as Offer;
 

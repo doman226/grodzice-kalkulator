@@ -25,8 +25,14 @@ export interface NipData {
 /** Centralna funkcja pobierania danych firmy po NIP (GUS/MF).
  *  Jeden punkt dostępu – klucz Supabase czytany tylko tutaj. */
 export async function fetchNipData(nip: string): Promise<NipData> {
-  const res = await fetch(`${supabaseUrl}/functions/v1/nip-lookup?nip=${nip}`, {
-    headers: { apikey: supabaseAnonKey, Authorization: `Bearer ${supabaseAnonKey}` },
+  const res = await fetch(`${supabaseUrl}/functions/v1/nip-lookup`, {
+    method: 'POST',
+    headers: {
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${supabaseAnonKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ nip }),
   });
   const data = await res.json();
   if (!res.ok || data.error) throw new Error(data.error ?? 'Nie znaleziono firmy.');
