@@ -344,14 +344,14 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
                       NBP {nbpRate.date ? `· ${formatNBPDate(nbpRate.date)}` : ''}
                     </span>
                   )}
-                  {(manualRate || nbpError) && (
-                    <button
-                      onClick={loadNBP}
-                      className="ml-2 text-blue-600 hover:underline"
-                    >
-                      ↺ pobierz NBP
-                    </button>
-                  )}
+                  <button
+                    onClick={loadNBP}
+                    disabled={nbpLoading}
+                    className="ml-2 text-blue-600 hover:underline disabled:opacity-40"
+                    title="Pobierz aktualny kurs z NBP"
+                  >
+                    {nbpLoading ? '...' : '↺'}
+                  </button>
                 </div>
               </div>
             )}

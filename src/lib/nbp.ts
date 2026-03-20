@@ -12,7 +12,7 @@ export interface NBPRate {
 export async function fetchNBPRate(): Promise<NBPRate> {
   const res = await fetch(
     'https://api.nbp.pl/api/exchangerates/rates/A/EUR/last/1/?format=json',
-    { signal: AbortSignal.timeout(8000) }
+    { signal: AbortSignal.timeout(8000), cache: 'no-store' }
   );
 
   if (!res.ok) {
