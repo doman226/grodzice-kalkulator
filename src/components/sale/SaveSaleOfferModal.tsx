@@ -205,7 +205,7 @@ export default function SaveSaleOfferModal({
           sell_eur_t:     item.sellEurT     || null,
           cost_eur_total: item.costEurTotal || null,
           sell_eur_total: item.sellEurTotal || null,
-          sell_pln_total: item.sellEurTotal * exchangeRate || null,
+          sell_pln_total: (currency === 'EUR' ? item.sellEurTotal * exchangeRate : item.sellEurTotal) || null,
           margin_pct:     item.marginPct,
           sort_order:     idx,
         }))

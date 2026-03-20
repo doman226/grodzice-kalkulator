@@ -253,7 +253,9 @@ export default function SaleOfferPDF({ offer }: Props) {
             {offer.prepared_by && SALES_REPS[offer.prepared_by] && (
               <Text style={s.metaLine}><Text style={s.metaBold}>Telefon: </Text>{SALES_REPS[offer.prepared_by]}</Text>
             )}
-            <Text style={s.metaLine}><Text style={s.metaBold}>Kurs EUR/PLN: </Text>{exchRate.toFixed(4)} (NBP)</Text>
+            {currency === 'EUR' && (
+              <Text style={s.metaLine}><Text style={s.metaBold}>Kurs EUR/PLN: </Text>{exchRate.toFixed(4)} (NBP)</Text>
+            )}
           </View>
           <View style={s.metaRight}>
             <Text style={[s.metaBold, { fontSize: 9, marginBottom: 3, color: C.navy }]}>Dane klienta:</Text>
@@ -346,33 +348,37 @@ export default function SaleOfferPDF({ offer }: Props) {
 
         {/* ── CENA SPRZEDAŻY ── */}
         <View style={s.priceBox}>
-          <Text style={s.priceLabel}>
-            {dPaidBy === 'dap_included' && deliveryCostPLN > 0 ? 'Cena sprzedaży (towary + dostawa DAP)' : 'Cena sprzedaży'}
-          </Text>
+          <Text style={s.priceLabel}>Cena sprzedaży</Text>
           <Text style={s.priceValue}>
             {isEUR ? formatEUR(totalForClientEUR) : formatPLN(totalForClientPLN)}
             <Text style={s.priceSuffix}> {currency} netto</Text>
           </Text>
           <View style={s.priceRow}>
             {(() => {
+              const unitLabel = isEUR ? 'EUR/t' : 'PLN/t';
+              // Gdy DAP w cenie – pokaż efektywną cenę/t (towary + transport) / masa łączna
+              if (dPaidBy === 'dap_included' && deliveryCostPLN > 0 && totalMassT > 0) {
+                const effectivePricePerT = isEUR
+                  ? totalForClientEUR / totalMassT
+                  : totalForClientPLN / totalMassT;
+                return (
+                  <Text>Cena sprzedaży za tonę: {formatEUR(effectivePricePerT)} {unitLabel}</Text>
+                );
+              }
+              // Standardowo – ceny z pozycji
               const priced = sortedItems.filter(item => item.sell_eur_t != null);
               const allSame = priced.length > 0 && priced.every(i => i.sell_eur_t === priced[0].sell_eur_t);
-              if (allSame) {
+              if (allSame && priced.length > 0) {
                 return (
-                  <Text>Cena sprzedaży za tonę: {priced[0].sell_eur_t} EUR/t</Text>
+                  <Text>Cena sprzedaży za tonę: {priced[0].sell_eur_t} {unitLabel}</Text>
                 );
               }
               return priced.map((item, i) => (
                 <Text key={i}>
-                  {item.profile_name}: {item.sell_eur_t} EUR/t
+                  {item.profile_name}: {item.sell_eur_t} {unitLabel}
                 </Text>
               ));
             })()}
-            {!isEUR && (
-              <Text style={{ marginLeft: 'auto' }}>
-                kurs {exchRate.toFixed(4)} PLN/EUR
-              </Text>
-            )}
           </View>
         </View>
 

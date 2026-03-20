@@ -171,6 +171,13 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
     return priceMap[warehouseId]?.[profileName]?.[steelGrade] ?? 0;
   }
 
+  // Zwraca cenę z cennika już w bieżącej walucie (EUR lub PLN)
+  function lookupCostInCurrency(warehouseId: string, profileName: string, steelGrade: string): number {
+    const eurPrice = lookupCostPrice(warehouseId, profileName, steelGrade);
+    if (eurPrice <= 0) return 0;
+    return currency === 'EUR' ? eurPrice : Math.round(eurPrice * exchangeRate);
+  }
+
   // --- Zarządzanie pozycjami ---
   function addItem() {
     const wh   = warehouses[0]?.id ?? '';
@@ -181,7 +188,7 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
       warehouseId: wh, profileName: prof, steelGrade: gr,
       quantity: 10, lengthM: 12,
       isPaired: false,
-      costPriceEurT: lookupCostPrice(wh, prof, gr),
+      costPriceEurT: lookupCostInCurrency(wh, prof, gr),
       sellPriceEurT: 0,
     }]);
   }
@@ -196,7 +203,7 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
       const updated = { ...item, ...patch };
       // Jeśli zmienił się magazyn/profil/gatunek → auto-aktualizuj cenę kosztu
       if ('warehouseId' in patch || 'profileName' in patch || 'steelGrade' in patch) {
-        updated.costPriceEurT = lookupCostPrice(
+        updated.costPriceEurT = lookupCostInCurrency(
           updated.warehouseId, updated.profileName, updated.steelGrade
         );
       }
@@ -220,12 +227,14 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
       const totalLengthM = piles * item.lengthM;
       const massT        = (totalLengthM * profile.weight_kg_per_m) / 1000;
       const wallAreaM2   = totalLengthM * (profile.width_mm / 1000);
-      const costEUR      = massT * (item.costPriceEurT || 0);
-      const sellEUR      = massT * (item.sellPriceEurT || 0);
+      // Ceny w stanie są w bieżącej walucie (EUR lub PLN) – przeliczamy do EUR do obliczeń
+      const priceScale   = currency === 'EUR' ? 1 : 1 / exchangeRate;
+      const costEUR      = massT * (item.costPriceEurT || 0) * priceScale;
+      const sellEUR      = massT * (item.sellPriceEurT || 0) * priceScale;
       const marginPct    = sellEUR > 0 ? ((sellEUR - costEUR) / sellEUR) * 100 : 0;
       return { valid: true, piles, totalLengthM, massT, wallAreaM2, costEUR, sellEUR, marginPct, profile };
     }),
-    [items, profiles]
+    [items, profiles, currency, exchangeRate]
   );
 
   // --- Sumy łączne ---
@@ -268,6 +277,28 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
   const deliveryCostCurrency  = (deliveryPaidBy === 'dap_included' && deliveryCalc) ? deliveryCalc.totalInCurrency : 0;
   // Łącznie w wybranej walucie: towary + dostawa (obie w tej samej jednostce)
   const totalForClientInCurrency = (currency === 'EUR' ? totals.totalSellEUR : totals.totalSellPLN) + deliveryCostCurrency;
+
+  // Handler zmiany waluty – konwertuje istniejące ceny pozycji do nowej waluty
+  function handleCurrencyChange(newCurrency: 'EUR' | 'PLN') {
+    if (newCurrency === currency) return;
+    setItems(prev => prev.map(item => ({
+      ...item,
+      costPriceEurT: item.costPriceEurT
+        ? newCurrency === 'PLN'
+          ? Math.round(item.costPriceEurT * exchangeRate)
+          : Math.round((item.costPriceEurT / exchangeRate) * 100) / 100
+        : 0,
+      sellPriceEurT: item.sellPriceEurT
+        ? newCurrency === 'PLN'
+          ? Math.round(item.sellPriceEurT * exchangeRate)
+          : Math.round((item.sellPriceEurT / exchangeRate) * 100) / 100
+        : 0,
+    })));
+    setCurrency(newCurrency);
+  }
+  // Efektywna cena/t i /m² – uwzględnia transport DAP w cenie
+  const effectivePerTon = totals.totalMassT > 0 ? totalForClientInCurrency / totals.totalMassT : 0;
+  const effectivePerM2  = totals.totalWallAreaM2 > 0 ? totalForClientInCurrency / totals.totalWallAreaM2 : 0;
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -332,7 +363,7 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
             <label className="block text-xs font-medium text-gray-500 mb-1">Waluta oferty</label>
             <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm font-medium">
               {(['EUR', 'PLN'] as const).map(cur => (
-                <button key={cur} onClick={() => setCurrency(cur)}
+                <button key={cur} onClick={() => handleCurrencyChange(cur)}
                   className={`px-4 py-1.5 transition-colors ${currency === cur ? 'bg-blue-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                   {cur}
                 </button>
@@ -346,7 +377,7 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
               <input
                 type="number" min={0} step={1}
                 value={applyAllSellPrice || ''}
-                placeholder="EUR/t"
+                placeholder={`${currency}/t`}
                 onChange={e => setApplyAllSellPrice(parseFloat(e.target.value) || 0)}
                 className="w-28 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -373,7 +404,11 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
           {items.map((item, idx) => {
             const r = itemResults[idx];
             const warehouse = warehouses.find(w => w.id === item.warehouseId);
-            const costFromMatrix = lookupCostPrice(item.warehouseId, item.profileName, item.steelGrade);
+            const costFromMatrixEur = lookupCostPrice(item.warehouseId, item.profileName, item.steelGrade);
+            // Przelicz do bieżącej waluty – pole costPriceEurT trzyma wartość w walucie widoku
+            const costFromMatrix = costFromMatrixEur > 0
+              ? (currency === 'EUR' ? costFromMatrixEur : Math.round(costFromMatrixEur * exchangeRate))
+              : 0;
             const costChanged = item.costPriceEurT !== costFromMatrix && costFromMatrix > 0;
 
             return (
@@ -460,7 +495,7 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
                   {/* Cena kosztu */}
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">
-                      Cena kosztu [EUR/t]
+                      Cena kosztu [{currency}/t]
                       {costChanged && (
                         <button onClick={() => updateItem(item.uid, { costPriceEurT: costFromMatrix })}
                           className="ml-1 text-blue-600 underline font-normal">
@@ -473,14 +508,14 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
                       className="w-28 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
                     <p className="text-xs text-gray-400 mt-0.5">
                       {costFromMatrix > 0
-                        ? `z cennika: ${costFromMatrix} EUR/t`
+                        ? `z cennika: ${costFromMatrix} ${currency}/t`
                         : <span className="text-amber-500">⚠ brak w cenniku dla {warehouse?.name}</span>}
                     </p>
                   </div>
 
                   {/* Cena sprzedaży */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Cena sprzedaży [EUR/t]</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Cena sprzedaży [{currency}/t]</label>
                     <input type="number" min={0} step={1} value={item.sellPriceEurT || ''}
                       placeholder="wpisz..."
                       onChange={e => updateItem(item.uid, { sellPriceEurT: parseFloat(e.target.value) || 0 })}
@@ -530,8 +565,8 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard label="Masa łączna" value={formatNumber(totals.totalMassT, 3)} unit="t" />
               <StatCard label="Powierzchnia ścianki" value={formatNumber(totals.totalWallAreaM2, 2)} unit="m²" />
-              <StatCard label="Cena sprzedaży / t" value={totals.sellPerTon > 0 ? formatEUR(totals.sellPerTon) : '—'} unit="EUR/t" />
-              <StatCard label="Cena sprzedaży / m²" value={totals.sellPerM2 > 0 ? formatEUR(totals.sellPerM2) : '—'} unit="EUR/m²" />
+              <StatCard label="Cena sprzedaży / t" value={effectivePerTon > 0 ? formatEUR(effectivePerTon) : '—'} unit={`${currency}/t`} />
+              <StatCard label="Cena sprzedaży / m²" value={effectivePerM2 > 0 ? formatEUR(effectivePerM2) : '—'} unit={`${currency}/m²`} />
             </div>
             {items.length > 1 && (
               <div className="mt-4 pt-4 border-t border-gray-100 space-y-1">
@@ -610,8 +645,8 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
                       <tr className="bg-gray-100 text-gray-600 text-xs uppercase tracking-wide">
                         <th className="text-left px-4 py-2 font-semibold">Pozycja</th>
                         <th className="text-right px-4 py-2 font-semibold">Masa [t]</th>
-                        <th className="text-right px-4 py-2 font-semibold">Koszt EUR/t</th>
-                        <th className="text-right px-4 py-2 font-semibold">Sprzedaż EUR/t</th>
+                        <th className="text-right px-4 py-2 font-semibold">Koszt {currency}/t</th>
+                        <th className="text-right px-4 py-2 font-semibold">Sprzedaż {currency}/t</th>
                         <th className="text-right px-4 py-2 font-semibold">Marża %</th>
                         <th className="text-right px-4 py-2 font-semibold">Wartość [{currency}]</th>
                       </tr>

@@ -144,8 +144,7 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
               <th className="text-left px-4 py-3 text-xs uppercase tracking-wide font-semibold">Klient</th>
               <th className="text-left px-4 py-3 text-xs uppercase tracking-wide font-semibold">Data</th>
               <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Masa [t]</th>
-              <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Wartość EUR</th>
-              <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Wartość PLN</th>
+              <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Wartość</th>
               <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Marża %</th>
               <th className="text-center px-4 py-3 text-xs uppercase tracking-wide font-semibold">Status</th>
               <th className="text-center px-4 py-3 text-xs uppercase tracking-wide font-semibold">Szczegóły</th>
@@ -189,14 +188,27 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                       : '—'}
                   </td>
 
-                  {/* Wartość EUR */}
-                  <td className="px-4 py-3 text-right font-semibold text-gray-800">
-                    {offer.total_sell_eur != null ? `${formatEUR(offer.total_sell_eur)} EUR` : '—'}
-                  </td>
-
-                  {/* Wartość PLN */}
-                  <td className="px-4 py-3 text-right text-gray-600">
-                    {offer.total_sell_pln != null ? `${formatPLN(offer.total_sell_pln)} PLN` : '—'}
+                  {/* Wartość – primary wg waluty oferty */}
+                  <td className="px-4 py-3 text-right">
+                    {(offer.currency ?? 'EUR') === 'PLN' ? (
+                      <>
+                        <div className="font-semibold text-gray-800">
+                          {offer.total_sell_pln != null ? `${formatPLN(offer.total_sell_pln)} PLN` : '—'}
+                        </div>
+                        {offer.total_sell_eur != null && (
+                          <div className="text-xs text-gray-400">{formatEUR(offer.total_sell_eur)} EUR</div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div className="font-semibold text-gray-800">
+                          {offer.total_sell_eur != null ? `${formatEUR(offer.total_sell_eur)} EUR` : '—'}
+                        </div>
+                        {offer.total_sell_pln != null && (
+                          <div className="text-xs text-gray-400">{formatPLN(offer.total_sell_pln)} PLN</div>
+                        )}
+                      </>
+                    )}
                   </td>
 
                   {/* Marża */}
@@ -323,9 +335,9 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                                   <th className="text-right px-3 py-2 font-semibold">Szt.</th>
                                   <th className="text-right px-3 py-2 font-semibold">Dług. [m]</th>
                                   <th className="text-right px-3 py-2 font-semibold">Masa [t]</th>
-                                  <th className="text-right px-3 py-2 font-semibold">Koszt EUR/t</th>
-                                  <th className="text-right px-3 py-2 font-semibold">Sprz. EUR/t</th>
-                                  <th className="text-right px-3 py-2 font-semibold">Wartość EUR</th>
+                                  <th className="text-right px-3 py-2 font-semibold">Koszt {(offer.currency ?? 'EUR')}/t</th>
+                                  <th className="text-right px-3 py-2 font-semibold">Sprz. {(offer.currency ?? 'EUR')}/t</th>
+                                  <th className="text-right px-3 py-2 font-semibold">Wartość {offer.currency ?? 'EUR'}</th>
                                   <th className="text-right px-3 py-2 font-semibold">Marża</th>
                                 </tr>
                               </thead>
@@ -346,7 +358,10 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                                     <td className="px-3 py-2 text-right text-gray-500">{item.cost_eur_t ?? '—'}</td>
                                     <td className="px-3 py-2 text-right font-semibold text-gray-800">{item.sell_eur_t ?? '—'}</td>
                                     <td className="px-3 py-2 text-right font-bold text-gray-900">
-                                      {item.sell_eur_total != null ? `${formatEUR(item.sell_eur_total)} EUR` : '—'}
+                                      {(offer.currency ?? 'EUR') === 'PLN'
+                                        ? (item.sell_pln_total != null ? `${formatPLN(item.sell_pln_total)} PLN` : '—')
+                                        : (item.sell_eur_total != null ? `${formatEUR(item.sell_eur_total)} EUR` : '—')
+                                      }
                                     </td>
                                     <td className={`px-3 py-2 text-right font-semibold ${
                                       (item.margin_pct ?? 0) < 0 ? 'text-red-600'

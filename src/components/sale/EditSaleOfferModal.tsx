@@ -143,7 +143,18 @@ export default function EditSaleOfferModal({
 
   // ── Transport ──
   const [deliveryTrucks,       setDeliveryTrucks]       = useState<number | ''>(offer.delivery_trucks ?? '');
-  const [deliveryCostPerTruck, setDeliveryCostPerTruck] = useState<number | ''>(offer.delivery_cost_per_truck ?? '');
+  const [deliveryCostPerTruck, setDeliveryCostPerTruck] = useState<number | ''>(() => {
+    if (offer.delivery_cost_per_truck != null) return offer.delivery_cost_per_truck;
+    // Reverse-calculate from total when delivery_cost_per_truck was not stored
+    if (offer.delivery_cost_total && offer.delivery_trucks && offer.delivery_trucks > 0) {
+      const rate = offer.exchange_rate ?? 4.25;
+      const totalInCurrency = offer.currency === 'EUR'
+        ? offer.delivery_cost_total / rate
+        : offer.delivery_cost_total;
+      return totalInCurrency / offer.delivery_trucks;
+    }
+    return '';
+  });
   const [deliveryPaidBy, setDeliveryPaidBy] = useState<'dap_included' | 'dap_extra' | 'fca'>(() => {
     const v = offer.delivery_paid_by as string | undefined;
     if (v === 'intra')  return 'dap_included';
@@ -203,11 +214,11 @@ export default function EditSaleOfferModal({
       const wallAreaM2    = totalLengthM * (profile.width_mm / 1000);
       const costEurTotal  = item.costEurT * massT;
       const sellEurTotal  = item.sellEurT * massT;
-      const sellPlnTotal  = sellEurTotal * exchangeRate;
+      const sellPlnTotal  = currency === 'EUR' ? sellEurTotal * exchangeRate : sellEurTotal;
       const marginPct     = sellEurTotal > 0 ? ((sellEurTotal - costEurTotal) / sellEurTotal) * 100 : 0;
       return { totalLengthM, massT, wallAreaM2, costEurTotal, sellEurTotal, sellPlnTotal, marginPct };
     }),
-    [editItems, saleProfiles, exchangeRate]
+    [editItems, saleProfiles, exchangeRate, currency]
   );
 
   const totals = useMemo(() => {
