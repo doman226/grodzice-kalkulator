@@ -197,8 +197,9 @@ export default function SaleOfferPDF({ offer }: Props) {
   // Posortowane pozycje
   const sortedItems = [...(offer.items ?? [])].sort((a, b) => a.sort_order - b.sort_order);
 
-  // Masa łączna
-  const totalMassT = sortedItems.reduce((sum, i) => sum + (i.mass_t ?? 0), 0);
+  // Masa łączna i powierzchnia ścianki
+  const totalMassT     = sortedItems.reduce((sum, i) => sum + (i.mass_t      ?? 0), 0);
+  const totalWallAreaM2 = sortedItems.reduce((sum, i) => sum + (i.wall_area_m2 ?? 0), 0);
 
   // Termin dostawy → tekst na PDF
   function deliveryTimelineText(): string {
@@ -355,29 +356,40 @@ export default function SaleOfferPDF({ offer }: Props) {
           </Text>
           <View style={s.priceRow}>
             {(() => {
-              const unitLabel = isEUR ? 'EUR/t' : 'PLN/t';
-              // Gdy DAP w cenie – pokaż efektywną cenę/t (towary + transport) / masa łączna
-              if (dPaidBy === 'dap_included' && deliveryCostPLN > 0 && totalMassT > 0) {
-                const effectivePricePerT = isEUR
-                  ? totalForClientEUR / totalMassT
-                  : totalForClientPLN / totalMassT;
+              const unitLabelT  = isEUR ? 'EUR/t'  : 'PLN/t';
+              const unitLabelM2 = isEUR ? 'EUR/m²' : 'PLN/m²';
+              const totalClient = isEUR ? totalForClientEUR : totalForClientPLN;
+              const pricePerT   = totalMassT      > 0 ? totalClient / totalMassT      : null;
+              const pricePerM2  = totalWallAreaM2 > 0 ? totalClient / totalWallAreaM2 : null;
+
+              // Gdy DAP w cenie – pokaż efektywną cenę/t i /m² (towary + transport)
+              if (dPaidBy === 'dap_included' && deliveryCostPLN > 0) {
                 return (
-                  <Text>Cena sprzedaży za tonę: {formatEUR(effectivePricePerT)} {unitLabel}</Text>
+                  <>
+                    {pricePerT  != null && <Text>Cena sprzedaży za tonę: {formatEUR(pricePerT)} {unitLabelT}</Text>}
+                    {pricePerM2 != null && <Text>Cena sprzedaży za m²: {formatEUR(pricePerM2)} {unitLabelM2}</Text>}
+                  </>
                 );
               }
-              // Standardowo – ceny z pozycji
+              // Standardowo – ceny z pozycji (za tonę) + obliczone za m²
               const priced = sortedItems.filter(item => item.sell_eur_t != null);
               const allSame = priced.length > 0 && priced.every(i => i.sell_eur_t === priced[0].sell_eur_t);
               if (allSame && priced.length > 0) {
                 return (
-                  <Text>Cena sprzedaży za tonę: {priced[0].sell_eur_t} {unitLabel}</Text>
+                  <>
+                    <Text>Cena sprzedaży za tonę: {priced[0].sell_eur_t} {unitLabelT}</Text>
+                    {pricePerM2 != null && <Text>Cena sprzedaży za m²: {formatEUR(pricePerM2)} {unitLabelM2}</Text>}
+                  </>
                 );
               }
-              return priced.map((item, i) => (
-                <Text key={i}>
-                  {item.profile_name}: {item.sell_eur_t} {unitLabel}
-                </Text>
-              ));
+              return (
+                <>
+                  {priced.map((item, i) => (
+                    <Text key={i}>{item.profile_name}: {item.sell_eur_t} {unitLabelT}</Text>
+                  ))}
+                  {pricePerM2 != null && <Text>Cena sprzedaży za m²: {formatEUR(pricePerM2)} {unitLabelM2}</Text>}
+                </>
+              );
             })()}
           </View>
         </View>
