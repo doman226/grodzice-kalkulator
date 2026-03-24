@@ -266,7 +266,9 @@ export default function SaveOfferModal({
                     {transport.paidBy === 'dap_extra' && <span className="text-orange-600 ml-1">[refaktura]</span>}:
                   </span>
                   <strong className={transport.paidBy === 'dap_extra' ? 'text-orange-600' : ''}>
-                    {formatPLN(transport.totalCost)} PLN
+                    {currency === 'EUR'
+                      ? `${formatEUR(transport.totalCost)} EUR`
+                      : `${formatPLN(transport.totalCost)} PLN`}
                   </strong>
                 </div>
               )}
