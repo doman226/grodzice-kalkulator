@@ -1,6 +1,7 @@
 import { Document, Page, View, Text, Image, StyleSheet, Font } from '@react-pdf/renderer';
 import type { SaleOffer } from '../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
+import { PDF_STRINGS, type PdfLang } from '../../lib/pdfStrings';
 
 // ─── Fonty (identyczne z OfferPDF) ───────────────────────────────────────────
 
@@ -166,12 +167,16 @@ const s = StyleSheet.create({
 
 interface Props {
   offer: SaleOffer;
+  lang?: PdfLang;
 }
 
 // ─── Komponent ────────────────────────────────────────────────────────────────
 
-export default function SaleOfferPDF({ offer }: Props) {
-  const dateStr     = new Intl.DateTimeFormat('pl-PL', { dateStyle: 'long' }).format(new Date(offer.created_at));
+export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
+  const t = PDF_STRINGS[lang];
+
+  const dateLocale  = lang === 'en' ? 'en-GB' : 'pl-PL';
+  const dateStr     = new Intl.DateTimeFormat(dateLocale, { dateStyle: 'long' }).format(new Date(offer.created_at));
   const headerUrl   = `${window.location.origin}/header-logo.png`;
   const footerUrl   = `${window.location.origin}/footer-logo.png`;
   const currency    = offer.currency ?? 'EUR';
@@ -198,44 +203,32 @@ export default function SaleOfferPDF({ offer }: Props) {
   const sortedItems = [...(offer.items ?? [])].sort((a, b) => a.sort_order - b.sort_order);
 
   // Masa łączna i powierzchnia ścianki
-  const totalMassT     = sortedItems.reduce((sum, i) => sum + (i.mass_t      ?? 0), 0);
+  const totalMassT      = sortedItems.reduce((sum, i) => sum + (i.mass_t       ?? 0), 0);
   const totalWallAreaM2 = sortedItems.reduce((sum, i) => sum + (i.wall_area_m2 ?? 0), 0);
 
-  // Termin dostawy → tekst na PDF
   function deliveryTimelineText(): string {
     if (offer.delivery_timeline === 'huta') {
       const kampania = offer.campaign_weeks ?? '??';
       const dostawa  = offer.campaign_delivery_weeks;
-      return `produkcja w planowanej kampanii w tyg. ${kampania}`
-        + (dostawa ? ` – dostawy wstępnie możliwe od ${dostawa} tygodnia` : '')
-        + ' – do potwierdzenia po zakończonej produkcji.';
+      return t.deliveryFromMill(String(kampania), dostawa ? String(dostawa) : undefined);
     }
-    return `z magazynu${offer.warehouse_delivery_time ? `, ${offer.warehouse_delivery_time}` : ''}.`;
+    return t.deliveryFromStock(offer.warehouse_delivery_time ?? undefined);
   }
 
-  // Warunki dostawy → tekst na PDF
   function deliveryTermsText(): string {
     if (offer.delivery_terms === 'FCA') {
-      return `odbiór własny wg. FCA (${offer.fca_location ?? 'magazyn odbioru'}).`;
+      return t.deliveryFca(offer.fca_location ?? (lang === 'en' ? 'collection warehouse' : 'magazyn odbioru'));
     }
-    const addr = offer.delivery_to ?? 'adres dostawy';
-    return `dostawa w cenie wg. DAP (${addr}).`;
+    return t.deliveryDap(offer.delivery_to ?? (lang === 'en' ? 'delivery address' : 'adres dostawy'));
   }
 
-  // Warunki handlowe → tekst na PDF
   function paymentText(): string {
-    if (offer.payment_days === 0) return 'przedpłata 100%.';
-    return `${offer.payment_days} dni od daty wystawienia faktury, z zastrzeżeniem uzyskania zabezpieczenia wartości zamówienia (Limit kupiecki, gwarancja bankowa, gwarancja płatności publicznego inwestora lub inne zabezpieczenie zaakceptowane przez Intra BV).`;
-  }
-
-  // Ważność oferty → tekst
-  function validityLabel(): string {
-    if (offer.valid_days === 1) return '24h';
-    return `${offer.valid_days} dni`;
+    if (offer.payment_days === 0) return t.paymentPrepaid;
+    return t.paymentCredit(offer.payment_days ?? 30);
   }
 
   return (
-    <Document title={`Oferta ${offer.offer_number}`} author="Intra B.V." language="pl">
+    <Document title={t.docTitle(offer.offer_number)} author="Intra B.V." language={t.docLanguage}>
       <Page size="A4" style={s.page}>
 
         {/* ── HEADER / FOOTER IMAGE ── */}
@@ -243,28 +236,28 @@ export default function SaleOfferPDF({ offer }: Props) {
         <Image fixed style={s.footerImg} src={footerUrl} />
 
         {/* ── TYTUŁ ── */}
-        <Text style={s.title}>OFERTA SPRZEDAŻY</Text>
+        <Text style={s.title}>{t.offerTitle}</Text>
 
         {/* ── META + KLIENT ── */}
         <View style={s.metaRow}>
           <View style={s.metaLeft}>
-            <Text style={s.metaLine}><Text style={s.metaBold}>Data: </Text>{dateStr}</Text>
-            <Text style={s.metaLine}><Text style={s.metaBold}>Numer oferty: </Text>{offer.offer_number}</Text>
-            <Text style={s.metaLine}><Text style={s.metaBold}>Opiekun handlowy: </Text>{offer.prepared_by ?? 'Intra B.V.'}</Text>
+            <Text style={s.metaLine}><Text style={s.metaBold}>{t.date} </Text>{dateStr}</Text>
+            <Text style={s.metaLine}><Text style={s.metaBold}>{t.offerNumber} </Text>{offer.offer_number}</Text>
+            <Text style={s.metaLine}><Text style={s.metaBold}>{t.salesRep} </Text>{offer.prepared_by ?? 'Intra B.V.'}</Text>
             {offer.prepared_by && SALES_REPS[offer.prepared_by] && (
-              <Text style={s.metaLine}><Text style={s.metaBold}>Telefon: </Text>{SALES_REPS[offer.prepared_by]}</Text>
+              <Text style={s.metaLine}><Text style={s.metaBold}>{t.phone} </Text>{SALES_REPS[offer.prepared_by]}</Text>
             )}
             {currency === 'EUR' && (
-              <Text style={s.metaLine}><Text style={s.metaBold}>Kurs EUR/PLN: </Text>{exchRate.toFixed(4)} (NBP)</Text>
+              <Text style={s.metaLine}><Text style={s.metaBold}>{t.exchangeRate} </Text>{exchRate.toFixed(4)} (NBP)</Text>
             )}
           </View>
           <View style={s.metaRight}>
-            <Text style={[s.metaBold, { fontSize: 9, marginBottom: 3, color: C.navy }]}>Dane klienta:</Text>
+            <Text style={[s.metaBold, { fontSize: 9, marginBottom: 3, color: C.navy }]}>{t.customerLabel}</Text>
             {offer.client ? (
               <>
                 <Text style={[s.metaLine, { fontFamily: 'Roboto', fontWeight: 700, textAlign: 'right' }]}>{offer.client.name}</Text>
                 <Text style={[s.metaLine, { textAlign: 'right', color: C.gray500 }]}>
-                  {offer.client.country === 'PL' ? `NIP: ${offer.client.nip}` : `VAT: ${offer.client.vat_number}`}
+                  {t.vatLabel(offer.client.country ?? '')} {offer.client.country === 'PL' ? offer.client.nip : offer.client.vat_number}
                   {' · '}{offer.client.country}
                 </Text>
                 {offer.client.address && (
@@ -286,21 +279,18 @@ export default function SaleOfferPDF({ offer }: Props) {
         <View style={s.sep} />
 
         {/* ── POWITANIE ── */}
-        <Text style={s.greeting}>Dzień dobry,</Text>
-        <Text style={s.intro}>
-          W nawiązaniu do przesłanego zapytania oraz naszych Ogólnych Warunków Sprzedaży i Płatności,
-          oferujemy sprzedaż grodzic stalowych na poniższych warunkach:
-        </Text>
+        <Text style={s.greeting}>{t.greeting}</Text>
+        <Text style={s.intro}>{t.intro}</Text>
 
         {/* ── TABELA POZYCJI ── */}
         <View style={s.table}>
           <View style={s.tableHeaderRow}>
-            <Text style={[s.thCell, { flex: 2.6 }]}>Profil</Text>
-            <Text style={[s.thCell, { flex: 2.0 }]}>Gatunek stali</Text>
-            <Text style={[s.thCell, { flex: 1.0, textAlign: 'center' }]}>Ilość</Text>
-            <Text style={[s.thCell, { flex: 1.0, textAlign: 'right' }]}>Dług. [m]</Text>
-            <Text style={[s.thCell, { flex: 0.8, textAlign: 'right' }]}>kg/m</Text>
-            <Text style={[s.thCell, { flex: 1.2, textAlign: 'right' }]}>Masa [t]</Text>
+            <Text style={[s.thCell, { flex: 2.6 }]}>{t.thProfile}</Text>
+            <Text style={[s.thCell, { flex: 2.0 }]}>{t.thSteelGrade}</Text>
+            <Text style={[s.thCell, { flex: 1.0, textAlign: 'center' }]}>{t.thQty}</Text>
+            <Text style={[s.thCell, { flex: 1.0, textAlign: 'right' }]}>{t.thLength}</Text>
+            <Text style={[s.thCell, { flex: 0.8, textAlign: 'right' }]}>{t.thKgPerM}</Text>
+            <Text style={[s.thCell, { flex: 1.2, textAlign: 'right' }]}>{t.thMass}</Text>
           </View>
 
           {sortedItems.map((item, idx) => {
@@ -318,8 +308,8 @@ export default function SaleOfferPDF({ offer }: Props) {
                 </Text>
                 <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'center' }]}>
                   {item.is_paired
-                    ? `${item.quantity} par`
-                    : `${item.quantity} szt.`}
+                    ? `${item.quantity} ${t.unitPairs}`
+                    : `${item.quantity} ${t.unitPcs}`}
                 </Text>
                 <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right' }]}>
                   {item.length_m != null ? `${item.length_m} m` : '—'}
@@ -336,7 +326,7 @@ export default function SaleOfferPDF({ offer }: Props) {
 
           {/* Wiersz sumy */}
           <View style={[s.tableBodyRow, { backgroundColor: C.gray100 }]}>
-            <Text style={[s.tdLabel, { flex: 2.6, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>Łącznie</Text>
+            <Text style={[s.tdLabel, { flex: 2.6, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{t.totalRow}</Text>
             <Text style={[s.tdLabel, { flex: 2.0 }]} />
             <Text style={[s.tdLabel, { flex: 1.0 }]} />
             <Text style={[s.tdLabel, { flex: 1.0 }]} />
@@ -349,10 +339,10 @@ export default function SaleOfferPDF({ offer }: Props) {
 
         {/* ── CENA SPRZEDAŻY ── */}
         <View style={s.priceBox}>
-          <Text style={s.priceLabel}>Cena sprzedaży</Text>
+          <Text style={s.priceLabel}>{t.priceLabel}</Text>
           <Text style={s.priceValue}>
             {isEUR ? formatEUR(totalForClientEUR) : formatPLN(totalForClientPLN)}
-            <Text style={s.priceSuffix}> {currency} netto</Text>
+            <Text style={s.priceSuffix}> {currency} {t.netSuffix}</Text>
           </Text>
           <View style={s.priceRow}>
             {(() => {
@@ -362,12 +352,15 @@ export default function SaleOfferPDF({ offer }: Props) {
               const pricePerT   = totalMassT      > 0 ? totalClient / totalMassT      : null;
               const pricePerM2  = totalWallAreaM2 > 0 ? totalClient / totalWallAreaM2 : null;
 
-              // Gdy DAP w cenie – pokaż efektywną cenę/t i /m² (towary + transport)
+              function fmtT(v: number)  { return isEUR ? formatEUR(v) : formatPLN(v); }
+              function fmtM2(v: number) { return isEUR ? formatEUR(v) : formatPLN(v); }
+
+              // Gdy DAP w cenie – pokaż efektywną cenę/t i /m²
               if (dPaidBy === 'dap_included' && deliveryCostPLN > 0) {
                 return (
                   <>
-                    {pricePerT  != null && <Text>Cena sprzedaży za tonę: {formatEUR(pricePerT)} {unitLabelT}</Text>}
-                    {pricePerM2 != null && <Text>Cena sprzedaży za m²: {formatEUR(pricePerM2)} {unitLabelM2}</Text>}
+                    {pricePerT  != null && <Text>{t.pricePerTon(unitLabelT).replace('{value}', fmtT(pricePerT))}</Text>}
+                    {pricePerM2 != null && <Text>{t.pricePerM2(unitLabelM2).replace('{value}', fmtM2(pricePerM2))}</Text>}
                   </>
                 );
               }
@@ -377,8 +370,8 @@ export default function SaleOfferPDF({ offer }: Props) {
               if (allSame && priced.length > 0) {
                 return (
                   <>
-                    <Text>Cena sprzedaży za tonę: {priced[0].sell_eur_t} {unitLabelT}</Text>
-                    {pricePerM2 != null && <Text>Cena sprzedaży za m²: {formatEUR(pricePerM2)} {unitLabelM2}</Text>}
+                    <Text>{t.pricePerTon(unitLabelT).replace('{value}', String(priced[0].sell_eur_t))}</Text>
+                    {pricePerM2 != null && <Text>{t.pricePerM2(unitLabelM2).replace('{value}', fmtM2(pricePerM2))}</Text>}
                   </>
                 );
               }
@@ -387,7 +380,7 @@ export default function SaleOfferPDF({ offer }: Props) {
                   {priced.map((item, i) => (
                     <Text key={i}>{item.profile_name}: {item.sell_eur_t} {unitLabelT}</Text>
                   ))}
-                  {pricePerM2 != null && <Text>Cena sprzedaży za m²: {formatEUR(pricePerM2)} {unitLabelM2}</Text>}
+                  {pricePerM2 != null && <Text>{t.pricePerM2(unitLabelM2).replace('{value}', fmtM2(pricePerM2))}</Text>}
                 </>
               );
             })()}
@@ -398,18 +391,17 @@ export default function SaleOfferPDF({ offer }: Props) {
         {(dPaidBy === 'dap_extra' || dPaidBy === 'fca' ||
           (dPaidBy === 'dap_included' && offer.delivery_cost_total != null && offer.delivery_cost_total > 0)) && (
           <>
-            <Text style={s.sectionTitle}>Transport:</Text>
+            <Text style={s.sectionTitle}>{t.sectionTransport}</Text>
             <View style={s.transportBox}>
               {dPaidBy === 'dap_included' && (
-                // DAP w cenie – klient nie widzi kosztu
                 <>
                   <View style={s.transportRow}>
-                    <Text style={s.transportLabel}>Dostawa:</Text>
-                    <Text style={[s.transportValue, { color: C.navy }]}>DAP – w cenie / Intra B.V.</Text>
+                    <Text style={s.transportLabel}>{t.labelDelivery}</Text>
+                    <Text style={[s.transportValue, { color: C.navy }]}>{t.valueDapIncluded}</Text>
                   </View>
                   {(offer.delivery_from || offer.delivery_to) && (
                     <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}`, alignItems: 'flex-end' }]}>
-                      <Text style={s.transportLabel}>Trasa:</Text>
+                      <Text style={s.transportLabel}>{t.labelRoute}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
                       <Text style={s.transportValue}>
                         {offer.delivery_from}{offer.delivery_to ? ` — ${offer.delivery_to}` : ''}
@@ -419,15 +411,14 @@ export default function SaleOfferPDF({ offer }: Props) {
                 </>
               )}
               {dPaidBy === 'dap_extra' && (
-                // DAP refaktura – Intra organizuje, klient płaci osobno
                 <>
                   <View style={s.transportRow}>
-                    <Text style={s.transportLabel}>Dostawa:</Text>
-                    <Text style={[s.transportValue, { color: C.navy }]}>DAP / Intra B.V.</Text>
+                    <Text style={s.transportLabel}>{t.labelDelivery}</Text>
+                    <Text style={[s.transportValue, { color: C.navy }]}>{t.valueDapExtra}</Text>
                   </View>
                   {(offer.delivery_from || offer.delivery_to) && (
                     <View style={[s.transportRow, { alignItems: 'flex-end' }]}>
-                      <Text style={s.transportLabel}>Trasa:</Text>
+                      <Text style={s.transportLabel}>{t.labelRoute}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
                       <Text style={s.transportValue}>
                         {offer.delivery_from}{offer.delivery_to ? ` — ${offer.delivery_to}` : ''}
@@ -436,46 +427,45 @@ export default function SaleOfferPDF({ offer }: Props) {
                   )}
                   {offer.delivery_trucks != null && (
                     <View style={s.transportRow}>
-                      <Text style={s.transportLabel}>Liczba aut:</Text>
+                      <Text style={s.transportLabel}>{t.labelTrucks}</Text>
                       <Text style={s.transportValue}>{offer.delivery_trucks}</Text>
                     </View>
                   )}
                   {offer.delivery_cost_per_truck != null && offer.delivery_cost_per_truck > 0 && (
                     <View style={s.transportRow}>
-                      <Text style={s.transportLabel}>Koszt / auto:</Text>
+                      <Text style={s.transportLabel}>{t.labelCostPerTruck}</Text>
                       <Text style={s.transportValue}>
                         {isEUR
-                          ? `${formatEUR(offer.delivery_cost_per_truck ?? 0)} EUR netto`
-                          : `${formatPLN(offer.delivery_cost_per_truck ?? 0)} PLN netto`}
+                          ? `${formatEUR(offer.delivery_cost_per_truck ?? 0)} EUR ${t.netSuffix}`
+                          : `${formatPLN(offer.delivery_cost_per_truck ?? 0)} PLN ${t.netSuffix}`}
                       </Text>
                     </View>
                   )}
                   {offer.delivery_cost_total != null && offer.delivery_cost_total > 0 && (
                     <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}` }]}>
-                      <Text style={s.transportLabel}>Łączny koszt dostawy:</Text>
+                      <Text style={s.transportLabel}>{t.labelTotalDelivery}</Text>
                       <Text style={[s.transportValue, { color: C.orange }]}>
                         {isEUR
-                          ? `${formatEUR(offer.delivery_cost_total / exchRate)} EUR netto`
-                          : `${formatPLN(offer.delivery_cost_total)} PLN netto`}
+                          ? `${formatEUR(offer.delivery_cost_total / exchRate)} EUR ${t.netSuffix}`
+                          : `${formatPLN(offer.delivery_cost_total)} PLN ${t.netSuffix}`}
                       </Text>
                     </View>
                   )}
                   <View style={s.transportRow}>
-                    <Text style={s.transportLabel}>Rozliczenie:</Text>
-                    <Text style={[s.transportValue, { color: C.orange }]}>Refaktura kosztów dostawy na klienta</Text>
+                    <Text style={s.transportLabel}>{t.labelSettlement}</Text>
+                    <Text style={[s.transportValue, { color: C.orange }]}>{t.valueRecharge}</Text>
                   </View>
                 </>
               )}
               {dPaidBy === 'fca' && (
-                // FCA – odbiór własny klienta
                 <>
                   <View style={s.transportRow}>
-                    <Text style={s.transportLabel}>Dostawa:</Text>
-                    <Text style={[s.transportValue, { color: C.navy }]}>FCA – odbiór własny</Text>
+                    <Text style={s.transportLabel}>{t.labelDelivery}</Text>
+                    <Text style={[s.transportValue, { color: C.navy }]}>{t.valueFca}</Text>
                   </View>
                   {offer.delivery_from && (
                     <View style={[s.transportRow, { alignItems: 'flex-end' }]}>
-                      <Text style={s.transportLabel}>Odbiór z:</Text>
+                      <Text style={s.transportLabel}>{lang === 'en' ? 'Pick-up from:' : 'Odbiór z:'}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
                       <Text style={s.transportValue}>{offer.delivery_from}</Text>
                     </View>
@@ -491,7 +481,7 @@ export default function SaleOfferPDF({ offer }: Props) {
         ══════════════════════════════════════ */}
 
         {/* ── TERMIN DOSTAWY ── */}
-        <Text style={s.sectionTitle}>Termin dostawy:</Text>
+        <Text style={s.sectionTitle}>{t.sectionDeliveryTime}</Text>
         <View style={s.conditionsBox}>
           <Text style={[s.conditionItem, { marginBottom: 0 }]}>
             - {deliveryTimelineText()}
@@ -499,7 +489,7 @@ export default function SaleOfferPDF({ offer }: Props) {
         </View>
 
         {/* ── WARUNKI DOSTAWY (Incoterms) ── */}
-        <Text style={s.sectionTitle}>Warunki dostawy:</Text>
+        <Text style={s.sectionTitle}>{t.sectionDeliveryTerms}</Text>
         <View style={s.conditionsBox}>
           <Text style={[s.conditionItem, { marginBottom: 0 }]}>
             - {deliveryTermsText()}
@@ -507,27 +497,27 @@ export default function SaleOfferPDF({ offer }: Props) {
         </View>
 
         {/* ── WARUNKI TECHNICZNE ── */}
-        <Text style={s.sectionTitle}>Warunki techniczne:</Text>
+        <Text style={s.sectionTitle}>{t.sectionTechnical}</Text>
         <View style={s.conditionsBox}>
-          <Text style={s.conditionItem}>- dostawa wg. EN10248-1/2.</Text>
-          <Text style={s.conditionItem}>- gatunek stali zgodny z ofertą.</Text>
-          <Text style={s.conditionItem}>- tolerancja długości +-200mm.</Text>
-          <Text style={s.conditionItem}>- certyfikat 3.1/EN10204.</Text>
-          <Text style={s.conditionItem}>- fakturowanie wg. wagi teoretycznej.</Text>
+          <Text style={s.conditionItem}>{t.techStandard}</Text>
+          <Text style={s.conditionItem}>{t.techGrade}</Text>
+          <Text style={s.conditionItem}>{t.techTolerance}</Text>
+          <Text style={s.conditionItem}>{t.techCert}</Text>
+          <Text style={s.conditionItem}>{t.techWeighing}</Text>
           {!isEUR && (
             <Text style={[s.conditionItem, { marginBottom: 0 }]}>
-              - oferta kalkulowana po kursie €/zł z dnia przesłania oferty.
+              {t.techCurrencyPLN(exchRate)}
             </Text>
           )}
           {isEUR && (
             <Text style={[s.conditionItem, { marginBottom: 0 }]}>
-              - ceny podane w EUR netto.
+              {t.techCurrencyEUR}
             </Text>
           )}
         </View>
 
         {/* ── WARUNKI HANDLOWE ── */}
-        <Text style={s.sectionTitle}>Warunki handlowe:</Text>
+        <Text style={s.sectionTitle}>{t.sectionCommercial}</Text>
         <View style={s.conditionsBox}>
           <Text style={[s.conditionItem, { marginBottom: 0 }]}>
             - {paymentText()}
@@ -535,20 +525,20 @@ export default function SaleOfferPDF({ offer }: Props) {
         </View>
 
         {/* ── WAŻNOŚĆ OFERTY ── */}
-        <Text style={s.sectionTitle}>Ważność oferty:</Text>
+        <Text style={s.sectionTitle}>{t.sectionValidity}</Text>
         <View style={s.conditionsBox}>
           <Text style={s.conditionItem}>
-            - Oferta ważna {validityLabel()} od daty wysłania i wymaga finalnego potwierdzenia.
+            {t.validityLine1(t.validityLabel(offer.valid_days ?? 14))}
           </Text>
           <Text style={[s.conditionItem, { marginBottom: 0 }]}>
-            - Oferta nie rezerwuje dostępności magazynowych oraz możliwości produkcyjnych.
+            {t.validityLine2}
           </Text>
         </View>
 
         {/* ── NOTATKI ── */}
         {offer.notes && (
           <View style={s.notesBox}>
-            <Text style={s.notesLabel}>Uwagi</Text>
+            <Text style={s.notesLabel}>{t.notesLabel}</Text>
             <Text style={s.notesText}>{offer.notes}</Text>
           </View>
         )}

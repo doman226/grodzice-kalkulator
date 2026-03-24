@@ -214,7 +214,7 @@ export default function EditSaleOfferModal({
       const wallAreaM2    = totalLengthM * (profile.width_mm / 1000);
       const costEurTotal  = item.costEurT * massT;
       const sellEurTotal  = item.sellEurT * massT;
-      const sellPlnTotal  = currency === 'EUR' ? sellEurTotal * exchangeRate : sellEurTotal;
+      const sellPlnTotal  = sellEurTotal * exchangeRate;
       const marginPct     = sellEurTotal > 0 ? ((sellEurTotal - costEurTotal) / sellEurTotal) * 100 : 0;
       return { totalLengthM, massT, wallAreaM2, costEurTotal, sellEurTotal, sellPlnTotal, marginPct };
     }),
