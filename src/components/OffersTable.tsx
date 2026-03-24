@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { supabase } from '../lib/supabase';
 import type { Offer, OfferStatus, Profile, RentalPrices, Client } from '../types';
-import { formatPLN, formatNumber } from '../lib/calculations';
+import { formatPLN, formatEUR, formatNumber } from '../lib/calculations';
 import OfferPDF from './OfferPDF';
 import EditOfferModal from './EditOfferModal';
 
@@ -149,7 +149,7 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
               <th className="text-left px-4 py-3 text-xs uppercase tracking-wide font-semibold">Profil</th>
               <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Masa [t]</th>
               <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Okres</th>
-              <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Kwota [PLN]</th>
+              <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Kwota</th>
               <th className="text-center px-4 py-3 text-xs uppercase tracking-wide font-semibold">Status</th>
               <th className="text-center px-4 py-3 text-xs uppercase tracking-wide font-semibold">Szczegóły</th>
             </tr>
@@ -203,7 +203,14 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
 
                   {/* Kwota */}
                   <td className="px-4 py-3 text-right font-semibold text-gray-800">
-                    {formatPLN(offer.rental_cost_pln)} PLN
+                    {(offer.currency ?? 'PLN') === 'EUR' && offer.rental_cost_eur != null ? (
+                      <div>
+                        <div>{formatEUR(offer.rental_cost_eur)} EUR</div>
+                        <div className="text-xs font-normal text-gray-400">{formatPLN(offer.rental_cost_pln)} PLN</div>
+                      </div>
+                    ) : (
+                      <>{formatPLN(offer.rental_cost_pln)} PLN</>
+                    )}
                   </td>
 
                   {/* Status */}
@@ -247,6 +254,9 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                           {offer.prepared_by && (
                             <div><span className="text-gray-500">Opiekun:</span> <strong>{offer.prepared_by}</strong></div>
+                          )}
+                          {(offer.currency ?? 'PLN') === 'EUR' && offer.exchange_rate && (
+                            <div><span className="text-gray-500">Kurs EUR:</span> <strong>{offer.exchange_rate.toFixed(4)} PLN</strong></div>
                           )}
                           <div>
                             <span className="text-gray-500">Płatność:</span>{' '}

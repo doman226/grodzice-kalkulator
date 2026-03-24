@@ -228,6 +228,9 @@ export interface Offer {
   transport_from?: string;
   transport_to?: string;
   prepared_by?: string;
+  currency?: 'EUR' | 'PLN';
+  exchange_rate?: number;
+  rental_cost_eur?: number;
   created_at: string;
   updated_at: string;
   items?: OfferItem[];

@@ -1,7 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import type { Profile, RentalPrices, Client, Offer } from '../types';
-import { calculateRentalCost, formatPLN, formatNumber } from '../lib/calculations';
+import { calculateRentalCost, formatPLN, formatEUR, formatNumber } from '../lib/calculations';
 import SaveOfferModal, { type OfferItemInput } from './SaveOfferModal';
+
+interface NBPRate { rate: number; date: string; }
 
 interface Props {
   profiles: Profile[];
@@ -41,6 +43,13 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
   const [cuttingPrice, setCuttingPrice] = useState<number>(prices.cutting_price_pln ?? 59);
   const [repairPrice, setRepairPrice] = useState<number>(prices.repair_price_pln ?? 250);
 
+  // Waluta i kurs
+  const [currency, setCurrency]     = useState<'EUR' | 'PLN'>('PLN');
+  const [manualRate, setManualRate] = useState(4.25);
+  const [nbpRate, setNbpRate]       = useState<NBPRate | null>(null);
+  const [nbpLoading, setNbpLoading] = useState(false);
+  const exchangeRate = nbpRate?.rate ?? manualRate;
+
   // Gdy globalne stawki się zmienią (po zapisie w Ustawieniach cen), resetuj lokalne ceny
   useEffect(() => {
     setPricePerTon(prices.base_price_pln);
@@ -52,6 +61,16 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
     setCuttingPrice(prices.cutting_price_pln ?? 59);
     setRepairPrice(prices.repair_price_pln ?? 250);
   }, [prices.updated_at]);
+
+  // NBP fetch przy starcie
+  useEffect(() => {
+    setNbpLoading(true);
+    fetch('https://api.nbp.pl/api/exchangerates/rates/A/EUR/last/1/?format=json')
+      .then(r => r.json())
+      .then(d => { setNbpRate({ rate: d.rates[0].mid, date: d.rates[0].effectiveDate }); setManualRate(d.rates[0].mid); })
+      .catch(() => {})
+      .finally(() => setNbpLoading(false));
+  }, []);
 
   const [showSaveModal, setShowSaveModal] = useState(false);
 
@@ -77,6 +96,21 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
 
   function updateItem(uid: string, patch: Partial<CalcItem>) {
     setItems(prev => prev.map(i => i.uid === uid ? { ...i, ...patch } : i));
+  }
+
+  function handleCurrencyChange(newCur: 'EUR' | 'PLN') {
+    if (newCur === currency) return;
+    const factor = newCur === 'EUR' ? 1 / exchangeRate : exchangeRate;
+    const conv = (v: number) => Math.round(v * factor * 100) / 100;
+    setPricePerTon(prev => conv(prev));
+    setPricePerWeek1(prev => conv(prev));
+    setLossPrice(prev => conv(prev));
+    setSortingPrice(prev => conv(prev));
+    setGrindingPrice(prev => conv(prev));
+    setWeldingPrice(prev => conv(prev));
+    setCuttingPrice(prev => conv(prev));
+    setRepairPrice(prev => conv(prev));
+    setCurrency(newCur);
   }
 
   // --- Wyliczenia per pozycja ---
@@ -108,11 +142,14 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
 
   const isValid = totals.totalMassT > 0;
 
-  // Koszt = masa [t] × cena [PLN/t]
+  // Koszt = masa [t] × cena [currency/t]
   const rentalCost = useMemo(() =>
     isValid ? calculateRentalCost(totals.totalMassT, pricePerTon) : 0,
     [totals.totalMassT, pricePerTon, isValid]
   );
+  // Zawsze trzymaj obie wartości dla zapisu do bazy
+  const rentalCostPLN = currency === 'PLN' ? rentalCost : rentalCost * exchangeRate;
+  const rentalCostEUR = currency === 'EUR' ? rentalCost : rentalCost / exchangeRate;
 
   const transportCalc = useMemo(() => {
     if (!isValid) return null;
@@ -122,10 +159,14 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
     return { trucks, autoTrucks, costPerTruck, totalCost: trucks * costPerTruck };
   }, [isValid, totals.totalMassT, transportCostPerTruck, customTrucks]);
 
+  // Transport zawsze w PLN; przy EUR przeliczamy na EUR do wyświetlenia
   const totalCostInclTransport = useMemo(() => {
-    const transportAdd = (transportPaidBy === 'dap_included' && transportCalc) ? transportCalc.totalCost : 0;
-    return rentalCost + transportAdd;
-  }, [rentalCost, transportCalc, transportPaidBy]);
+    if (!transportCalc || transportPaidBy !== 'dap_included') return rentalCost;
+    const transportInCurrency = currency === 'EUR'
+      ? transportCalc.totalCost / exchangeRate
+      : transportCalc.totalCost;
+    return rentalCost + transportInCurrency;
+  }, [rentalCost, transportCalc, transportPaidBy, currency, exchangeRate]);
 
   // Dane do SaveOfferModal
   const offerItems = useMemo((): OfferItemInput[] =>
@@ -304,11 +345,57 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
           </p>
         </div>
 
-        {/* Cena wynajmu PLN/t */}
+        {/* Cena wynajmu i waluta */}
         <div className="mt-4 pt-4 border-t border-gray-100">
+          {/* Toggle EUR/PLN */}
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-sm font-medium text-gray-700">Waluta oferty</span>
+            <div className="flex rounded-lg border border-gray-300 overflow-hidden text-xs font-medium">
+              {(['PLN', 'EUR'] as const).map(c => (
+                <button key={c} type="button"
+                  onClick={() => handleCurrencyChange(c)}
+                  className={`px-4 py-1.5 transition-colors ${currency === c ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Kurs – widoczny tylko przy EUR */}
+          {currency === 'EUR' && (
+            <div className="mb-3 flex items-start gap-4 flex-wrap">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Kurs EUR/PLN</label>
+                <div className="flex items-center gap-2">
+                  <input type="number" min={1} step={0.0001}
+                    value={manualRate}
+                    onChange={e => { setManualRate(parseFloat(e.target.value) || 4.25); setNbpRate(null); }}
+                    className="w-28 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button onClick={() => {
+                    setNbpLoading(true);
+                    fetch('https://api.nbp.pl/api/exchangerates/rates/A/EUR/last/1/?format=json')
+                      .then(r => r.json())
+                      .then(d => { setNbpRate({ rate: d.rates[0].mid, date: d.rates[0].effectiveDate }); setManualRate(d.rates[0].mid); })
+                      .catch(() => {})
+                      .finally(() => setNbpLoading(false));
+                  }} className="px-2 py-1.5 text-xs bg-blue-50 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-100">
+                    {nbpLoading ? '...' : '↻ NBP'}
+                  </button>
+                </div>
+                {nbpRate && <p className="text-xs text-gray-400 mt-1">NBP: {nbpRate.rate.toFixed(4)} PLN (tabela z {nbpRate.date})</p>}
+              </div>
+              <div className="text-xs text-gray-500 bg-blue-50 rounded-lg px-3 py-2 border border-blue-100 self-end">
+                <p className="font-medium text-blue-700 mb-0.5">1 EUR = {exchangeRate.toFixed(4)} PLN</p>
+                {isValid && <p>Koszt ≈ {formatPLN(rentalCostPLN)} PLN</p>}
+              </div>
+            </div>
+          )}
+
+          {/* Cena i stawka tygodniowa */}
           <div className="grid grid-cols-2 gap-4 max-w-lg">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Cena wynajmu [PLN/t]</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Cena wynajmu [{currency}/t]</label>
               <input
                 type="number" min={0} step={1}
                 value={pricePerTon}
@@ -317,7 +404,7 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 whitespace-nowrap">Każdy kolejny tydzień [PLN/t]</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1 whitespace-nowrap">Każdy kolejny tydzień [{currency}/t]</label>
               <input
                 type="number" min={0} step={1}
                 value={pricePerWeek1}
@@ -333,12 +420,12 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
           <p className="text-sm font-medium text-gray-700 mb-3">Cennik szkód i napraw</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {[
-              { label: 'Zagubienie / strata [PLN/t]', value: lossPrice, set: setLossPrice },
-              { label: 'Sortowanie i czyszczenie [PLN/t]', value: sortingPrice, set: setSortingPrice },
-              { label: 'Szlifowanie spawów [PLN/mb]', value: grindingPrice, set: setGrindingPrice },
-              { label: 'Spawanie otworów pod kotwy [PLN/szt]', value: weldingPrice, set: setWeldingPrice },
-              { label: 'Głowica tnąca [PLN/cięcie]', value: cuttingPrice, set: setCuttingPrice },
-              { label: 'Naprawa zamków [PLN/mb]', value: repairPrice, set: setRepairPrice },
+              { label: `Zagubienie / strata [${currency}/t]`, value: lossPrice, set: setLossPrice },
+              { label: `Sortowanie i czyszczenie [${currency}/t]`, value: sortingPrice, set: setSortingPrice },
+              { label: `Szlifowanie spawów [${currency}/mb]`, value: grindingPrice, set: setGrindingPrice },
+              { label: `Spawanie otworów pod kotwy [${currency}/szt]`, value: weldingPrice, set: setWeldingPrice },
+              { label: `Głowica tnąca [${currency}/cięcie]`, value: cuttingPrice, set: setCuttingPrice },
+              { label: `Naprawa zamków [${currency}/mb]`, value: repairPrice, set: setRepairPrice },
             ].map(({ label, value, set }) => (
               <div key={label}>
                 <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
@@ -383,10 +470,19 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Koszt dzierżawy</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <ResultCard label="Koszt łączny" value={formatPLN(totalCostInclTransport)} unit="PLN" highlight />
-              <ResultCard label="Każdy kolejny tydzień" value={formatPLN(totals.totalMassT * pricePerWeek1)} unit="PLN/tydz." />
-              <ResultCard label="Koszt / m²" value={formatPLN(totals.totalWallAreaM2 > 0 ? totalCostInclTransport / totals.totalWallAreaM2 : 0)} unit="PLN/m²" />
-              <ResultCard label="Koszt / tonę" value={formatPLN(totals.totalMassT > 0 ? totalCostInclTransport / totals.totalMassT : 0)} unit="PLN/t" />
+              <ResultCard label="Koszt łączny"
+                value={currency === 'EUR' ? formatEUR(totalCostInclTransport) : formatPLN(totalCostInclTransport)}
+                unit={currency === 'EUR' ? `EUR  ≈ ${formatPLN(totalCostInclTransport * exchangeRate)} PLN` : 'PLN'}
+                highlight />
+              <ResultCard label="Każdy kolejny tydzień"
+                value={currency === 'EUR' ? formatEUR(totals.totalMassT * pricePerWeek1) : formatPLN(totals.totalMassT * pricePerWeek1)}
+                unit={`${currency}/tydz.`} />
+              <ResultCard label="Koszt / m²"
+                value={currency === 'EUR' ? formatEUR(totals.totalWallAreaM2 > 0 ? totalCostInclTransport / totals.totalWallAreaM2 : 0) : formatPLN(totals.totalWallAreaM2 > 0 ? totalCostInclTransport / totals.totalWallAreaM2 : 0)}
+                unit={`${currency}/m²`} />
+              <ResultCard label="Koszt / tonę"
+                value={currency === 'EUR' ? formatEUR(totals.totalMassT > 0 ? totalCostInclTransport / totals.totalMassT : 0) : formatPLN(totals.totalMassT > 0 ? totalCostInclTransport / totals.totalMassT : 0)}
+                unit={`${currency}/t`} />
             </div>
           </div>
 
@@ -474,16 +570,29 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
                 {transportPaidBy === 'dap_included' && (
                   <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
                     <p className="text-blue-200 text-xs mb-0.5">Łączny koszt dla klienta (dzierżawa + transport)</p>
-                    <p className="text-2xl font-bold">{formatPLN(rentalCost + transportCalc.totalCost)} PLN</p>
-                    <p className="text-blue-300 text-xs mt-0.5">
-                      dzierżawa {formatPLN(rentalCost)} + transport {formatPLN(transportCalc.totalCost)} PLN
-                    </p>
+                    {currency === 'EUR' ? (
+                      <>
+                        <p className="text-2xl font-bold">{formatEUR(totalCostInclTransport)} EUR</p>
+                        <p className="text-blue-300 text-xs mt-0.5">
+                          dzierżawa {formatEUR(rentalCost)} EUR + transport {formatEUR(transportCalc.totalCost / exchangeRate)} EUR ({formatPLN(transportCalc.totalCost)} PLN)
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-2xl font-bold">{formatPLN(rentalCost + transportCalc.totalCost)} PLN</p>
+                        <p className="text-blue-300 text-xs mt-0.5">
+                          dzierżawa {formatPLN(rentalCost)} + transport {formatPLN(transportCalc.totalCost)} PLN
+                        </p>
+                      </>
+                    )}
                   </div>
                 )}
                 {transportPaidBy === 'dap_extra' && (
                   <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
                     <p className="text-blue-200 text-xs mb-0.5">Koszt dzierżawy (na ofercie)</p>
-                    <p className="text-2xl font-bold">{formatPLN(rentalCost)} PLN</p>
+                    <p className="text-2xl font-bold">
+                      {currency === 'EUR' ? `${formatEUR(rentalCost)} EUR` : `${formatPLN(rentalCost)} PLN`}
+                    </p>
                     <p className="text-orange-300 text-xs mt-0.5">+ {formatPLN(transportCalc.totalCost)} PLN transport (refaktura)</p>
                   </div>
                 )}
@@ -514,7 +623,18 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
           offerItems={offerItems}
           rentalWeeks={rentalWeeks}
           displayUnit={displayUnit}
-          totals={{ massT: totals.totalMassT, wallAreaM2: totals.totalWallAreaM2, totalLengthM: totals.totalLengthM, rentalCostPLN: rentalCost, costPerM2: totals.totalWallAreaM2 > 0 ? totalCostInclTransport / totals.totalWallAreaM2 : 0, costPerTon: totals.totalMassT > 0 ? totalCostInclTransport / totals.totalMassT : 0 }}
+          totals={{
+            massT: totals.totalMassT,
+            wallAreaM2: totals.totalWallAreaM2,
+            totalLengthM: totals.totalLengthM,
+            rentalCostPLN: rentalCostPLN,
+            rentalCostEUR: rentalCostEUR,
+            costPerM2: totals.totalWallAreaM2 > 0 ? totalCostInclTransport / totals.totalWallAreaM2 : 0,
+            costPerTon: totals.totalMassT > 0 ? totalCostInclTransport / totals.totalMassT : 0,
+          }}
+          currency={currency}
+          exchangeRate={exchangeRate}
+          nbpDate={nbpRate?.date ?? ''}
           transport={{ trucks: transportCalc.trucks, costPerTruck: transportCalc.costPerTruck, totalCost: transportCalc.totalCost, paidBy: transportPaidBy, from: transportFrom, to: transportTo }}
           prices={effectivePricesForOffer}
           onClientAdded={onClientAdded}

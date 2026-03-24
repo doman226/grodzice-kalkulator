@@ -1,6 +1,6 @@
 import { Document, Page, View, Text, Image, StyleSheet, Font } from '@react-pdf/renderer';
 import type { Offer } from '../types';
-import { formatPLN, formatNumber } from '../lib/calculations';
+import { formatPLN, formatEUR, formatNumber } from '../lib/calculations';
 
 const SALES_REPS: Record<string, string> = {
   'Szymon Sobczak': '579 376 107',
@@ -333,7 +333,12 @@ function Row({ label, value, alt }: { label: string; value: string; alt: boolean
 export default function OfferPDF({ offer }: Props) {
   const dateStr = new Intl.DateTimeFormat('pl-PL', { dateStyle: 'long' }).format(new Date(offer.created_at));
 
-  // Używamy > 0 zamiast truthy – chroni przed edge case transport_cost_per_truck = 0
+  // Waluta oferty
+  const isEUR  = (offer.currency ?? 'PLN') === 'EUR';
+  const exRate = offer.exchange_rate ?? 4.25;
+  const fmtVal = (pln: number) => isEUR ? formatEUR(pln / exRate) : formatPLN(pln);
+  const currSuffix = isEUR ? 'EUR netto' : 'PLN netto';
+
   // backward compat: 'intra' (stare) = dap_included
   const tPaidByRaw = offer.transport_paid_by as string | undefined;
   const tPaidBy = tPaidByRaw === 'intra' ? 'dap_included'
@@ -489,12 +494,13 @@ export default function OfferPDF({ offer }: Props) {
         <View style={s.priceBox}>
           <Text style={s.priceLabel}>Koszt dzierżawy</Text>
           <Text style={s.priceValue}>
-            {formatPLN(totalWithTransport)}
-            <Text style={s.priceSuffix}> PLN netto</Text>
+            {fmtVal(totalWithTransport)}
+            <Text style={s.priceSuffix}> {currSuffix}</Text>
           </Text>
           <View style={s.priceRow}>
-            <Text>Koszt dzierżawy za m²: {formatPLN(offer.wall_area_m2 > 0 ? totalWithTransport / offer.wall_area_m2 : offer.cost_per_m2)} PLN/m²</Text>
-            <Text>Koszt dzierżawy za tonę: {formatPLN(offer.mass_t > 0 ? totalWithTransport / offer.mass_t : offer.cost_per_ton)} PLN/t</Text>
+            <Text>Koszt za m²: {fmtVal(offer.wall_area_m2 > 0 ? totalWithTransport / offer.wall_area_m2 : offer.cost_per_m2 ?? 0)} {isEUR ? 'EUR' : 'PLN'}/m²</Text>
+            <Text>Koszt za tonę: {fmtVal(offer.mass_t > 0 ? totalWithTransport / offer.mass_t : offer.cost_per_ton ?? 0)} {isEUR ? 'EUR' : 'PLN'}/t</Text>
+            {isEUR && <Text>Kurs EUR/PLN: {exRate.toFixed(4)}</Text>}
           </View>
         </View>
 
@@ -503,8 +509,8 @@ export default function OfferPDF({ offer }: Props) {
           <View style={[s.priceBox, { marginTop: 10 }]}>
             <Text style={s.priceLabel}>KAŻDY KOLEJNY TYDZIEŃ DZIERŻAWY</Text>
             <Text style={s.priceValue}>
-              {formatPLN(offer.price_per_week_1)}
-              <Text style={s.priceSuffix}> PLN/tona netto</Text>
+              {isEUR ? formatEUR(offer.price_per_week_1) : formatPLN(offer.price_per_week_1)}
+              <Text style={s.priceSuffix}> {isEUR ? 'EUR' : 'PLN'}/tona netto</Text>
             </Text>
             <View style={s.priceRow}>
               <Text>po upływie podstawowego okresu dzierżawy</Text>
@@ -556,14 +562,14 @@ export default function OfferPDF({ offer }: Props) {
                   {offer.transport_cost_per_truck != null && offer.transport_cost_per_truck > 0 && (
                     <View style={s.transportRow}>
                       <Text style={s.transportLabel}>Koszt / auto:</Text>
-                      <Text style={s.transportValue}>{formatPLN(offer.transport_cost_per_truck)} PLN netto</Text>
+                      <Text style={s.transportValue}>{isEUR ? formatEUR(offer.transport_cost_per_truck / exRate) : formatPLN(offer.transport_cost_per_truck)} {isEUR ? 'EUR' : 'PLN'} netto</Text>
                     </View>
                   )}
                   {offer.transport_cost_total != null && offer.transport_cost_total > 0 && (
                     <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}` }]}>
                       <Text style={s.transportLabel}>Łączny koszt transportu:</Text>
                       <Text style={[s.transportValue, { color: C.orange }]}>
-                        {formatPLN(offer.transport_cost_total)} PLN netto
+                        {isEUR ? formatEUR(offer.transport_cost_total / exRate) : formatPLN(offer.transport_cost_total)} {isEUR ? 'EUR' : 'PLN'} netto
                       </Text>
                     </View>
                   )}
@@ -605,7 +611,7 @@ export default function OfferPDF({ offer }: Props) {
           Pragniemy zaznaczyć, że są to grodzice wypożyczone i w każdym przypadku należy je zwrócić. Zwracamy uwagę, że zwrotowi mogą podlegać wyłącznie materiały dostarczone przez Intra.
         </Text>
         <Text style={s.paragraph}>
-          Dostawa i zwrot grodzic muszą nastąpić wg. EN10248-1/2. Za straty materialne, także spowodowane cięciami uszkodzonych części grodzic, obciążymy Państwa dodatkową kwotą w wysokości {offer.loss_price_pln ?? 3950},- zł/tona grodzic.
+          Dostawa i zwrot grodzic muszą nastąpić wg. EN10248-1/2. Za straty materialne, także spowodowane cięciami uszkodzonych części grodzic, obciążymy Państwa dodatkową kwotą w wysokości {offer.loss_price_pln ?? 3950},- {isEUR ? 'EUR' : 'zł'}/tona grodzic.
         </Text>
         <Text style={s.paragraph}>
           Grodzice po zwrocie muszą nadawać się do ponownego użycia – bez konieczności ponownej obróbki, czyszczenia oraz napraw. Grodzice nie mogą posiadać uszkodzeń, zabrudzeń, przylegającej ziemi i innych niedoskonałości ponad normatywne zużycie.
@@ -615,12 +621,12 @@ export default function OfferPDF({ offer }: Props) {
         {/* ── CENNIK SZKÓD ── */}
         <Text style={s.sectionTitle}>Cennik:</Text>
         <View style={s.cennikBox}>
-          <Text style={s.cennikItem}>- Zagubienie / całkowita strata uszkodzonych grodzic = +{offer.loss_price_pln ?? 3950},- zł / tona;</Text>
-          <Text style={s.cennikItem}>- Sortowanie oraz czyszczenie grodzic = +{offer.sorting_price_pln ?? 99},- zł / tona;</Text>
-          <Text style={s.cennikItem}>- Szlifowanie pozostałości przyspawanych kształtowników = +{offer.grinding_price_pln ?? 250},- zł/mb;</Text>
-          <Text style={s.cennikItem}>- Spawanie (zamykanie) otworów pod kotwy = +{offer.welding_price_pln ?? 250},- zł / szt.;</Text>
-          <Text style={s.cennikItem}>- Głowica tnąca - w celu np. ucięcia uszkodzenia = +{offer.cutting_price_pln ?? 59},- zł / za cięcie;</Text>
-          <Text style={[s.cennikItem, { marginBottom: 0 }]}>- Naprawa / prostowanie zamków = +{offer.repair_price_pln ?? 250},- zł / mb;</Text>
+          <Text style={s.cennikItem}>- Zagubienie / całkowita strata uszkodzonych grodzic = +{offer.loss_price_pln ?? 3950},- {isEUR ? 'EUR' : 'zł'} / tona;</Text>
+          <Text style={s.cennikItem}>- Sortowanie oraz czyszczenie grodzic = +{offer.sorting_price_pln ?? 99},- {isEUR ? 'EUR' : 'zł'} / tona;</Text>
+          <Text style={s.cennikItem}>- Szlifowanie pozostałości przyspawanych kształtowników = +{offer.grinding_price_pln ?? 250},- {isEUR ? 'EUR' : 'zł'}/mb;</Text>
+          <Text style={s.cennikItem}>- Spawanie (zamykanie) otworów pod kotwy = +{offer.welding_price_pln ?? 250},- {isEUR ? 'EUR' : 'zł'} / szt.;</Text>
+          <Text style={s.cennikItem}>- Głowica tnąca - w celu np. ucięcia uszkodzenia = +{offer.cutting_price_pln ?? 59},- {isEUR ? 'EUR' : 'zł'} / za cięcie;</Text>
+          <Text style={[s.cennikItem, { marginBottom: 0 }]}>- Naprawa / prostowanie zamków = +{offer.repair_price_pln ?? 250},- {isEUR ? 'EUR' : 'zł'} / mb;</Text>
         </View>
 
         {/* ── TERMIN DOSTAWY ── */}

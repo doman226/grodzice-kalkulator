@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase, fetchNipData } from '../lib/supabase';
 import type { Client, Offer, RentalPrices } from '../types';
-import { formatPLN, formatNumber } from '../lib/calculations';
+import { formatPLN, formatEUR, formatNumber } from '../lib/calculations';
 
 interface TransportData {
   trucks: number;
@@ -29,6 +29,7 @@ interface Totals {
   wallAreaM2: number;
   totalLengthM: number;
   rentalCostPLN: number;
+  rentalCostEUR: number;
   costPerM2: number;
   costPerTon: number;
 }
@@ -39,6 +40,9 @@ interface Props {
   rentalWeeks: number;
   displayUnit: 'weeks' | 'months';
   totals: Totals;
+  currency: 'EUR' | 'PLN';
+  exchangeRate: number;
+  nbpDate: string;
   transport: TransportData;
   prices: RentalPrices;
   onSaved: (offer: Offer) => void;
@@ -54,7 +58,7 @@ const SALES_REPS = [
 ];
 
 export default function SaveOfferModal({
-  clients, offerItems, rentalWeeks, displayUnit, totals, transport, prices, onSaved, onClose, onClientAdded,
+  clients, offerItems, rentalWeeks, displayUnit, totals, currency, exchangeRate, nbpDate, transport, prices, onSaved, onClose, onClientAdded,
 }: Props) {
   const [clientId, setClientId] = useState('');
   const [preparedBy, setPreparedBy] = useState(SALES_REPS[0].name);
@@ -133,6 +137,9 @@ export default function SaveOfferModal({
       mass_t: totals.massT,
       wall_area_m2: totals.wallAreaM2,
       rental_cost_pln: totals.rentalCostPLN,
+      rental_cost_eur: totals.rentalCostEUR,
+      currency,
+      exchange_rate: currency === 'EUR' ? exchangeRate : null,
       cost_per_m2: totals.costPerM2,
       cost_per_ton: totals.costPerTon,
       transport_trucks: transport.trucks,
@@ -234,8 +241,18 @@ export default function SaveOfferModal({
             <div className="pt-2 border-t border-blue-200 mt-2 space-y-1">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Wynajem:</span>
-                <strong>{formatPLN(totals.rentalCostPLN)} PLN</strong>
+                <strong>
+                  {currency === 'EUR'
+                    ? `${formatEUR(totals.rentalCostEUR)} EUR`
+                    : `${formatPLN(totals.rentalCostPLN)} PLN`}
+                </strong>
               </div>
+              {currency === 'EUR' && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Kurs EUR/PLN:</span>
+                  <span className="text-gray-500">{exchangeRate.toFixed(4)}{nbpDate ? ` (NBP ${nbpDate})` : ' (ręczny)'}</span>
+                </div>
+              )}
               {transport.costPerTruck > 0 && transport.paidBy !== 'fca' && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">
@@ -255,7 +272,11 @@ export default function SaveOfferModal({
               )}
               <div className="flex justify-between pt-1 border-t border-blue-200 text-sm">
                 <span className="text-gray-600 font-medium">Łączna kwota oferty:</span>
-                <strong className="text-blue-900 text-base">{formatPLN(totalWithTransport)} PLN</strong>
+                <strong className="text-blue-900 text-base">
+                  {currency === 'EUR'
+                    ? `${formatEUR(totals.rentalCostEUR + (transport.paidBy === 'dap_included' ? transport.totalCost / exchangeRate : 0))} EUR`
+                    : `${formatPLN(totalWithTransport)} PLN`}
+                </strong>
               </div>
             </div>
             {transport.to && (
