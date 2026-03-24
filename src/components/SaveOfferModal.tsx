@@ -89,9 +89,10 @@ export default function SaveOfferModal({
     setNipLookupLoading(false);
   }
 
+  const rentalCostMain = currency === 'EUR' ? totals.rentalCostEUR : totals.rentalCostPLN;
   const totalWithTransport = transport.costPerTruck > 0 && transport.paidBy === 'dap_included'
-    ? totals.rentalCostPLN + transport.totalCost
-    : totals.rentalCostPLN;
+    ? rentalCostMain + transport.totalCost
+    : rentalCostMain;
 
   // Nazwa profilu do wyświetlenia w liście ofert (1 pozycja → nazwa profilu, wiele → "Wiele profili")
   const mainProfileName = offerItems.length === 1 ? offerItems[0].profileName : 'Wiele profili';
@@ -143,8 +144,13 @@ export default function SaveOfferModal({
       cost_per_m2: totals.costPerM2,
       cost_per_ton: totals.costPerTon,
       transport_trucks: transport.trucks,
-      transport_cost_per_truck: transport.costPerTruck > 0 ? transport.costPerTruck : null,
-      transport_cost_total: transport.costPerTruck > 0 ? transport.totalCost : null,
+      // transport zawsze zapisujemy w PLN w bazie – konwersja z EUR jeśli potrzeba
+      transport_cost_per_truck: transport.costPerTruck > 0
+        ? (currency === 'EUR' ? transport.costPerTruck * exchangeRate : transport.costPerTruck)
+        : null,
+      transport_cost_total: transport.costPerTruck > 0
+        ? (currency === 'EUR' ? transport.totalCost * exchangeRate : transport.totalCost)
+        : null,
       transport_paid_by: transport.paidBy,
       transport_from: transport.from || null,
       transport_to: transport.to || null,
@@ -274,7 +280,7 @@ export default function SaveOfferModal({
                 <span className="text-gray-600 font-medium">Łączna kwota oferty:</span>
                 <strong className="text-blue-900 text-base">
                   {currency === 'EUR'
-                    ? `${formatEUR(totals.rentalCostEUR + (transport.paidBy === 'dap_included' ? transport.totalCost / exchangeRate : 0))} EUR`
+                    ? `${formatEUR(totalWithTransport)} EUR`
                     : `${formatPLN(totalWithTransport)} PLN`}
                 </strong>
               </div>

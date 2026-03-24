@@ -159,14 +159,12 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
     return { trucks, autoTrucks, costPerTruck, totalCost: trucks * costPerTruck };
   }, [isValid, totals.totalMassT, transportCostPerTruck, customTrucks]);
 
-  // Transport zawsze w PLN; przy EUR przeliczamy na EUR do wyświetlenia
+  // transport.costPerTruck jest wpisywane w wybranej walucie (PLN lub EUR)
+  // obie wartości (rentalCost i transportCalc.totalCost) są w tej samej walucie
   const totalCostInclTransport = useMemo(() => {
     if (!transportCalc || transportPaidBy !== 'dap_included') return rentalCost;
-    const transportInCurrency = currency === 'EUR'
-      ? transportCalc.totalCost / exchangeRate
-      : transportCalc.totalCost;
-    return rentalCost + transportInCurrency;
-  }, [rentalCost, transportCalc, transportPaidBy, currency, exchangeRate]);
+    return rentalCost + transportCalc.totalCost;
+  }, [rentalCost, transportCalc, transportPaidBy]);
 
   // Dane do SaveOfferModal
   const offerItems = useMemo((): OfferItemInput[] =>
@@ -530,10 +528,18 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
                   <p className="text-xs text-gray-400 mt-1">Szacunek: {transportCalc?.autoTrucks ?? '—'} aut</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Koszt / auto [PLN]</label>
-                  <input type="number" min={0} step={100} value={transportCostPerTruck} placeholder="np. 2500"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Koszt / auto [{currency}]
+                    {currency === 'EUR' && <span className="ml-1 text-xs text-blue-600 font-normal">(wpisz w EUR)</span>}
+                  </label>
+                  <input type="number" min={0} step={currency === 'EUR' ? 10 : 100}
+                    value={transportCostPerTruck}
+                    placeholder={currency === 'EUR' ? 'np. 600' : 'np. 2500'}
                     onChange={e => setTransportCostPerTruck(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value)))}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  {currency === 'EUR' && typeof transportCostPerTruck === 'number' && transportCostPerTruck > 0 && (
+                    <p className="text-xs text-gray-400 mt-1">≈ {formatPLN(transportCostPerTruck * exchangeRate)} PLN / auto</p>
+                  )}
                 </div>
               </div>
             )}
@@ -561,8 +567,15 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
             {transportCalc && transportCalc.costPerTruck > 0 && transportPaidBy !== 'fca' && (
               <div className="mt-2 pt-4 border-t border-gray-100 flex flex-wrap gap-4">
                 <div className={`rounded-lg px-5 py-3 text-right ${transportPaidBy === 'dap_extra' ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-200'}`}>
-                  <p className="text-xs text-gray-500 mb-0.5">{transportCalc.trucks} auto{transportCalc.trucks > 1 ? 'a' : ''} × {formatPLN(transportCalc.costPerTruck)} PLN</p>
-                  <p className="text-xl font-bold text-gray-800">{formatPLN(transportCalc.totalCost)} PLN</p>
+                  <p className="text-xs text-gray-500 mb-0.5">
+                    {transportCalc.trucks} auto{transportCalc.trucks > 1 ? 'a' : ''} × {currency === 'EUR' ? formatEUR(transportCalc.costPerTruck) : formatPLN(transportCalc.costPerTruck)} {currency}
+                  </p>
+                  <p className="text-xl font-bold text-gray-800">
+                    {currency === 'EUR' ? formatEUR(transportCalc.totalCost) : formatPLN(transportCalc.totalCost)} {currency}
+                  </p>
+                  {currency === 'EUR' && (
+                    <p className="text-xs text-gray-400">≈ {formatPLN(transportCalc.totalCost * exchangeRate)} PLN</p>
+                  )}
                   <p className={`text-xs font-medium mt-0.5 ${transportPaidBy === 'dap_extra' ? 'text-orange-600' : 'text-gray-500'}`}>
                     {transportPaidBy === 'dap_extra' ? '⚠ Refaktura na klienta' : 'Koszt po stronie Intra B.V.'}
                   </p>
@@ -570,21 +583,12 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
                 {transportPaidBy === 'dap_included' && (
                   <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
                     <p className="text-blue-200 text-xs mb-0.5">Łączny koszt dla klienta (dzierżawa + transport)</p>
-                    {currency === 'EUR' ? (
-                      <>
-                        <p className="text-2xl font-bold">{formatEUR(totalCostInclTransport)} EUR</p>
-                        <p className="text-blue-300 text-xs mt-0.5">
-                          dzierżawa {formatEUR(rentalCost)} EUR + transport {formatEUR(transportCalc.totalCost / exchangeRate)} EUR ({formatPLN(transportCalc.totalCost)} PLN)
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-2xl font-bold">{formatPLN(rentalCost + transportCalc.totalCost)} PLN</p>
-                        <p className="text-blue-300 text-xs mt-0.5">
-                          dzierżawa {formatPLN(rentalCost)} + transport {formatPLN(transportCalc.totalCost)} PLN
-                        </p>
-                      </>
-                    )}
+                    <p className="text-2xl font-bold">
+                      {currency === 'EUR' ? formatEUR(totalCostInclTransport) : formatPLN(totalCostInclTransport)} {currency}
+                    </p>
+                    <p className="text-blue-300 text-xs mt-0.5">
+                      dzierżawa {currency === 'EUR' ? formatEUR(rentalCost) : formatPLN(rentalCost)} + transport {currency === 'EUR' ? formatEUR(transportCalc.totalCost) : formatPLN(transportCalc.totalCost)} {currency}
+                    </p>
                   </div>
                 )}
                 {transportPaidBy === 'dap_extra' && (
@@ -593,7 +597,9 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
                     <p className="text-2xl font-bold">
                       {currency === 'EUR' ? `${formatEUR(rentalCost)} EUR` : `${formatPLN(rentalCost)} PLN`}
                     </p>
-                    <p className="text-orange-300 text-xs mt-0.5">+ {formatPLN(transportCalc.totalCost)} PLN transport (refaktura)</p>
+                    <p className="text-orange-300 text-xs mt-0.5">
+                      + {currency === 'EUR' ? `${formatEUR(transportCalc.totalCost)} EUR` : `${formatPLN(transportCalc.totalCost)} PLN`} transport (refaktura)
+                    </p>
                   </div>
                 )}
               </div>
