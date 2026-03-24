@@ -151,7 +151,7 @@ const pl: PdfStrings = {
   techCert:        '- certyfikat 3.1/EN10204.',
   techWeighing:    '- fakturowanie wg. wagi teoretycznej.',
   techCurrencyEUR: '- ceny podane w EUR netto.',
-  techCurrencyPLN: rate => `- oferta kalkulowana po kursie €/zł z dnia przesłania oferty.`,
+  techCurrencyPLN: _rate => `- oferta kalkulowana po kursie €/zł z dnia przesłania oferty.`,
 
   deliveryFromMill: (weeks, deliveryWeeks) =>
     `produkcja w planowanej kampanii w tyg. ${weeks}`
