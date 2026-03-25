@@ -79,7 +79,8 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
   const [transportCostPerTruck, setTransportCostPerTruck] = useState<number | ''>('');
   const [customTrucks, setCustomTrucks] = useState<number | ''>('');
   const [transportPaidBy, setTransportPaidBy] = useState<'dap_included' | 'dap_extra' | 'fca'>('dap_included');
-  const [transportFrom, setTransportFrom] = useState('Magazyn Intra B.V.');
+  const WAREHOUSE_PRESET = 'Cieśle 42, 56400, PL';
+  const [transportFrom, setTransportFrom] = useState(WAREHOUSE_PRESET);
   const [transportTo, setTransportTo] = useState('');
 
   // --- Zarządzanie pozycjami ---
@@ -550,8 +551,18 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   {transportPaidBy === 'fca' ? 'Odbiór z (magazyn)' : 'Załadunek (magazyn)'}
                 </label>
-                <input type="text" value={transportFrom} onChange={e => setTransportFrom(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <select
+                  value={transportFrom === WAREHOUSE_PRESET ? WAREHOUSE_PRESET : '__custom__'}
+                  onChange={e => setTransportFrom(e.target.value === '__custom__' ? '' : e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value={WAREHOUSE_PRESET}>Magazyn Intra B.V. (Cieśle 42, 56400, PL)</option>
+                  <option value="__custom__">Inny adres…</option>
+                </select>
+                {transportFrom !== WAREHOUSE_PRESET && (
+                  <input type="text" value={transportFrom} placeholder="Wpisz adres magazynu"
+                    onChange={e => setTransportFrom(e.target.value)}
+                    className="w-full mt-1.5 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                )}
               </div>
               {transportPaidBy !== 'fca' && (
                 <div>

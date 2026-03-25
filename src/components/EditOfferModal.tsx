@@ -34,6 +34,7 @@ interface Props {
 }
 
 const TRUCK_CAPACITY_T = 24.5;
+const WAREHOUSE_PRESET = 'Cieśle 42, 56400, PL';
 
 function itemsFromOffer(offer: Offer, profiles: Profile[]): CalcItem[] {
   if (offer.items && offer.items.length > 0) {
@@ -116,6 +117,14 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
     offer.price_per_week_1 ?? prices.price_per_week_1
   );
 
+  // Ceny szkód — inicjalizowane ze snapshotu oferty (nie z globalnych cen PLN!)
+  const [lossPrice,     setLossPrice]     = useState<number>(offer.loss_price_pln     ?? prices.loss_price_pln     ?? 3950);
+  const [sortingPrice,  setSortingPrice]  = useState<number>(offer.sorting_price_pln  ?? prices.sorting_price_pln  ?? 99);
+  const [grindingPrice, setGrindingPrice] = useState<number>(offer.grinding_price_pln ?? prices.grinding_price_pln ?? 250);
+  const [weldingPrice,  setWeldingPrice]  = useState<number>(offer.welding_price_pln  ?? prices.welding_price_pln  ?? 250);
+  const [cuttingPrice,  setCuttingPrice]  = useState<number>(offer.cutting_price_pln  ?? prices.cutting_price_pln  ?? 59);
+  const [repairPrice,   setRepairPrice]   = useState<number>(offer.repair_price_pln   ?? prices.repair_price_pln   ?? 250);
+
   // Przelicz wszystkie ceny przy zmianie waluty
   function handleCurrencyChange(newCur: 'EUR' | 'PLN') {
     if (newCur === currency) return;
@@ -123,6 +132,12 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
     const conv = (v: number) => Math.round(v * factor * 100) / 100;
     setCustomBasePricePln(prev => conv(prev));
     setCustomPricePerWeek1(prev => conv(prev));
+    setLossPrice(prev     => conv(prev));
+    setSortingPrice(prev  => conv(prev));
+    setGrindingPrice(prev => conv(prev));
+    setWeldingPrice(prev  => conv(prev));
+    setCuttingPrice(prev  => conv(prev));
+    setRepairPrice(prev   => conv(prev));
     // Przelicz transport (jest w bieżącej walucie po poprzednim przeliczeniu)
     if (typeof transportCostPerTruck === 'number' && transportCostPerTruck > 0) {
       setTransportCostPerTruck(Math.round(transportCostPerTruck * factor * 100) / 100);
@@ -247,12 +262,12 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
       price_per_week_1: effectivePrices.price_per_week_1,
       price_per_week_2: effectivePrices.price_per_week_2,
       threshold_weeks: effectivePrices.threshold_weeks,
-      loss_price_pln: effectivePrices.loss_price_pln,
-      sorting_price_pln: effectivePrices.sorting_price_pln,
-      grinding_price_pln: effectivePrices.grinding_price_pln,
-      welding_price_pln: effectivePrices.welding_price_pln,
-      cutting_price_pln: effectivePrices.cutting_price_pln,
-      repair_price_pln: effectivePrices.repair_price_pln,
+      loss_price_pln: lossPrice,
+      sorting_price_pln: sortingPrice,
+      grinding_price_pln: grindingPrice,
+      welding_price_pln: weldingPrice,
+      cutting_price_pln: cuttingPrice,
+      repair_price_pln: repairPrice,
       notes: notes.trim() || null,
       valid_days: validDays,
       payment_days: paymentDays,
@@ -526,6 +541,34 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
             )}
           </div>
 
+          {/* Cennik szkód */}
+          <details className="border border-gray-200 rounded-lg">
+            <summary className="px-4 py-3 text-sm font-semibold text-gray-700 cursor-pointer select-none list-none flex items-center justify-between hover:bg-gray-50 rounded-lg">
+              <span>Cennik szkód i napraw</span>
+              <span className="text-xs font-normal text-gray-400 ml-2">({currency} / jedn.) ▸ rozwiń</span>
+            </summary>
+            <div className="px-4 pb-4 pt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {([
+                { label: `Zagubienie / strata [${currency}/t]`,          val: lossPrice,     set: (v: number) => setLossPrice(v)     },
+                { label: `Sortowanie i czyszczenie [${currency}/t]`,     val: sortingPrice,  set: (v: number) => setSortingPrice(v)  },
+                { label: `Szlifowanie spawów [${currency}/mb]`,          val: grindingPrice, set: (v: number) => setGrindingPrice(v) },
+                { label: `Spawanie otworów pod kotwy [${currency}/szt]`, val: weldingPrice,  set: (v: number) => setWeldingPrice(v)  },
+                { label: `Głowica tnąca [${currency}/cięcie]`,           val: cuttingPrice,  set: (v: number) => setCuttingPrice(v)  },
+                { label: `Naprawa zamków [${currency}/mb]`,              val: repairPrice,   set: (v: number) => setRepairPrice(v)   },
+              ] as { label: string; val: number; set: (v: number) => void }[]).map(({ label, val, set }) => (
+                <div key={label}>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+                  <input
+                    type="number" min={0} step={0.01}
+                    value={val}
+                    onChange={e => set(Math.max(0, parseFloat(e.target.value) || 0))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              ))}
+            </div>
+          </details>
+
           {/* Klient */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Klient</label>
@@ -572,8 +615,18 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Załadunek</label>
-                <input type="text" value={transportFrom} onChange={e => setTransportFrom(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <select
+                  value={transportFrom === WAREHOUSE_PRESET ? WAREHOUSE_PRESET : '__custom__'}
+                  onChange={e => setTransportFrom(e.target.value === '__custom__' ? '' : e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value={WAREHOUSE_PRESET}>Magazyn Intra B.V.</option>
+                  <option value="__custom__">Inny adres…</option>
+                </select>
+                {transportFrom !== WAREHOUSE_PRESET && (
+                  <input type="text" value={transportFrom} placeholder="Wpisz adres magazynu"
+                    onChange={e => setTransportFrom(e.target.value)}
+                    className="w-full mt-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                )}
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Dostawa</label>

@@ -512,7 +512,6 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
           <View style={s.priceRow}>
             <Text>{t.costPerM2Label} {fmtRatio(offer.wall_area_m2 > 0 ? totalWithTransport / offer.wall_area_m2 : offer.cost_per_m2 ?? 0)} {currCode}/m²</Text>
             <Text>{t.costPerTonLabel} {fmtRatio(offer.mass_t > 0 ? totalWithTransport / offer.mass_t : offer.cost_per_ton ?? 0)} {currCode}/t</Text>
-            {isEUR && <Text>{t.exchangeRateLabel} {exRate.toFixed(4)}</Text>}
           </View>
         </View>
 
