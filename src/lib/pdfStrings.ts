@@ -210,7 +210,7 @@ const en: PdfStrings = {
 
   priceLabel:  'SALES PRICE',
   netSuffix:   'net',
-  pricePerTon: unit => `Unit price per tonne: {value} ${unit}`,
+  pricePerTon: unit => `Unit price per ton: {value} ${unit}`,
   pricePerM2:  unit => `Unit price per m²: {value} ${unit}`,
 
   sectionTransport:   'Transport:',
@@ -337,6 +337,7 @@ export interface RentalPdfStrings {
   // Rental conditions
   sectionRentalTerms: string;
   rentalTerm1:        string;
+  rentalTerm1Fca:     string;
   rentalTerm2:        string;
   rentalTerm3:        string;
   para1:              string;
@@ -441,6 +442,7 @@ const rental_pl: RentalPdfStrings = {
 
   sectionRentalTerms: 'Warunki dzierżawy:',
   rentalTerm1: '1) Oferowana cena jest ceną z transportami po stronie Intra: magazyn→budowa. Zwrot do magazynu Intra BV (Cieśle 42 k. Wrocławia) jest obowiązkiem i kosztem Klienta.',
+  rentalTerm1Fca: '1) Transport grodzic po stronie Klienta (FCA – odbiór własny). Zwrot do magazynu Intra BV (Cieśle 42 k. Wrocławia) jest obowiązkiem i kosztem Klienta.',
   rentalTerm2: '2) Na budowie grodzice muszą zostać rozładowane i załadowane na koszt Klienta.',
   rentalTerm3: '3) Podane ceny są cenami netto.',
 
@@ -518,11 +520,11 @@ const rental_en: RentalPdfStrings = {
   rentalCostLabel:   'Rental cost',
   netSuffix:         'net',
   costPerM2Label:    'Cost per m²:',
-  costPerTonLabel:   'Cost per tonne:',
+  costPerTonLabel:   'Cost per ton:',
   exchangeRateLabel: 'EUR/PLN rate:',
 
   weeklyRateTitle:  'EACH ADDITIONAL WEEK OF RENTAL',
-  weeklyRateSuffix: '/tonne net',
+  weeklyRateSuffix: '/ton net',
   weeklyRateNote:   'after the basic rental period',
 
   sectionTransport:    'Transport:',
@@ -540,17 +542,18 @@ const rental_en: RentalPdfStrings = {
 
   sectionRentalTerms: 'Rental terms:',
   rentalTerm1: '1) The quoted price includes delivery by Intra from warehouse to site. Return to Intra B.V. warehouse (Cieśle 42, near Wrocław) is the Customer\'s responsibility and cost.',
+  rentalTerm1Fca: '1) Transport of sheet piles is arranged by the Customer (FCA – ex works, customer\'s collection). Return to Intra B.V. warehouse (Cieśle 42, near Wrocław) is the Customer\'s responsibility and cost.',
   rentalTerm2: '2) At the construction site, sheet piles must be unloaded and loaded at the Customer\'s expense.',
   rentalTerm3: '3) All prices quoted are net prices.',
 
   para1: 'Please note that these are rented sheet piles and must be returned in all cases. Only materials supplied by Intra B.V. are eligible for return.',
-  para2: (val, unit) => `Delivery and return of sheet piles must comply with EN 10248-1/2. For material losses, including those caused by cutting of damaged sections, an additional charge of ${val},- ${unit}/tonne will apply.`,
+  para2: (val, unit) => `Delivery and return of sheet piles must comply with EN 10248-1/2. For material losses, including those caused by cutting of damaged sections, an additional charge of ${val},- ${unit}/ton will apply.`,
   para3: 'Sheet piles must be returned in a reusable condition – without the need for re-processing, cleaning or repairs. Sheet piles must not show damage, contamination, adhering soil or other defects beyond normal wear.',
   para4: 'Otherwise the following charges will apply:',
 
   sectionDamages: 'Schedule of charges:',
-  damage1: (val, unit) => `- Loss / total damage of sheet piles = +${val},- ${unit} / tonne;`,
-  damage2: (val, unit) => `- Sorting and cleaning of sheet piles = +${val},- ${unit} / tonne;`,
+  damage1: (val, unit) => `- Loss / total damage of sheet piles = +${val},- ${unit} / ton;`,
+  damage2: (val, unit) => `- Sorting and cleaning of sheet piles = +${val},- ${unit} / ton;`,
   damage3: (val, unit) => `- Grinding of welded-on sections = +${val},- ${unit}/lm;`,
   damage4: (val, unit) => `- Welding (sealing) of anchor holes = +${val},- ${unit} / pc.;`,
   damage5: (val, unit) => `- Cutting head – e.g. to remove damage = +${val},- ${unit} / cut;`,

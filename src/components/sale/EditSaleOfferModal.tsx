@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { Client, SaleOffer, SaleOfferItem, SaleProfile } from '../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
+import ClientSearchInput from '../ClientSearchInput';
 
 interface Warehouse { id: string; name: string; }
 interface SalePrice { warehouse_id: string; profile_name: string; steel_grade: string; price_eur_t: number | null; }
@@ -610,15 +611,7 @@ export default function EditSaleOfferModal({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Klient <span className="text-red-500">*</span>
             </label>
-            <select value={clientId} onChange={e => setClientId(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-              <option value="">— wybierz klienta —</option>
-              {clients.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.country === 'PL' ? c.nip : c.vat_number})
-                </option>
-              ))}
-            </select>
+            <ClientSearchInput clients={clients} value={clientId} onChange={setClientId} />
           </div>
 
           {/* ── Opiekun handlowy ── */}

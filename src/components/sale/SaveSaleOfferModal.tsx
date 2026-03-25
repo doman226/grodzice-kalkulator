@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase, fetchNipData } from '../../lib/supabase';
 import type { Client, SaleOffer, SaleOfferItem, OfferStatus } from '../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
+import ClientSearchInput from '../ClientSearchInput';
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
@@ -331,15 +332,7 @@ export default function SaveSaleOfferModal({
             </label>
             {!addingClient ? (
               <div className="flex gap-2">
-                <select value={clientId} onChange={e => setClientId(e.target.value)}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                  <option value="">— wybierz klienta —</option>
-                  {clients.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.country === 'PL' ? c.nip : c.vat_number})
-                    </option>
-                  ))}
-                </select>
+                <ClientSearchInput clients={clients} value={clientId} onChange={setClientId} required />
                 <button onClick={() => setAddingClient(true)}
                   className="px-3 py-2 text-sm text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 whitespace-nowrap">
                   + Nowy
