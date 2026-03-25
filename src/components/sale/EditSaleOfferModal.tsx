@@ -769,10 +769,26 @@ export default function EditSaleOfferModal({
                 {deliveryTimeline === 'magazyn' && (
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Szacowany czas dostawy</label>
-                    <select value={warehouseDeliveryTime} onChange={e => setWarehouseDeliveryTime(e.target.value)}
+                    <select
+                      value={WAREHOUSE_DELIVERY_OPTIONS.includes(warehouseDeliveryTime) ? warehouseDeliveryTime : '__custom__'}
+                      onChange={e => {
+                        if (e.target.value !== '__custom__') setWarehouseDeliveryTime(e.target.value);
+                        else setWarehouseDeliveryTime('');
+                      }}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                       {WAREHOUSE_DELIVERY_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                      <option value="__custom__">── Wpisz własny ──</option>
                     </select>
+                    {!WAREHOUSE_DELIVERY_OPTIONS.includes(warehouseDeliveryTime) && (
+                      <input
+                        type="text"
+                        value={warehouseDeliveryTime}
+                        onChange={e => setWarehouseDeliveryTime(e.target.value)}
+                        placeholder="np. 2–3 tygodnie, natychmiastowo..."
+                        autoFocus
+                        className="mt-2 w-full border border-blue-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    )}
                     <p className="text-xs text-gray-400 mt-1">
                       Na PDF: „z magazynu, {warehouseDeliveryTime}"
                     </p>
