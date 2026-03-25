@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { supabase } from '../lib/supabase';
 import type { Offer, OfferStatus, Profile, RentalPrices, Client } from '../types';
-import { formatPLN, formatEUR, formatNumber } from '../lib/calculations';
+import { formatPLN, formatEUR, formatRound, formatNumber } from '../lib/calculations';
 import OfferPDF from './OfferPDF';
 import type { PdfLang } from '../lib/pdfStrings';
 import EditOfferModal from './EditOfferModal';
@@ -280,7 +280,10 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
                                 (offer.transport_paid_by as string) === 'dap_extra' || (offer.transport_paid_by as string) === 'klient'
                                   ? 'text-orange-600' : ''
                               }>
-                                {formatPLN(offer.transport_cost_total ?? 0)} PLN
+                                {/* Transport zawsze w PLN w DB – dla EUR ofert przelicz przez kurs */}
+                                {(offer.currency ?? 'PLN') === 'EUR' && offer.exchange_rate
+                                  ? `${formatEUR((offer.transport_cost_total ?? 0) / offer.exchange_rate)} EUR`
+                                  : `${formatPLN(offer.transport_cost_total ?? 0)} PLN`}
                                 {' '}
                                 <span className="font-normal">(
                                   {(offer.transport_paid_by as string) === 'dap_included' || (offer.transport_paid_by as string) === 'intra' ? 'DAP – w cenie'
@@ -328,21 +331,38 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
                           </div>
                         )}
 
-                        {/* Wycena */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-                          <div className="bg-blue-900 rounded-lg px-3 py-2 text-white">
-                            <p className="text-blue-300 mb-0.5">Koszt wynajmu</p>
-                            <p className="font-bold text-base">{formatPLN(offer.rental_cost_pln)} PLN</p>
-                          </div>
-                          <div className="bg-white border border-blue-200 rounded-lg px-3 py-2">
-                            <p className="text-gray-400 mb-0.5">Koszt / m²</p>
-                            <p className="font-semibold text-gray-800">{formatPLN(offer.cost_per_m2)} PLN</p>
-                          </div>
-                          <div className="bg-white border border-blue-200 rounded-lg px-3 py-2">
-                            <p className="text-gray-400 mb-0.5">Koszt / t</p>
-                            <p className="font-semibold text-gray-800">{formatPLN(offer.cost_per_ton)} PLN</p>
-                          </div>
-                        </div>
+                        {/* Wycena – wyświetlaj w walucie oferty */}
+                        {(() => {
+                          const isEUR = (offer.currency ?? 'PLN') === 'EUR';
+                          const exRate = offer.exchange_rate ?? 4.25;
+                          const currCode = isEUR ? 'EUR' : 'PLN';
+                          // rental_cost_eur przechowuje wartość EUR; koszt PLN zawsze w rental_cost_pln
+                          const rentalMain = isEUR
+                            ? (offer.rental_cost_eur != null ? formatEUR(offer.rental_cost_eur) : formatEUR(offer.rental_cost_pln / exRate))
+                            : formatPLN(offer.rental_cost_pln);
+                          // cost_per_m2 i cost_per_ton zapisane w walucie oferty
+                          const perM2 = formatRound(offer.cost_per_m2 ?? 0);
+                          const perTon = formatRound(offer.cost_per_ton ?? 0);
+                          return (
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                              <div className="bg-blue-900 rounded-lg px-3 py-2 text-white">
+                                <p className="text-blue-300 mb-0.5">Koszt wynajmu</p>
+                                <p className="font-bold text-base">{rentalMain} {currCode}</p>
+                                {isEUR && (
+                                  <p className="text-blue-400 text-xs mt-0.5">≈ {formatPLN(offer.rental_cost_pln)} PLN</p>
+                                )}
+                              </div>
+                              <div className="bg-white border border-blue-200 rounded-lg px-3 py-2">
+                                <p className="text-gray-400 mb-0.5">Koszt / m²</p>
+                                <p className="font-semibold text-gray-800">{perM2} {currCode}</p>
+                              </div>
+                              <div className="bg-white border border-blue-200 rounded-lg px-3 py-2">
+                                <p className="text-gray-400 mb-0.5">Koszt / t</p>
+                                <p className="font-semibold text-gray-800">{perTon} {currCode}</p>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {offer.notes && (
                           <p className="text-xs text-gray-600 italic">Notatki: {offer.notes}</p>
