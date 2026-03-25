@@ -1,6 +1,8 @@
 import { Document, Page, View, Text, Image, StyleSheet, Font } from '@react-pdf/renderer';
 import type { Offer } from '../types';
 import { formatPLN, formatEUR, formatNumber } from '../lib/calculations';
+import { RENTAL_PDF_STRINGS } from '../lib/pdfStrings';
+import type { PdfLang } from '../lib/pdfStrings';
 
 const SALES_REPS: Record<string, string> = {
   'Szymon Sobczak': '579 376 107',
@@ -30,6 +32,7 @@ Font.registerHyphenationCallback(word => [word]);
 
 interface Props {
   offer: Offer;
+  lang?: PdfLang;
 }
 
 const C = {
@@ -330,14 +333,18 @@ function Row({ label, value, alt }: { label: string; value: string; alt: boolean
   );
 }
 
-export default function OfferPDF({ offer }: Props) {
-  const dateStr = new Intl.DateTimeFormat('pl-PL', { dateStyle: 'long' }).format(new Date(offer.created_at));
+export default function OfferPDF({ offer, lang = 'pl' }: Props) {
+  const t = RENTAL_PDF_STRINGS[lang];
+
+  const dateLocale = lang === 'en' ? 'en-GB' : 'pl-PL';
+  const dateStr = new Intl.DateTimeFormat(dateLocale, { dateStyle: 'long' }).format(new Date(offer.created_at));
 
   // Waluta oferty
   const isEUR  = (offer.currency ?? 'PLN') === 'EUR';
   const exRate = offer.exchange_rate ?? 4.25;
   const fmtVal = (pln: number) => isEUR ? formatEUR(pln / exRate) : formatPLN(pln);
-  const currSuffix = isEUR ? 'EUR netto' : 'PLN netto';
+  const currCode   = isEUR ? 'EUR' : 'PLN';
+  const currSuffix = `${currCode} ${t.netSuffix}`;
 
   // backward compat: 'intra' (stare) = dap_included
   const tPaidByRaw = offer.transport_paid_by as string | undefined;
@@ -349,26 +356,30 @@ export default function OfferPDF({ offer }: Props) {
       ? offer.rental_cost_pln + (tPaidBy === 'dap_included' ? (offer.transport_cost_total ?? 0) : 0)
       : offer.rental_cost_pln;
 
-  function formatMonths(n: number): string {
+  // Okres dzierżawy – lokalizowany
+  function formatPeriod(weeks: number): string {
+    const n = weeks / 4;
+    if (lang === 'en') {
+      return n === 1 ? '1 month' : n % 1 === 0 ? `${n} months` : `${weeks} weeks`;
+    }
     if (n === 1) return '1 miesiąc';
     if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) return `${n} miesiące`;
     return `${n} miesięcy`;
   }
   const rentalPeriodLabel = offer.display_unit === 'months'
-    ? formatMonths(offer.rental_weeks / 4)
-    : `${offer.rental_weeks} tygodni`;
+    ? formatPeriod(offer.rental_weeks)
+    : lang === 'en'
+      ? `${offer.rental_weeks} weeks`
+      : `${offer.rental_weeks} tygodni`;
+
+  // Jednostka waluty w cenniku szkód
+  const dmgUnit = isEUR ? 'EUR' : (lang === 'en' ? 'PLN' : 'zł');
 
   const headerUrl = `${window.location.origin}/header-logo.png`;
   const footerUrl = `${window.location.origin}/footer-logo.png`;
 
-  function formatValidDays(days: number): string {
-    if (days === 1) return '24 godziny';
-    if (days === 2 || days === 3 || days === 4) return `${days} dni`;
-    return `${days} dni`;
-  }
-
   return (
-    <Document title={`Oferta ${offer.offer_number}`} author="Intra B.V." language="pl">
+    <Document title={t.docTitle(offer.offer_number)} author="Intra B.V." language={t.docLanguage}>
       <Page size="A4" style={s.page}>
         {/* ── HEADER IMAGE ── */}
         <Image fixed style={s.headerImg} src={headerUrl} />
@@ -377,37 +388,37 @@ export default function OfferPDF({ offer }: Props) {
         <Image fixed style={s.footerImg} src={footerUrl} />
 
         {/* ── TYTUŁ ── */}
-        <Text style={s.title}>OFERTA WYNAJMU</Text>
+        <Text style={s.title}>{t.offerTitle}</Text>
 
         {/* ── META + KLIENT ── */}
         <View style={s.metaRow}>
           <View style={s.metaLeft}>
             <Text style={s.metaLine}>
-              <Text style={s.metaBold}>Data: </Text>
+              <Text style={s.metaBold}>{t.date} </Text>
               {dateStr}
             </Text>
             <Text style={s.metaLine}>
-              <Text style={s.metaBold}>Numer oferty: </Text>
+              <Text style={s.metaBold}>{t.offerNumber} </Text>
               {offer.offer_number}
             </Text>
             <Text style={s.metaLine}>
-              <Text style={s.metaBold}>Opiekun handlowy: </Text>
+              <Text style={s.metaBold}>{t.salesRep} </Text>
               {offer.prepared_by ?? 'Intra B.V.'}
             </Text>
             {offer.prepared_by && SALES_REPS[offer.prepared_by] && (
               <Text style={s.metaLine}>
-                <Text style={s.metaBold}>Telefon: </Text>
+                <Text style={s.metaBold}>{t.phone} </Text>
                 {SALES_REPS[offer.prepared_by]}
               </Text>
             )}
           </View>
           <View style={s.metaRight}>
-            <Text style={[s.metaBold, { fontSize: 9, marginBottom: 3, color: C.navy }]}>Dane klienta:</Text>
+            <Text style={[s.metaBold, { fontSize: 9, marginBottom: 3, color: C.navy }]}>{t.customerLabel}</Text>
             {offer.client ? (
               <>
                 <Text style={[s.metaLine, { fontFamily: 'Roboto', fontWeight: 700, textAlign: 'right' }]}>{offer.client.name}</Text>
                 <Text style={[s.metaLine, { textAlign: 'right', color: C.gray500 }]}>
-                  {offer.client.country === 'PL' ? `NIP: ${offer.client.nip}` : `VAT: ${offer.client.vat_number}`}
+                  {t.vatLabel(offer.client.country)} {offer.client.country === 'PL' ? offer.client.nip : offer.client.vat_number}
                   {' · '}{offer.client.country}
                 </Text>
                 {offer.client.address && (
@@ -429,28 +440,26 @@ export default function OfferPDF({ offer }: Props) {
         <View style={s.sep} />
 
         {/* ── POWITANIE ── */}
-        <Text style={s.greeting}>Dzień dobry,</Text>
-        <Text style={s.intro}>
-          W nawiązaniu do przesłanego zapytania oraz naszych Ogólnych Warunków Sprzedaży i Płatności oferujemy usługę dzierżawy grodzic stalowych:
-        </Text>
+        <Text style={s.greeting}>{t.greeting}</Text>
+        <Text style={s.intro}>{t.intro}</Text>
 
         {/* ── TABELA POZYCJI ── */}
         {offer.items && offer.items.length > 0 ? (
           // Wielopozycyjna tabela (nowe oferty)
           <View style={s.table}>
             <View style={s.tableHeaderRow}>
-              <Text style={[s.thCell, { flex: 3 }]}>Profil</Text>
-              <Text style={[s.thCell, { flex: 2 }]}>Gatunek stali</Text>
-              <Text style={[s.thCell, { flex: 1.5, textAlign: 'center' }]}>Ilość</Text>
-              <Text style={[s.thCell, { flex: 1.5, textAlign: 'right' }]}>Dług. [m]</Text>
-              <Text style={[s.thCell, { flex: 1.5, textAlign: 'right' }]}>kg/m</Text>
-              <Text style={[s.thCell, { flex: 1.5, textAlign: 'right' }]}>Masa [t]</Text>
+              <Text style={[s.thCell, { flex: 3 }]}>{t.thProfile}</Text>
+              <Text style={[s.thCell, { flex: 2 }]}>{t.thSteelGrade}</Text>
+              <Text style={[s.thCell, { flex: 1.5, textAlign: 'center' }]}>{t.thQty}</Text>
+              <Text style={[s.thCell, { flex: 1.5, textAlign: 'right' }]}>{t.thLength}</Text>
+              <Text style={[s.thCell, { flex: 1.5, textAlign: 'right' }]}>{t.thKgPerM}</Text>
+              <Text style={[s.thCell, { flex: 1.5, textAlign: 'right' }]}>{t.thMass}</Text>
             </View>
             {[...offer.items].sort((a, b) => a.sort_order - b.sort_order).map((item, idx) => (
               <View key={item.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
                 <Text style={[s.tdLabel, { flex: 3, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{item.profile_name} ({item.profile_type})</Text>
                 <Text style={[s.tdLabel, { flex: 2, color: C.gray700 }]}>{item.steel_grade ?? '—'}</Text>
-                <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'center' }]}>{item.quantity} szt.</Text>
+                <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'center' }]}>{item.quantity} {t.unitPcs}</Text>
                 <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'right' }]}>{item.length_m != null ? `${item.length_m} m` : '–'}</Text>
                 <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'right' }]}>{formatNumber(item.total_length_m > 0 ? item.mass_t * 1000 / item.total_length_m : 0, 1)}</Text>
                 <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{formatNumber(item.mass_t, 3)} t</Text>
@@ -458,7 +467,7 @@ export default function OfferPDF({ offer }: Props) {
             ))}
             {/* Podsumowanie */}
             <View style={[s.tableBodyRow, { backgroundColor: C.gray100 }]}>
-              <Text style={[s.tdLabel, { flex: 3, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>Łącznie</Text>
+              <Text style={[s.tdLabel, { flex: 3, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{t.totalRow}</Text>
               <Text style={[s.tdLabel, { flex: 1.5 }]}></Text>
               <Text style={[s.tdLabel, { flex: 1.5 }]}></Text>
               <Text style={[s.tdLabel, { flex: 1.5 }]}></Text>
@@ -466,7 +475,7 @@ export default function OfferPDF({ offer }: Props) {
             </View>
             {/* Okres */}
             <View style={[s.tableBodyRow, { borderBottom: 0 }]}>
-              <Text style={[s.tdLabel, { flex: 3, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>Podstawowy okres dzierżawy</Text>
+              <Text style={[s.tdLabel, { flex: 3, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{t.rentalPeriodRow}</Text>
               <Text style={[s.tdLabel, { flex: 1.5, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{rentalPeriodLabel}</Text>
               <Text style={[s.tdLabel, { flex: 1.5 }]}></Text>
               <Text style={[s.tdLabel, { flex: 1.5 }]}></Text>
@@ -477,43 +486,43 @@ export default function OfferPDF({ offer }: Props) {
           // Fallback – stare oferty (jeden profil)
           <View style={s.table}>
             <View style={s.tableHeaderRow}>
-              <Text style={[s.thCell, { flex: 1 }]}>Parametr</Text>
-              <Text style={[s.thCell, { width: '45%' }]}>Wartość</Text>
+              <Text style={[s.thCell, { flex: 1 }]}>{t.thParam}</Text>
+              <Text style={[s.thCell, { width: '45%' }]}>{t.thValue}</Text>
             </View>
-            <Row label="Profil grodzicy" value={`${offer.profile_name} (${offer.profile_type})`} alt={false} />
-            <Row label="Ilość" value={`${offer.quantity} szt.`} alt={true} />
-            <Row label="Długość jednej grodzicy" value={offer.length_m != null ? `${offer.length_m} m` : '–'} alt={false} />
-            <Row label="Łączna długość" value={`${formatNumber(offer.total_length_m, 1)} m`} alt={true} />
-            <Row label="Masa całkowita" value={`${formatNumber(offer.mass_t, 3)} t`} alt={false} />
-            <Row label="Powierzchnia ścianki" value={`${formatNumber(offer.wall_area_m2, 2)} m²`} alt={true} />
-            <Row label="Podstawowy okres dzierżawy" value={rentalPeriodLabel} alt={false} />
+            <Row label={t.legacyProfile} value={`${offer.profile_name} (${offer.profile_type})`} alt={false} />
+            <Row label={t.legacyQty} value={`${offer.quantity} ${t.unitPcs}`} alt={true} />
+            <Row label={t.legacyLengthOne} value={offer.length_m != null ? `${offer.length_m} m` : '–'} alt={false} />
+            <Row label={t.legacyTotalLength} value={`${formatNumber(offer.total_length_m, 1)} m`} alt={true} />
+            <Row label={t.legacyTotalMass} value={`${formatNumber(offer.mass_t, 3)} t`} alt={false} />
+            <Row label={t.legacyWallArea} value={`${formatNumber(offer.wall_area_m2, 2)} m²`} alt={true} />
+            <Row label={t.legacyPeriod} value={rentalPeriodLabel} alt={false} />
           </View>
         )}
 
         {/* ── CENA DZIERŻAWY ── */}
         <View style={s.priceBox}>
-          <Text style={s.priceLabel}>Koszt dzierżawy</Text>
+          <Text style={s.priceLabel}>{t.rentalCostLabel}</Text>
           <Text style={s.priceValue}>
             {fmtVal(totalWithTransport)}
             <Text style={s.priceSuffix}> {currSuffix}</Text>
           </Text>
           <View style={s.priceRow}>
-            <Text>Koszt za m²: {fmtVal(offer.wall_area_m2 > 0 ? totalWithTransport / offer.wall_area_m2 : offer.cost_per_m2 ?? 0)} {isEUR ? 'EUR' : 'PLN'}/m²</Text>
-            <Text>Koszt za tonę: {fmtVal(offer.mass_t > 0 ? totalWithTransport / offer.mass_t : offer.cost_per_ton ?? 0)} {isEUR ? 'EUR' : 'PLN'}/t</Text>
-            {isEUR && <Text>Kurs EUR/PLN: {exRate.toFixed(4)}</Text>}
+            <Text>{t.costPerM2Label} {fmtVal(offer.wall_area_m2 > 0 ? totalWithTransport / offer.wall_area_m2 : offer.cost_per_m2 ?? 0)} {currCode}/m²</Text>
+            <Text>{t.costPerTonLabel} {fmtVal(offer.mass_t > 0 ? totalWithTransport / offer.mass_t : offer.cost_per_ton ?? 0)} {currCode}/t</Text>
+            {isEUR && <Text>{t.exchangeRateLabel} {exRate.toFixed(4)}</Text>}
           </View>
         </View>
 
         {/* ── STAWKA ZA KOLEJNY TYDZIEŃ ── */}
         {offer.price_per_week_1 != null && (
           <View style={[s.priceBox, { marginTop: 10 }]}>
-            <Text style={s.priceLabel}>KAŻDY KOLEJNY TYDZIEŃ DZIERŻAWY</Text>
+            <Text style={s.priceLabel}>{t.weeklyRateTitle}</Text>
             <Text style={s.priceValue}>
               {isEUR ? formatEUR(offer.price_per_week_1) : formatPLN(offer.price_per_week_1)}
-              <Text style={s.priceSuffix}> {isEUR ? 'EUR' : 'PLN'}/tona netto</Text>
+              <Text style={s.priceSuffix}> {currCode}{t.weeklyRateSuffix}</Text>
             </Text>
             <View style={s.priceRow}>
-              <Text>po upływie podstawowego okresu dzierżawy</Text>
+              <Text>{t.weeklyRateNote}</Text>
             </View>
           </View>
         )}
@@ -521,18 +530,17 @@ export default function OfferPDF({ offer }: Props) {
         {/* ── TRANSPORT ── */}
         {(offer.transport_cost_per_truck != null || tPaidBy === 'fca') && (
           <>
-            <Text style={s.sectionTitle}>Transport:</Text>
+            <Text style={s.sectionTitle}>{t.sectionTransport}</Text>
             <View style={s.transportBox}>
               {tPaidBy === 'dap_included' && (
-                // DAP w cenie – brak kwot dla klienta
                 <>
                   <View style={s.transportRow}>
-                    <Text style={s.transportLabel}>Dostawa:</Text>
-                    <Text style={[s.transportValue, { color: C.navy }]}>DAP – w cenie / Intra B.V.</Text>
+                    <Text style={s.transportLabel}>{t.labelDelivery}</Text>
+                    <Text style={[s.transportValue, { color: C.navy }]}>{t.valueDapIncluded}</Text>
                   </View>
                   {offer.transport_from && (
                     <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}`, alignItems: 'flex-end' }]}>
-                      <Text style={s.transportLabel}>Trasa:</Text>
+                      <Text style={s.transportLabel}>{t.labelRoute}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
                       <Text style={s.transportValue}>{offer.transport_from}{offer.transport_to ? ` — ${offer.transport_to}` : ''}</Text>
                     </View>
@@ -540,55 +548,53 @@ export default function OfferPDF({ offer }: Props) {
                 </>
               )}
               {tPaidBy === 'dap_extra' && (
-                // DAP refaktura – Intra organizuje, klient płaci osobno
                 <>
                   <View style={s.transportRow}>
-                    <Text style={s.transportLabel}>Dostawa:</Text>
-                    <Text style={[s.transportValue, { color: C.navy }]}>DAP / Intra B.V.</Text>
+                    <Text style={s.transportLabel}>{t.labelDelivery}</Text>
+                    <Text style={[s.transportValue, { color: C.navy }]}>{t.valueDapExtra}</Text>
                   </View>
                   {offer.transport_from && (
                     <View style={[s.transportRow, { alignItems: 'flex-end' }]}>
-                      <Text style={s.transportLabel}>Trasa:</Text>
+                      <Text style={s.transportLabel}>{t.labelRoute}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
                       <Text style={s.transportValue}>{offer.transport_from}{offer.transport_to ? ` — ${offer.transport_to}` : ''}</Text>
                     </View>
                   )}
                   {offer.transport_trucks != null && (
                     <View style={s.transportRow}>
-                      <Text style={s.transportLabel}>Liczba aut:</Text>
+                      <Text style={s.transportLabel}>{t.labelTrucks}</Text>
                       <Text style={s.transportValue}>{offer.transport_trucks}</Text>
                     </View>
                   )}
                   {offer.transport_cost_per_truck != null && offer.transport_cost_per_truck > 0 && (
                     <View style={s.transportRow}>
-                      <Text style={s.transportLabel}>Koszt / auto:</Text>
-                      <Text style={s.transportValue}>{isEUR ? formatEUR(offer.transport_cost_per_truck / exRate) : formatPLN(offer.transport_cost_per_truck)} {isEUR ? 'EUR' : 'PLN'} netto</Text>
+                      <Text style={s.transportLabel}>{t.labelCostPerTruck}</Text>
+                      <Text style={s.transportValue}>{isEUR ? formatEUR(offer.transport_cost_per_truck / exRate) : formatPLN(offer.transport_cost_per_truck)} {currCode} {t.netSuffix}</Text>
                     </View>
                   )}
                   {offer.transport_cost_total != null && offer.transport_cost_total > 0 && (
                     <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}` }]}>
-                      <Text style={s.transportLabel}>Łączny koszt transportu:</Text>
+                      <Text style={s.transportLabel}>{t.labelTotalTransport}</Text>
                       <Text style={[s.transportValue, { color: C.orange }]}>
-                        {isEUR ? formatEUR(offer.transport_cost_total / exRate) : formatPLN(offer.transport_cost_total)} {isEUR ? 'EUR' : 'PLN'} netto
+                        {isEUR ? formatEUR(offer.transport_cost_total / exRate) : formatPLN(offer.transport_cost_total)} {currCode} {t.netSuffix}
                       </Text>
                     </View>
                   )}
                   <View style={s.transportRow}>
-                    <Text style={s.transportLabel}>Rozliczenie:</Text>
-                    <Text style={[s.transportValue, { color: C.orange }]}>Refaktura kosztów transportu na klienta</Text>
+                    <Text style={s.transportLabel}>{t.labelSettlement}</Text>
+                    <Text style={[s.transportValue, { color: C.orange }]}>{t.valueRecharge}</Text>
                   </View>
                 </>
               )}
               {tPaidBy === 'fca' && (
-                // FCA – klient organizuje odbiór własny
                 <>
                   <View style={s.transportRow}>
-                    <Text style={s.transportLabel}>Dostawa:</Text>
-                    <Text style={[s.transportValue, { color: C.navy }]}>FCA – odbiór własny</Text>
+                    <Text style={s.transportLabel}>{t.labelDelivery}</Text>
+                    <Text style={[s.transportValue, { color: C.navy }]}>{t.valueFca}</Text>
                   </View>
                   {offer.transport_from && (
                     <View style={[s.transportRow, { alignItems: 'flex-end' }]}>
-                      <Text style={s.transportLabel}>Odbiór z:</Text>
+                      <Text style={s.transportLabel}>{t.labelPickupFrom}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
                       <Text style={s.transportValue}>{offer.transport_from}</Text>
                     </View>
@@ -600,79 +606,71 @@ export default function OfferPDF({ offer }: Props) {
         )}
 
         {/* ── WARUNKI DZIERŻAWY ── */}
-        <Text style={s.sectionTitle} break={offer.transport_cost_per_truck != null}>Warunki dzierżawy:</Text>
+        <Text style={s.sectionTitle} break={offer.transport_cost_per_truck != null}>{t.sectionRentalTerms}</Text>
         <View style={s.conditionsBox}>
-          <Text style={s.conditionItem}>1) Oferowana cena jest ceną z transportami po stronie Intra: magazyn→budowa. Zwrot do magazynu Intra BV (Cieśle 42 k. Wrocławia) jest obowiązkiem i kosztem Klienta.</Text>
-          <Text style={s.conditionItem}>2) Na budowie grodzice muszą zostać rozładowane i załadowane na koszt Klienta.</Text>
-          <Text style={[s.conditionItem, { marginBottom: 0 }]}>3) Podane ceny są cenami netto.</Text>
+          <Text style={s.conditionItem}>{t.rentalTerm1}</Text>
+          <Text style={s.conditionItem}>{t.rentalTerm2}</Text>
+          <Text style={[s.conditionItem, { marginBottom: 0 }]}>{t.rentalTerm3}</Text>
         </View>
 
-        <Text style={s.paragraph}>
-          Pragniemy zaznaczyć, że są to grodzice wypożyczone i w każdym przypadku należy je zwrócić. Zwracamy uwagę, że zwrotowi mogą podlegać wyłącznie materiały dostarczone przez Intra.
-        </Text>
-        <Text style={s.paragraph}>
-          Dostawa i zwrot grodzic muszą nastąpić wg. EN10248-1/2. Za straty materialne, także spowodowane cięciami uszkodzonych części grodzic, obciążymy Państwa dodatkową kwotą w wysokości {offer.loss_price_pln ?? 3950},- {isEUR ? 'EUR' : 'zł'}/tona grodzic.
-        </Text>
-        <Text style={s.paragraph}>
-          Grodzice po zwrocie muszą nadawać się do ponownego użycia – bez konieczności ponownej obróbki, czyszczenia oraz napraw. Grodzice nie mogą posiadać uszkodzeń, zabrudzeń, przylegającej ziemi i innych niedoskonałości ponad normatywne zużycie.
-        </Text>
-        <Text style={s.paragraph}>W przeciwnym razie obciążymy Państwa następującymi kosztami:</Text>
+        <Text style={s.paragraph}>{t.para1}</Text>
+        <Text style={s.paragraph}>{t.para2(offer.loss_price_pln ?? 3950, dmgUnit)}</Text>
+        <Text style={s.paragraph}>{t.para3}</Text>
+        <Text style={s.paragraph}>{t.para4}</Text>
 
         {/* ── CENNIK SZKÓD ── */}
-        <Text style={s.sectionTitle}>Cennik:</Text>
+        <Text style={s.sectionTitle}>{t.sectionDamages}</Text>
         <View style={s.cennikBox}>
-          <Text style={s.cennikItem}>- Zagubienie / całkowita strata uszkodzonych grodzic = +{offer.loss_price_pln ?? 3950},- {isEUR ? 'EUR' : 'zł'} / tona;</Text>
-          <Text style={s.cennikItem}>- Sortowanie oraz czyszczenie grodzic = +{offer.sorting_price_pln ?? 99},- {isEUR ? 'EUR' : 'zł'} / tona;</Text>
-          <Text style={s.cennikItem}>- Szlifowanie pozostałości przyspawanych kształtowników = +{offer.grinding_price_pln ?? 250},- {isEUR ? 'EUR' : 'zł'}/mb;</Text>
-          <Text style={s.cennikItem}>- Spawanie (zamykanie) otworów pod kotwy = +{offer.welding_price_pln ?? 250},- {isEUR ? 'EUR' : 'zł'} / szt.;</Text>
-          <Text style={s.cennikItem}>- Głowica tnąca - w celu np. ucięcia uszkodzenia = +{offer.cutting_price_pln ?? 59},- {isEUR ? 'EUR' : 'zł'} / za cięcie;</Text>
-          <Text style={[s.cennikItem, { marginBottom: 0 }]}>- Naprawa / prostowanie zamków = +{offer.repair_price_pln ?? 250},- {isEUR ? 'EUR' : 'zł'} / mb;</Text>
+          <Text style={s.cennikItem}>{t.damage1(offer.loss_price_pln ?? 3950, dmgUnit)}</Text>
+          <Text style={s.cennikItem}>{t.damage2(offer.sorting_price_pln ?? 99, dmgUnit)}</Text>
+          <Text style={s.cennikItem}>{t.damage3(offer.grinding_price_pln ?? 250, dmgUnit)}</Text>
+          <Text style={s.cennikItem}>{t.damage4(offer.welding_price_pln ?? 250, dmgUnit)}</Text>
+          <Text style={s.cennikItem}>{t.damage5(offer.cutting_price_pln ?? 59, dmgUnit)}</Text>
+          <Text style={[s.cennikItem, { marginBottom: 0 }]}>{t.damage6(offer.repair_price_pln ?? 250, dmgUnit)}</Text>
         </View>
 
         {/* ── TERMIN DOSTAWY ── */}
-        <Text style={s.sectionTitle}>Termin dostawy:</Text>
+        <Text style={s.sectionTitle}>{t.sectionDelivery}</Text>
         <View style={s.conditionsBox}>
           <Text style={[s.conditionItem, { marginBottom: 0 }]}>
-            {offer.delivery_info ? `- ${offer.delivery_info}` : '- ............'}
+            {offer.delivery_info ? `- ${offer.delivery_info}` : t.deliveryPlaceholder}
           </Text>
         </View>
 
         {/* ── WARUNKI TECHNICZNE ── */}
-        <Text style={s.sectionTitle}>Warunki techniczne:</Text>
+        <Text style={s.sectionTitle}>{t.sectionTechnical}</Text>
         <View style={s.conditionsBox}>
-          <Text style={s.conditionItem}>- dostawa wg. EN10248-1/2.</Text>
-          <Text style={s.conditionItem}>- gatunek stali zgodny z ofertą.</Text>
-          <Text style={s.conditionItem}>- tolerancja długości +-200mm.</Text>
-          <Text style={[s.conditionItem, { marginBottom: 0 }]}>- fakturowanie wg. wagi teoretycznej.</Text>
+          <Text style={s.conditionItem}>{t.techStandard}</Text>
+          <Text style={s.conditionItem}>{t.techGrade}</Text>
+          <Text style={s.conditionItem}>{t.techTolerance}</Text>
+          <Text style={[s.conditionItem, { marginBottom: 0 }]}>{t.techWeighing}</Text>
         </View>
 
         {/* ── WARUNKI PŁATNOŚCI ── */}
-        <Text style={s.sectionTitle}>Warunki płatności:</Text>
+        <Text style={s.sectionTitle}>{t.sectionPayment}</Text>
         <View style={s.conditionsBox}>
           <Text style={[s.conditionItem, { marginBottom: 0 }]}>
             {offer.payment_days === 0
-              ? '- Przedpłata – płatność wymagana przed realizacją zlecenia.'
-              : `- ${offer.payment_days ?? 30} dni od daty wystawienia faktury, z zastrzeżeniem uzyskania zabezpieczenia wartości zamówienia (Limit kupiecki, gwarancja bankowa, gwarancja płatności publicznego inwestora lub inne zabezpieczenie zaakceptowane przez Intra BV).`
+              ? t.paymentPrepaid
+              : t.paymentCredit(offer.payment_days ?? 30)
             }
           </Text>
         </View>
 
         {/* ── WAŻNOŚĆ OFERTY ── */}
-        <Text style={s.sectionTitle}>Ważność oferty:</Text>
+        <Text style={s.sectionTitle}>{t.sectionValidity}</Text>
         <View style={s.conditionsBox}>
           <Text style={[s.conditionItem, { marginBottom: 0 }]}>
-            - {formatValidDays(offer.valid_days)} od daty przesłania oferty.
+            {t.validityLine(t.validityLabel(offer.valid_days))}
           </Text>
         </View>
 
-        <Text style={[s.paragraph, { color: C.gray500 }]}>
-          Oferta nie rezerwuje dostępności z magazynu oraz możliwości produkcyjnych i wymaga finalnego potwierdzenia.
-        </Text>
+        <Text style={[s.paragraph, { color: C.gray500 }]}>{t.validityDisclaimer}</Text>
 
         {/* ── NOTATKI (opcjonalne) ── */}
         {offer.notes && (
           <View style={s.notesBox}>
-            <Text style={s.notesLabel}>Uwagi</Text>
+            <Text style={s.notesLabel}>{t.notesLabel}</Text>
             <Text style={s.notesText}>{offer.notes}</Text>
           </View>
         )}

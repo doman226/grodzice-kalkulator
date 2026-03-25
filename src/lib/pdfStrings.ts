@@ -261,6 +261,325 @@ const en: PdfStrings = {
   notesLabel: 'Notes',
 };
 
-// ─── Export ───────────────────────────────────────────────────────────────────
+// ─── Export (Sales) ───────────────────────────────────────────────────────────
 
 export const PDF_STRINGS: Record<PdfLang, PdfStrings> = { pl, en };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// RENTAL PDF STRINGS
+// ══════════════════════════════════════════════════════════════════════════════
+
+export interface RentalPdfStrings {
+  docTitle:      (offerNo: string) => string;
+  docLanguage:   string;
+  offerTitle:    string;
+
+  // Meta
+  date:          string;
+  offerNumber:   string;
+  salesRep:      string;
+  phone:         string;
+  customerLabel: string;
+  vatLabel:      (country: string) => string;
+
+  // Greeting & intro
+  greeting: string;
+  intro:    string;
+
+  // Table headers (multi-item)
+  thProfile:    string;
+  thSteelGrade: string;
+  thQty:        string;
+  thLength:     string;
+  thKgPerM:     string;
+  thMass:       string;
+  totalRow:     string;
+  unitPcs:      string;
+  rentalPeriodRow: string;
+
+  // Fallback single-item table
+  thParam:           string;
+  thValue:           string;
+  legacyProfile:     string;
+  legacyQty:         string;
+  legacyLengthOne:   string;
+  legacyTotalLength: string;
+  legacyTotalMass:   string;
+  legacyWallArea:    string;
+  legacyPeriod:      string;
+
+  // Price box
+  rentalCostLabel:   string;
+  netSuffix:         string;
+  costPerM2Label:    string;
+  costPerTonLabel:   string;
+  exchangeRateLabel: string;
+
+  // Weekly rate box
+  weeklyRateTitle:  string;
+  weeklyRateSuffix: string;
+  weeklyRateNote:   string;
+
+  // Transport
+  sectionTransport:    string;
+  labelDelivery:       string;
+  labelRoute:          string;
+  labelTrucks:         string;
+  labelCostPerTruck:   string;
+  labelTotalTransport: string;
+  labelSettlement:     string;
+  labelPickupFrom:     string;
+  valueDapIncluded:    string;
+  valueDapExtra:       string;
+  valueFca:            string;
+  valueRecharge:       string;
+
+  // Rental conditions
+  sectionRentalTerms: string;
+  rentalTerm1:        string;
+  rentalTerm2:        string;
+  rentalTerm3:        string;
+  para1:              string;
+  para2:              (val: number | string, unit: string) => string;
+  para3:              string;
+  para4:              string;
+
+  // Damage schedule
+  sectionDamages: string;
+  damage1: (val: number | string, unit: string) => string;
+  damage2: (val: number | string, unit: string) => string;
+  damage3: (val: number | string, unit: string) => string;
+  damage4: (val: number | string, unit: string) => string;
+  damage5: (val: number | string, unit: string) => string;
+  damage6: (val: number | string, unit: string) => string;
+
+  // Delivery time
+  sectionDelivery:     string;
+  deliveryPlaceholder: string;
+
+  // Technical
+  sectionTechnical: string;
+  techStandard:     string;
+  techGrade:        string;
+  techTolerance:    string;
+  techWeighing:     string;
+
+  // Payment
+  sectionPayment:  string;
+  paymentPrepaid:  string;
+  paymentCredit:   (days: number) => string;
+
+  // Validity
+  sectionValidity:    string;
+  validityLine:       (label: string) => string;
+  validityLabel:      (days: number) => string;
+  validityDisclaimer: string;
+
+  // Notes
+  notesLabel: string;
+}
+
+// ─── RENTAL POLISH ────────────────────────────────────────────────────────────
+
+const rental_pl: RentalPdfStrings = {
+  docTitle:      offerNo => `Oferta ${offerNo}`,
+  docLanguage:   'pl',
+  offerTitle:    'OFERTA WYNAJMU',
+
+  date:          'Data:',
+  offerNumber:   'Numer oferty:',
+  salesRep:      'Opiekun handlowy:',
+  phone:         'Telefon:',
+  customerLabel: 'Dane klienta:',
+  vatLabel:      country => country === 'PL' ? 'NIP:' : 'VAT:',
+
+  greeting: 'Dzień dobry,',
+  intro:    'W nawiązaniu do przesłanego zapytania oraz naszych Ogólnych Warunków Sprzedaży i Płatności oferujemy usługę dzierżawy grodzic stalowych:',
+
+  thProfile:       'Profil',
+  thSteelGrade:    'Gatunek stali',
+  thQty:           'Ilość',
+  thLength:        'Dług. [m]',
+  thKgPerM:        'kg/m',
+  thMass:          'Masa [t]',
+  totalRow:        'Łącznie',
+  unitPcs:         'szt.',
+  rentalPeriodRow: 'Podstawowy okres dzierżawy',
+
+  thParam:           'Parametr',
+  thValue:           'Wartość',
+  legacyProfile:     'Profil grodzicy',
+  legacyQty:         'Ilość',
+  legacyLengthOne:   'Długość jednej grodzicy',
+  legacyTotalLength: 'Łączna długość',
+  legacyTotalMass:   'Masa całkowita',
+  legacyWallArea:    'Powierzchnia ścianki',
+  legacyPeriod:      'Podstawowy okres dzierżawy',
+
+  rentalCostLabel:   'Koszt dzierżawy',
+  netSuffix:         'netto',
+  costPerM2Label:    'Koszt za m²:',
+  costPerTonLabel:   'Koszt za tonę:',
+  exchangeRateLabel: 'Kurs EUR/PLN:',
+
+  weeklyRateTitle:  'KAŻDY KOLEJNY TYDZIEŃ DZIERŻAWY',
+  weeklyRateSuffix: '/tona netto',
+  weeklyRateNote:   'po upływie podstawowego okresu dzierżawy',
+
+  sectionTransport:    'Transport:',
+  labelDelivery:       'Dostawa:',
+  labelRoute:          'Trasa:',
+  labelTrucks:         'Liczba aut:',
+  labelCostPerTruck:   'Koszt / auto:',
+  labelTotalTransport: 'Łączny koszt transportu:',
+  labelSettlement:     'Rozliczenie:',
+  labelPickupFrom:     'Odbiór z:',
+  valueDapIncluded:    'DAP – w cenie / Intra B.V.',
+  valueDapExtra:       'DAP / Intra B.V.',
+  valueFca:            'FCA – odbiór własny',
+  valueRecharge:       'Refaktura kosztów transportu na klienta',
+
+  sectionRentalTerms: 'Warunki dzierżawy:',
+  rentalTerm1: '1) Oferowana cena jest ceną z transportami po stronie Intra: magazyn→budowa. Zwrot do magazynu Intra BV (Cieśle 42 k. Wrocławia) jest obowiązkiem i kosztem Klienta.',
+  rentalTerm2: '2) Na budowie grodzice muszą zostać rozładowane i załadowane na koszt Klienta.',
+  rentalTerm3: '3) Podane ceny są cenami netto.',
+
+  para1: 'Pragniemy zaznaczyć, że są to grodzice wypożyczone i w każdym przypadku należy je zwrócić. Zwracamy uwagę, że zwrotowi mogą podlegać wyłącznie materiały dostarczone przez Intra.',
+  para2: (val, unit) => `Dostawa i zwrot grodzic muszą nastąpić wg. EN10248-1/2. Za straty materialne, także spowodowane cięciami uszkodzonych części grodzic, obciążymy Państwa dodatkową kwotą w wysokości ${val},- ${unit}/tona grodzic.`,
+  para3: 'Grodzice po zwrocie muszą nadawać się do ponownego użycia – bez konieczności ponownej obróbki, czyszczenia oraz napraw. Grodzice nie mogą posiadać uszkodzeń, zabrudzeń, przylegającej ziemi i innych niedoskonałości ponad normatywne zużycie.',
+  para4: 'W przeciwnym razie obciążymy Państwa następującymi kosztami:',
+
+  sectionDamages: 'Cennik:',
+  damage1: (val, unit) => `- Zagubienie / całkowita strata uszkodzonych grodzic = +${val},- ${unit} / tona;`,
+  damage2: (val, unit) => `- Sortowanie oraz czyszczenie grodzic = +${val},- ${unit} / tona;`,
+  damage3: (val, unit) => `- Szlifowanie pozostałości przyspawanych kształtowników = +${val},- ${unit}/mb;`,
+  damage4: (val, unit) => `- Spawanie (zamykanie) otworów pod kotwy = +${val},- ${unit} / szt.;`,
+  damage5: (val, unit) => `- Głowica tnąca - w celu np. ucięcia uszkodzenia = +${val},- ${unit} / za cięcie;`,
+  damage6: (val, unit) => `- Naprawa / prostowanie zamków = +${val},- ${unit} / mb;`,
+
+  sectionDelivery:     'Termin dostawy:',
+  deliveryPlaceholder: '- ............',
+
+  sectionTechnical: 'Warunki techniczne:',
+  techStandard:     '- dostawa wg. EN10248-1/2.',
+  techGrade:        '- gatunek stali zgodny z ofertą.',
+  techTolerance:    '- tolerancja długości +-200mm.',
+  techWeighing:     '- fakturowanie wg. wagi teoretycznej.',
+
+  sectionPayment:  'Warunki płatności:',
+  paymentPrepaid:  '- Przedpłata – płatność wymagana przed realizacją zlecenia.',
+  paymentCredit:   days => `- ${days} dni od daty wystawienia faktury, z zastrzeżeniem uzyskania zabezpieczenia wartości zamówienia (Limit kupiecki, gwarancja bankowa, gwarancja płatności publicznego inwestora lub inne zabezpieczenie zaakceptowane przez Intra BV).`,
+
+  sectionValidity:    'Ważność oferty:',
+  validityLine:       label => `- ${label} od daty przesłania oferty.`,
+  validityLabel:      days  => days === 1 ? '24 godziny' : `${days} dni`,
+  validityDisclaimer: 'Oferta nie rezerwuje dostępności z magazynu oraz możliwości produkcyjnych i wymaga finalnego potwierdzenia.',
+
+  notesLabel: 'Uwagi',
+};
+
+// ─── RENTAL ENGLISH ───────────────────────────────────────────────────────────
+
+const rental_en: RentalPdfStrings = {
+  docTitle:      offerNo => `Rental Offer ${offerNo}`,
+  docLanguage:   'en',
+  offerTitle:    'RENTAL OFFER',
+
+  date:          'Date:',
+  offerNumber:   'Offer No.:',
+  salesRep:      'Account Manager:',
+  phone:         'Phone:',
+  customerLabel: 'Customer:',
+  vatLabel:      country => country === 'PL' ? 'Tax No.:' : 'VAT No.:',
+
+  greeting: 'Dear Sir or Madam,',
+  intro:    'With reference to your enquiry and our General Terms and Conditions of Rental and Payment, we are pleased to offer hot rolled steel sheet piles for hire on the following terms:',
+
+  thProfile:       'Profile',
+  thSteelGrade:    'Steel grade',
+  thQty:           'Qty',
+  thLength:        'Length [m]',
+  thKgPerM:        'kg/m',
+  thMass:          'Mass [t]',
+  totalRow:        'Total',
+  unitPcs:         'pcs.',
+  rentalPeriodRow: 'Basic rental period',
+
+  thParam:           'Parameter',
+  thValue:           'Value',
+  legacyProfile:     'Sheet pile profile',
+  legacyQty:         'Quantity',
+  legacyLengthOne:   'Length of one sheet pile',
+  legacyTotalLength: 'Total length',
+  legacyTotalMass:   'Total mass',
+  legacyWallArea:    'Wall area',
+  legacyPeriod:      'Basic rental period',
+
+  rentalCostLabel:   'Rental cost',
+  netSuffix:         'net',
+  costPerM2Label:    'Cost per m²:',
+  costPerTonLabel:   'Cost per tonne:',
+  exchangeRateLabel: 'EUR/PLN rate:',
+
+  weeklyRateTitle:  'EACH ADDITIONAL WEEK OF RENTAL',
+  weeklyRateSuffix: '/tonne net',
+  weeklyRateNote:   'after the basic rental period',
+
+  sectionTransport:    'Transport:',
+  labelDelivery:       'Delivery:',
+  labelRoute:          'Route:',
+  labelTrucks:         'No. of trucks:',
+  labelCostPerTruck:   'Cost / truck:',
+  labelTotalTransport: 'Total transport cost:',
+  labelSettlement:     'Settlement:',
+  labelPickupFrom:     'Collection from:',
+  valueDapIncluded:    'DAP – included in price / Intra B.V.',
+  valueDapExtra:       'DAP / Intra B.V.',
+  valueFca:            "FCA – ex works, customer's collection",
+  valueRecharge:       'Transport costs recharged to customer',
+
+  sectionRentalTerms: 'Rental terms:',
+  rentalTerm1: '1) The quoted price includes delivery by Intra from warehouse to site. Return to Intra B.V. warehouse (Cieśle 42, near Wrocław) is the Customer\'s responsibility and cost.',
+  rentalTerm2: '2) At the construction site, sheet piles must be unloaded and loaded at the Customer\'s expense.',
+  rentalTerm3: '3) All prices quoted are net prices.',
+
+  para1: 'Please note that these are rented sheet piles and must be returned in all cases. Only materials supplied by Intra B.V. are eligible for return.',
+  para2: (val, unit) => `Delivery and return of sheet piles must comply with EN 10248-1/2. For material losses, including those caused by cutting of damaged sections, an additional charge of ${val},- ${unit}/tonne will apply.`,
+  para3: 'Sheet piles must be returned in a reusable condition – without the need for re-processing, cleaning or repairs. Sheet piles must not show damage, contamination, adhering soil or other defects beyond normal wear.',
+  para4: 'Otherwise the following charges will apply:',
+
+  sectionDamages: 'Schedule of charges:',
+  damage1: (val, unit) => `- Loss / total damage of sheet piles = +${val},- ${unit} / tonne;`,
+  damage2: (val, unit) => `- Sorting and cleaning of sheet piles = +${val},- ${unit} / tonne;`,
+  damage3: (val, unit) => `- Grinding of welded-on sections = +${val},- ${unit}/lm;`,
+  damage4: (val, unit) => `- Welding (sealing) of anchor holes = +${val},- ${unit} / pc.;`,
+  damage5: (val, unit) => `- Cutting head – e.g. to remove damage = +${val},- ${unit} / cut;`,
+  damage6: (val, unit) => `- Repair / straightening of interlocks = +${val},- ${unit} / lm;`,
+
+  sectionDelivery:     'Delivery time:',
+  deliveryPlaceholder: '- ............',
+
+  sectionTechnical: 'Technical terms:',
+  techStandard:     '- supply in accordance with EN 10248-1/2.',
+  techGrade:        '- steel grade as stated in this offer.',
+  techTolerance:    '- length tolerance ±200 mm.',
+  techWeighing:     '- invoicing based on theoretical weight.',
+
+  sectionPayment:  'Payment terms:',
+  paymentPrepaid:  '- Prepayment – payment required prior to execution of the order.',
+  paymentCredit:   days => `- ${days} days from invoice date, subject to obtaining security for the order value (Credit limit, bank guarantee, payment guarantee from a public investor, or other security accepted by Intra B.V.).`,
+
+  sectionValidity:    'Validity of offer:',
+  validityLine:       label => `- ${label} from the date of issue.`,
+  validityLabel:      days  => days === 1 ? '24 hours' : `${days} days`,
+  validityDisclaimer: 'This offer does not reserve stock availability or production capacity and requires final confirmation.',
+
+  notesLabel: 'Notes',
+};
+
+// ─── Export (Rental) ──────────────────────────────────────────────────────────
+
+export const RENTAL_PDF_STRINGS: Record<PdfLang, RentalPdfStrings> = {
+  pl: rental_pl,
+  en: rental_en,
+};
