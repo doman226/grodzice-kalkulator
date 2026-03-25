@@ -1,7 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Offer, Profile, RentalPrices, Client, OfferItem } from '../types';
-import { calculateRentalCost, formatPLN, formatNumber } from '../lib/calculations';
+import { calculateRentalCost, formatPLN, formatEUR, formatNumber } from '../lib/calculations';
+
+interface NBPRate { rate: number; date: string; }
 
 const SALES_REPS = [
   { name: 'Szymon Sobczak', phone: '579 376 107' },
@@ -88,13 +90,45 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
   const [transportFrom, setTransportFrom] = useState(offer.transport_from ?? 'Magazyn Intra B.V.');
   const [transportTo, setTransportTo] = useState(offer.transport_to ?? '');
   const [preparedBy, setPreparedBy] = useState(offer.prepared_by ?? SALES_REPS[0].name);
-  // Indywidualne ceny (inicjalizowane z snapshotu oferty lub globalnego cennika)
+
+  // Waluta i kurs
+  const [currency, setCurrency]     = useState<'EUR' | 'PLN'>(offer.currency ?? 'PLN');
+  const [manualRate, setManualRate] = useState(offer.exchange_rate ?? 4.25);
+  const [nbpRate, setNbpRate]       = useState<NBPRate | null>(null);
+  const [nbpLoading, setNbpLoading] = useState(false);
+  const exchangeRate = nbpRate?.rate ?? manualRate;
+
+  // Pobierz kurs NBP przy otwarciu modala
+  useEffect(() => {
+    setNbpLoading(true);
+    fetch('https://api.nbp.pl/api/exchangerates/rates/A/EUR/last/1/?format=json')
+      .then(r => r.json())
+      .then(d => { setNbpRate({ rate: d.rates[0].mid, date: d.rates[0].effectiveDate }); setManualRate(d.rates[0].mid); })
+      .catch(() => {})
+      .finally(() => setNbpLoading(false));
+  }, []);
+
+  // Indywidualne ceny — inicjalizowane ze snapshotu oferty (są już w walucie oferty)
   const [customBasePricePln, setCustomBasePricePln] = useState<number>(
     offer.base_price_pln ?? prices.base_price_pln
   );
   const [customPricePerWeek1, setCustomPricePerWeek1] = useState<number>(
     offer.price_per_week_1 ?? prices.price_per_week_1
   );
+
+  // Przelicz wszystkie ceny przy zmianie waluty
+  function handleCurrencyChange(newCur: 'EUR' | 'PLN') {
+    if (newCur === currency) return;
+    const factor = newCur === 'EUR' ? 1 / exchangeRate : exchangeRate;
+    const conv = (v: number) => Math.round(v * factor * 100) / 100;
+    setCustomBasePricePln(prev => conv(prev));
+    setCustomPricePerWeek1(prev => conv(prev));
+    // Przelicz transport (jest w bieżącej walucie po poprzednim przeliczeniu)
+    if (typeof transportCostPerTruck === 'number' && transportCostPerTruck > 0) {
+      setTransportCostPerTruck(Math.round(transportCostPerTruck * factor * 100) / 100);
+    }
+    setCurrency(newCur);
+  }
 
   const effectivePrices = useMemo(() => ({
     ...prices,
@@ -142,11 +176,14 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
     return { totalLengthM, totalMassT, totalWallAreaM2 };
   }, [itemResults]);
 
-  // Nowa logika: koszt = masa [t] × cena [PLN/t] — bez progów czasowych
+  // koszt w wybranej walucie (PLN lub EUR)
   const rentalCost = useMemo(() =>
     totals.totalMassT > 0 ? calculateRentalCost(totals.totalMassT, customBasePricePln) : 0,
     [totals.totalMassT, customBasePricePln]
   );
+  // zawsze obie wartości do zapisu w DB
+  const rentalCostPLN = currency === 'PLN' ? rentalCost : rentalCost * exchangeRate;
+  const rentalCostEUR = currency === 'EUR' ? rentalCost : rentalCost / exchangeRate;
 
   const transportCalc = useMemo(() => {
     const autoTrucks = totals.totalMassT > 0 ? Math.ceil(totals.totalMassT / TRUCK_CAPACITY_T) : 0;
@@ -166,6 +203,19 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
     const mainProfileName = validItems.length === 1 ? itemResults.find(r => r.valid)!.profile!.name : 'Wiele profili';
     const mainProfileType = validItems.length === 1 ? itemResults.find(r => r.valid)!.profile!.type : 'MIX';
 
+    // Transport zawsze w PLN w bazie (konwertuj jeśli EUR)
+    const transportCostPlnPerTruck = transportCalc.costPerTruck > 0
+      ? (currency === 'EUR' ? transportCalc.costPerTruck * exchangeRate : transportCalc.costPerTruck)
+      : null;
+    const transportCostPlnTotal = transportCalc.costPerTruck > 0
+      ? (currency === 'EUR' ? transportCalc.totalCost * exchangeRate : transportCalc.totalCost)
+      : null;
+
+    // Koszt z transportem w walucie oferty (do cost_per_m2 i cost_per_ton)
+    const totalCostForRatios = rentalCost + (
+      transportCalc.costPerTruck > 0 && transportPaidBy === 'dap_included' ? transportCalc.totalCost : 0
+    );
+
     // 1. Aktualizuj główny rekord oferty
     const { data, error: err } = await supabase.from('offers').update({
       client_id: clientId,
@@ -178,12 +228,15 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
       total_length_m: totals.totalLengthM,
       mass_t: totals.totalMassT,
       wall_area_m2: totals.totalWallAreaM2,
-      rental_cost_pln: rentalCost,
-      cost_per_m2: totals.totalWallAreaM2 > 0 ? rentalCost / totals.totalWallAreaM2 : 0,
-      cost_per_ton: totals.totalMassT > 0 ? rentalCost / totals.totalMassT : 0,
+      rental_cost_pln: rentalCostPLN,
+      rental_cost_eur: rentalCostEUR,
+      currency,
+      exchange_rate: currency === 'EUR' ? exchangeRate : null,
+      cost_per_m2: totals.totalWallAreaM2 > 0 ? totalCostForRatios / totals.totalWallAreaM2 : 0,
+      cost_per_ton: totals.totalMassT > 0 ? totalCostForRatios / totals.totalMassT : 0,
       transport_trucks: transportCalc.trucks,
-      transport_cost_per_truck: transportCalc.costPerTruck > 0 ? transportCalc.costPerTruck : null,
-      transport_cost_total: transportCalc.costPerTruck > 0 ? transportCalc.totalCost : null,
+      transport_cost_per_truck: transportCostPlnPerTruck,
+      transport_cost_total: transportCostPlnTotal,
       transport_paid_by: transportPaidBy,
       transport_from: transportFrom || null,
       transport_to: transportTo || null,
@@ -239,6 +292,9 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
         total_length_m: offer.total_length_m,
         wall_area_m2: offer.wall_area_m2,
         rental_cost_pln: offer.rental_cost_pln,
+        rental_cost_eur: offer.rental_cost_eur,
+        currency: offer.currency,
+        exchange_rate: offer.exchange_rate,
         cost_per_m2: offer.cost_per_m2,
         cost_per_ton: offer.cost_per_ton,
         quantity: offer.quantity,
@@ -327,7 +383,11 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
             {totals.totalMassT > 0 && (
               <div className="mt-2 flex gap-4 text-xs text-gray-500 px-1">
                 <span>Masa łączna: <strong className="text-gray-800">{formatNumber(totals.totalMassT, 3)} t</strong></span>
-                <span>Koszt: <strong className="text-blue-900">{formatPLN(rentalCost)} PLN</strong></span>
+                <span>Koszt: <strong className="text-blue-900">
+                  {currency === 'EUR'
+                    ? `${formatEUR(rentalCost)} EUR`
+                    : `${formatPLN(rentalCost)} PLN`}
+                </strong></span>
               </div>
             )}
           </div>
@@ -385,6 +445,43 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
             </div>
           </div>
 
+          {/* Waluta i kurs */}
+          <div className="border border-blue-200 rounded-lg p-4 bg-blue-50 space-y-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm font-semibold text-gray-700">Waluta oferty</span>
+              <div className="flex rounded-lg border border-gray-300 overflow-hidden text-xs font-medium">
+                {(['PLN', 'EUR'] as const).map(c => (
+                  <button key={c} type="button"
+                    onClick={() => handleCurrencyChange(c)}
+                    className={`px-4 py-1.5 transition-colors ${currency === c ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+              {currency === 'EUR' && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">Kurs EUR/PLN:</span>
+                  <input type="number" min={1} step={0.0001}
+                    value={manualRate}
+                    onChange={e => { setManualRate(parseFloat(e.target.value) || 4.25); setNbpRate(null); }}
+                    className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button onClick={() => {
+                    setNbpLoading(true);
+                    fetch('https://api.nbp.pl/api/exchangerates/rates/A/EUR/last/1/?format=json')
+                      .then(r => r.json())
+                      .then(d => { setNbpRate({ rate: d.rates[0].mid, date: d.rates[0].effectiveDate }); setManualRate(d.rates[0].mid); })
+                      .catch(() => {})
+                      .finally(() => setNbpLoading(false));
+                  }} className="px-2 py-1 text-xs bg-white border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-100">
+                    {nbpLoading ? '...' : '↻ NBP'}
+                  </button>
+                  {nbpRate && <span className="text-xs text-gray-400">NBP: {nbpRate.rate.toFixed(4)} ({nbpRate.date})</span>}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Ceny */}
           <div className="border border-amber-200 rounded-lg p-4 bg-amber-50 space-y-3">
             <h4 className="text-sm font-semibold text-gray-700">
@@ -396,7 +493,7 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Cena wynajmu [PLN/t]
+                  Cena wynajmu [{currency}/t]
                 </label>
                 <input
                   type="number" min={0} step={1}
@@ -407,7 +504,7 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Każdy kolejny tydzień [PLN/t]
+                  Każdy kolejny tydzień [{currency}/t]
                 </label>
                 <input
                   type="number" min={0} step={1}
@@ -420,7 +517,11 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
             {totals.totalMassT > 0 && (
               <div className="pt-2 border-t border-amber-200 text-sm text-gray-700">
                 Koszt przy tych cenach:
-                <strong className="text-blue-900 ml-1">{formatPLN(rentalCost)} PLN</strong>
+                <strong className="text-blue-900 ml-1">
+                  {currency === 'EUR'
+                    ? `${formatEUR(rentalCost)} EUR  ≈ ${formatPLN(rentalCostPLN)} PLN`
+                    : `${formatPLN(rentalCost)} PLN`}
+                </strong>
               </div>
             )}
           </div>
@@ -446,10 +547,18 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Koszt / auto [PLN]</label>
-                <input type="number" min={0} step={100} value={transportCostPerTruck} placeholder="np. 2500"
+                <label className="block text-xs text-gray-500 mb-1">
+                  Koszt / auto [{currency}]
+                  {currency === 'EUR' && <span className="ml-1 text-blue-600">(wpisz w EUR)</span>}
+                </label>
+                <input type="number" min={0} step={currency === 'EUR' ? 10 : 100}
+                  value={transportCostPerTruck}
+                  placeholder={currency === 'EUR' ? 'np. 600' : 'np. 2500'}
                   onChange={e => setTransportCostPerTruck(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value)))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                {currency === 'EUR' && typeof transportCostPerTruck === 'number' && transportCostPerTruck > 0 && (
+                  <p className="text-xs text-gray-400 mt-1">≈ {formatPLN(transportCostPerTruck * exchangeRate)} PLN / auto</p>
+                )}
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">
@@ -489,7 +598,11 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
                   </label>
                 ))}
                 {transportCalc.costPerTruck > 0 && transportPaidBy !== 'fca' && (
-                  <span className="ml-auto self-center text-sm font-semibold text-gray-700">{formatPLN(transportCalc.totalCost)} PLN</span>
+                  <span className="ml-auto self-center text-sm font-semibold text-gray-700">
+                    {currency === 'EUR'
+                      ? `${formatEUR(transportCalc.totalCost)} EUR`
+                      : `${formatPLN(transportCalc.totalCost)} PLN`}
+                  </span>
                 )}
               </div>
             </div>
