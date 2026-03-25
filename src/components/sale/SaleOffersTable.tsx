@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { supabase } from '../../lib/supabase';
 import type { Client, SaleOffer, SaleProfile, OfferStatus } from '../../types';
-import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
+import { formatEUR, formatPLN, formatRound, formatNumber } from '../../lib/calculations';
 import SaleOfferPDF from './SaleOfferPDF';
 import EditSaleOfferModal from './EditSaleOfferModal';
 import type { PdfLang } from '../../lib/pdfStrings';
@@ -297,7 +297,9 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                               }>
                                 {offer.delivery_paid_by === 'fca'
                                   ? 'FCA – odbiór własny'
-                                  : `${formatPLN(offer.delivery_cost_total ?? 0)} PLN`}
+                                  : (offer.currency ?? 'EUR') === 'EUR' && offer.exchange_rate
+                                    ? `${formatEUR((offer.delivery_cost_total ?? 0) / offer.exchange_rate)} EUR`
+                                    : `${formatPLN(offer.delivery_cost_total ?? 0)} PLN`}
                                 {' '}
                                 <span className="font-normal text-xs">(
                                   {(offer.delivery_paid_by as string) === 'dap_included' || (offer.delivery_paid_by as string) === 'intra' ? 'DAP – w cenie'
@@ -367,8 +369,8 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                                     <td className="px-3 py-2 text-right text-gray-600">{item.quantity}</td>
                                     <td className="px-3 py-2 text-right text-gray-600">{item.length_m}</td>
                                     <td className="px-3 py-2 text-right text-gray-600">{formatNumber(item.mass_t, 3)}</td>
-                                    <td className="px-3 py-2 text-right text-gray-500">{item.cost_eur_t ?? '—'}</td>
-                                    <td className="px-3 py-2 text-right font-semibold text-gray-800">{item.sell_eur_t ?? '—'}</td>
+                                    <td className="px-3 py-2 text-right text-gray-500">{item.cost_eur_t != null ? formatRound(item.cost_eur_t) : '—'}</td>
+                                    <td className="px-3 py-2 text-right font-semibold text-gray-800">{item.sell_eur_t != null ? formatRound(item.sell_eur_t) : '—'}</td>
                                     <td className="px-3 py-2 text-right font-bold text-gray-900">
                                       {(offer.currency ?? 'EUR') === 'PLN'
                                         ? (item.sell_pln_total != null ? `${formatPLN(item.sell_pln_total)} PLN` : '—')

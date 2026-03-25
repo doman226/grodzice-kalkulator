@@ -138,7 +138,7 @@ export default function EditSaleOfferModal({
   const [paymentDays, setPaymentDays] = useState(offer.payment_days ?? 30);
 
   // ── Waluta ──
-  const [currency,     setCurrency]     = useState<'EUR' | 'PLN'>(offer.currency as 'EUR' | 'PLN');
+  const [currency,     setCurrency]     = useState<'EUR' | 'PLN'>((offer.currency ?? 'EUR') as 'EUR' | 'PLN');
   const [exchangeRate, setExchangeRate] = useState(offer.exchange_rate ?? 4.25);
 
   // ── Transport ──

@@ -1,6 +1,6 @@
 import { Document, Page, View, Text, Image, StyleSheet, Font } from '@react-pdf/renderer';
 import type { SaleOffer } from '../../types';
-import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
+import { formatEUR, formatPLN, formatRound, formatNumber } from '../../lib/calculations';
 import { PDF_STRINGS, type PdfLang } from '../../lib/pdfStrings';
 
 // ─── Fonty (identyczne z OfferPDF) ───────────────────────────────────────────
@@ -352,8 +352,9 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
               const pricePerT   = totalMassT      > 0 ? totalClient / totalMassT      : null;
               const pricePerM2  = totalWallAreaM2 > 0 ? totalClient / totalWallAreaM2 : null;
 
-              function fmtT(v: number)  { return isEUR ? formatEUR(v) : formatPLN(v); }
-              function fmtM2(v: number) { return isEUR ? formatEUR(v) : formatPLN(v); }
+              // Wskaźniki pochodne (cena/t, cena/m²) – Math.round, nie Math.ceil
+              function fmtT(v: number)  { return formatRound(v); }
+              function fmtM2(v: number) { return formatRound(v); }
 
               // Gdy DAP w cenie – pokaż efektywną cenę/t i /m²
               if (dPaidBy === 'dap_included' && deliveryCostPLN > 0) {
@@ -370,7 +371,7 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
               if (allSame && priced.length > 0) {
                 return (
                   <>
-                    <Text>{t.pricePerTon(unitLabelT).replace('{value}', String(priced[0].sell_eur_t))}</Text>
+                    <Text>{t.pricePerTon(unitLabelT).replace('{value}', formatRound(priced[0].sell_eur_t ?? 0))}</Text>
                     {pricePerM2 != null && <Text>{t.pricePerM2(unitLabelM2).replace('{value}', fmtM2(pricePerM2))}</Text>}
                   </>
                 );
@@ -378,7 +379,7 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
               return (
                 <>
                   {priced.map((item, i) => (
-                    <Text key={i}>{item.profile_name}: {item.sell_eur_t} {unitLabelT}</Text>
+                    <Text key={i}>{item.profile_name}: {formatRound(item.sell_eur_t ?? 0)} {unitLabelT}</Text>
                   ))}
                   {pricePerM2 != null && <Text>{t.pricePerM2(unitLabelM2).replace('{value}', fmtM2(pricePerM2))}</Text>}
                 </>
