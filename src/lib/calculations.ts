@@ -56,6 +56,15 @@ export function formatEUR(value: number): string {
   }).format(Math.ceil(value));
 }
 
+// Dla wskaźników pochodnych (koszt/t, koszt/m²) – Math.round zamiast Math.ceil,
+// bo te metryki to wyniki dzielenia i Math.ceil(120.0000001) dałby błędne 121.
+export function formatRound(value: number): string {
+  return new Intl.NumberFormat('pl-PL', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.round(value));
+}
+
 export function formatNumber(value: number, decimals = 3): string {
   return new Intl.NumberFormat('pl-PL', {
     minimumFractionDigits: decimals,

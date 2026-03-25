@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import type { Profile, RentalPrices, Client, Offer } from '../types';
-import { calculateRentalCost, formatPLN, formatEUR, formatNumber } from '../lib/calculations';
+import { calculateRentalCost, formatPLN, formatEUR, formatRound, formatNumber } from '../lib/calculations';
 import SaveOfferModal, { type OfferItemInput } from './SaveOfferModal';
 
 interface NBPRate { rate: number; date: string; }
@@ -476,10 +476,10 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
                 value={currency === 'EUR' ? formatEUR(totals.totalMassT * pricePerWeek1) : formatPLN(totals.totalMassT * pricePerWeek1)}
                 unit={`${currency}/tydz.`} />
               <ResultCard label="Koszt / m²"
-                value={currency === 'EUR' ? formatEUR(totals.totalWallAreaM2 > 0 ? totalCostInclTransport / totals.totalWallAreaM2 : 0) : formatPLN(totals.totalWallAreaM2 > 0 ? totalCostInclTransport / totals.totalWallAreaM2 : 0)}
+                value={formatRound(totals.totalWallAreaM2 > 0 ? totalCostInclTransport / totals.totalWallAreaM2 : 0)}
                 unit={`${currency}/m²`} />
               <ResultCard label="Koszt / tonę"
-                value={currency === 'EUR' ? formatEUR(totals.totalMassT > 0 ? totalCostInclTransport / totals.totalMassT : 0) : formatPLN(totals.totalMassT > 0 ? totalCostInclTransport / totals.totalMassT : 0)}
+                value={formatRound(totals.totalMassT > 0 ? totalCostInclTransport / totals.totalMassT : 0)}
                 unit={`${currency}/t`} />
             </div>
           </div>

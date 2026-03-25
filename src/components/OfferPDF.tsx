@@ -1,6 +1,6 @@
 import { Document, Page, View, Text, Image, StyleSheet, Font } from '@react-pdf/renderer';
 import type { Offer } from '../types';
-import { formatPLN, formatEUR, formatNumber } from '../lib/calculations';
+import { formatPLN, formatEUR, formatRound, formatNumber } from '../lib/calculations';
 import { RENTAL_PDF_STRINGS } from '../lib/pdfStrings';
 import type { PdfLang } from '../lib/pdfStrings';
 
@@ -342,7 +342,10 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
   // Waluta oferty
   const isEUR  = (offer.currency ?? 'PLN') === 'EUR';
   const exRate = offer.exchange_rate ?? 4.25;
-  const fmtVal = (pln: number) => isEUR ? formatEUR(pln / exRate) : formatPLN(pln);
+  const fmtVal   = (pln: number) => isEUR ? formatEUR(pln / exRate)   : formatPLN(pln);
+  // Dla wskaźników pochodnych (koszt/t, koszt/m²) używamy Math.round,
+  // żeby uniknąć Math.ceil(120.0000001) = 121 (błąd float przy round-trip PLN↔EUR)
+  const fmtRatio = (pln: number) => isEUR ? formatRound(pln / exRate) : formatRound(pln);
   const currCode   = isEUR ? 'EUR' : 'PLN';
   const currSuffix = `${currCode} ${t.netSuffix}`;
 
@@ -507,8 +510,8 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
             <Text style={s.priceSuffix}> {currSuffix}</Text>
           </Text>
           <View style={s.priceRow}>
-            <Text>{t.costPerM2Label} {fmtVal(offer.wall_area_m2 > 0 ? totalWithTransport / offer.wall_area_m2 : offer.cost_per_m2 ?? 0)} {currCode}/m²</Text>
-            <Text>{t.costPerTonLabel} {fmtVal(offer.mass_t > 0 ? totalWithTransport / offer.mass_t : offer.cost_per_ton ?? 0)} {currCode}/t</Text>
+            <Text>{t.costPerM2Label} {fmtRatio(offer.wall_area_m2 > 0 ? totalWithTransport / offer.wall_area_m2 : offer.cost_per_m2 ?? 0)} {currCode}/m²</Text>
+            <Text>{t.costPerTonLabel} {fmtRatio(offer.mass_t > 0 ? totalWithTransport / offer.mass_t : offer.cost_per_ton ?? 0)} {currCode}/t</Text>
             {isEUR && <Text>{t.exchangeRateLabel} {exRate.toFixed(4)}</Text>}
           </View>
         </View>
