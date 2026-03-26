@@ -44,16 +44,16 @@ export const COMPARISON_WEEKS = [4, 8, 12, 16, 20, 26];
 
 export function formatPLN(value: number): string {
   return new Intl.NumberFormat('pl-PL', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(Math.ceil(value));
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Math.round(value * 100) / 100);
 }
 
 export function formatEUR(value: number): string {
   return new Intl.NumberFormat('pl-PL', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(Math.ceil(value));
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Math.round(value * 100) / 100);
 }
 
 // Dla wskaźników pochodnych (koszt/t, koszt/m²) – Math.round zamiast Math.ceil,
