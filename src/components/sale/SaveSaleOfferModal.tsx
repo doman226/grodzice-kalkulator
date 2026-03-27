@@ -177,8 +177,8 @@ export default function SaveSaleOfferModal({
         currency,
         exchange_rate:             exchangeRate,
         total_cost_eur:            totals.totalCostEUR,
-        total_sell_eur:            totals.totalSellEUR,
-        total_sell_pln:            totals.totalSellPLN,
+        total_sell_eur:            totals.totalSellEUR + lockTotalEUR,
+        total_sell_pln:            totals.totalSellPLN + lockTotalPLN,
         margin_pct:                totals.overallMarginPct,
         delivery_trucks:           delivery?.trucks          ?? null,
         delivery_cost_per_truck:   delivery?.costPerTruck    ?? null,
@@ -266,10 +266,16 @@ export default function SaveSaleOfferModal({
     onSaved(savedOffer);
   }
 
+  // Sumy zamków – potrzebne zarówno w handleSave() jak i w podglądzie JSX
+  const lockTotalEUR = lockItems.reduce((s, i) => s + i.totalEUR, 0);
+  const lockTotalPLN = lockItems.reduce((s, i) => s + i.totalPLN, 0);
+
   const deliveryCostCurrency   = delivery?.paidBy === 'dap_included'
     ? (currency === 'EUR' ? delivery.totalCostPLN / exchangeRate : delivery.totalCostPLN)
     : 0;
-  const totalForClientCurrency = (currency === 'EUR' ? totals.totalSellEUR : totals.totalSellPLN) + deliveryCostCurrency;
+  const totalForClientCurrency = (currency === 'EUR'
+    ? totals.totalSellEUR + lockTotalEUR
+    : totals.totalSellPLN + lockTotalPLN) + deliveryCostCurrency;
   const year = new Date().getFullYear();
 
   return (
@@ -336,11 +342,11 @@ export default function SaveSaleOfferModal({
             <div className="pt-2 border-t border-blue-200 mt-2 space-y-1">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Wartość sprzedaży (EUR):</span>
-                <strong>{formatEUR(totals.totalSellEUR)} EUR</strong>
+                <strong>{formatEUR(totals.totalSellEUR + lockTotalEUR)} EUR</strong>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Wartość sprzedaży (PLN):</span>
-                <strong>{formatPLN(totals.totalSellPLN)} PLN</strong>
+                <strong>{formatPLN(totals.totalSellPLN + lockTotalPLN)} PLN</strong>
               </div>
               <div className="flex justify-between text-sm pt-1 border-t border-blue-200">
                 <span className="text-gray-600 font-medium">Marża łączna:</span>

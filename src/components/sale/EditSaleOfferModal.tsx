@@ -299,6 +299,18 @@ export default function EditSaleOfferModal({
     return { totalMassT, totalCostEUR, totalSellEUR, totalSellPLN, overallMarginPct };
   }, [itemResults]);
 
+  // Sumy zamków – do wliczenia do total_sell_eur/pln przy zapisie
+  const lockTotals = useMemo(() => {
+    let totalEUR = 0, totalPLN = 0;
+    for (const item of editLockItems) {
+      const qMb = item.quantitySzt * item.lengthM;
+      const eur = qMb * item.priceEurMb;
+      totalEUR += eur;
+      totalPLN += eur * exchangeRate;
+    }
+    return { totalEUR, totalPLN };
+  }, [editLockItems, exchangeRate]);
+
   const isEUR = currency === 'EUR';
 
   // ── Zmiana waluty – konwertuje ceny pozycji (identyczna logika jak SaleCalculator) ──
@@ -367,8 +379,8 @@ export default function EditSaleOfferModal({
         currency,
         exchange_rate:             exchangeRate,
         total_cost_eur:            totals.totalCostEUR,
-        total_sell_eur:            totals.totalSellEUR,
-        total_sell_pln:            totals.totalSellPLN,
+        total_sell_eur:            totals.totalSellEUR + lockTotals.totalEUR,
+        total_sell_pln:            totals.totalSellPLN + lockTotals.totalPLN,
         margin_pct:                totals.overallMarginPct,
         delivery_trucks:           hasTransport ? deliveryCalc!.trucks         : null,
         delivery_cost_per_truck:   hasTransport ? deliveryCalc!.costPerTruck   : null,
