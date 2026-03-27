@@ -191,20 +191,30 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
                 : dPaidByRaw === 'klient' ? 'dap_extra'
                 : offer.delivery_paid_by;
 
+  // Posortowane pozycje grodzic
+  const sortedItems = [...(offer.items ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+  const hasSheetPiles = sortedItems.length > 0;
+
+  // Posortowane zamki
+  const sortedLocks = [...(offer.lock_items ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+  const hasLocks = sortedLocks.length > 0;
+
+  // Masa i powierzchnia grodzic
+  const totalMassT      = sortedItems.reduce((sum, i) => sum + (i.mass_t       ?? 0), 0);
+  const totalWallAreaM2 = sortedItems.reduce((sum, i) => sum + (i.wall_area_m2 ?? 0), 0);
+
+  // Sumy zamków – muszą być zdefiniowane PRZED totalForClient*
+  const locksTotalEUR   = sortedLocks.reduce((sum, l) => sum + (l.total_eur ?? 0), 0);
+  const locksTotalPLN   = sortedLocks.reduce((sum, l) => sum + (l.total_pln ?? 0), 0);
+  const locksTotalMassT = sortedLocks.reduce((sum, l) => sum + (l.mass_t   ?? 0), 0);
+
   // delivery_cost_total zawsze w PLN → przelicz na EUR jeśli potrzeba
   const deliveryCostPLN = (dPaidBy === 'dap_included' && (offer.delivery_cost_total ?? 0) > 0)
     ? (offer.delivery_cost_total ?? 0) : 0;
   const deliveryCostEUR = exchRate > 0 ? deliveryCostPLN / exchRate : 0;
-  // Cena dla klienta = towary + transport (gdy DAP w cenie)
-  const totalForClientEUR = totalSellEUR + deliveryCostEUR;
-  const totalForClientPLN = totalSellPLN + deliveryCostPLN;
-
-  // Posortowane pozycje
-  const sortedItems = [...(offer.items ?? [])].sort((a, b) => a.sort_order - b.sort_order);
-
-  // Masa łączna i powierzchnia ścianki
-  const totalMassT      = sortedItems.reduce((sum, i) => sum + (i.mass_t       ?? 0), 0);
-  const totalWallAreaM2 = sortedItems.reduce((sum, i) => sum + (i.wall_area_m2 ?? 0), 0);
+  // Cena dla klienta = grodzice + zamki + transport (gdy DAP w cenie)
+  const totalForClientEUR = totalSellEUR + locksTotalEUR + deliveryCostEUR;
+  const totalForClientPLN = totalSellPLN + locksTotalPLN + deliveryCostPLN;
 
   function deliveryTimelineText(): string {
     if (offer.delivery_timeline === 'huta') {
@@ -282,8 +292,8 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
         <Text style={s.greeting}>{t.greeting}</Text>
         <Text style={s.intro}>{t.intro}</Text>
 
-        {/* ── TABELA POZYCJI ── */}
-        <View style={s.table}>
+        {/* ── TABELA GRODZIC ── */}
+        {hasSheetPiles && <View style={s.table}>
           <View style={s.tableHeaderRow}>
             <Text style={[s.thCell, { flex: 2.6 }]}>{t.thProfile}</Text>
             <Text style={[s.thCell, { flex: 2.0 }]}>{t.thSteelGrade}</Text>
@@ -324,7 +334,7 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
             );
           })}
 
-          {/* Wiersz sumy */}
+          {/* Wiersz sumy grodzic */}
           <View style={[s.tableBodyRow, { backgroundColor: C.gray100 }]}>
             <Text style={[s.tdLabel, { flex: 2.6, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{t.totalRow}</Text>
             <Text style={[s.tdLabel, { flex: 2.0 }]} />
@@ -335,7 +345,81 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
               {formatNumber(totalMassT, 3)} t
             </Text>
           </View>
-        </View>
+        </View>}
+
+        {/* ── TABELA ZAMKÓW ── (bez tytułu sekcji – tabela jest samoopisująca) */}
+        {hasLocks && (
+          <View style={[s.table, { marginTop: hasSheetPiles ? 6 : 0 }]}>
+            {/* Nagłówek: Zamek | Gatunek | Szt. | Dł.[m] | kg/m | mb łącznie | EUR/mb | Wartość EUR */}
+            <View style={s.tableHeaderRow}>
+              <Text style={[s.thCell, { flex: 2.0 }]}>{t.thLock}</Text>
+              <Text style={[s.thCell, { flex: 1.4 }]}>{t.thSteelGrade}</Text>
+              <Text style={[s.thCell, { flex: 0.6, textAlign: 'right' }]}>{t.thLockQtySzt}</Text>
+              <Text style={[s.thCell, { flex: 0.8, textAlign: 'right' }]}>{t.thLength}</Text>
+              <Text style={[s.thCell, { flex: 0.7, textAlign: 'right' }]}>{t.thKgPerM}</Text>
+              <Text style={[s.thCell, { flex: 0.8, textAlign: 'right' }]}>{t.thMb}</Text>
+              <Text style={[s.thCell, { flex: 1.1, textAlign: 'right' }]}>{t.thPricePerMb}</Text>
+              <Text style={[s.thCell, { flex: 1.4, textAlign: 'right' }]}>{t.thValueEUR}</Text>
+            </View>
+
+            {/* Pozycje */}
+            {sortedLocks.map((lock, idx) => {
+              const qMb   = lock.quantity_mb ?? 0;
+              const massT = lock.mass_t ?? 0;
+              const kgPerM = qMb > 0 ? (massT * 1000) / qMb : 0;
+              const qtySzt = lock.quantity_szt ?? null;
+              const lenM   = lock.length_m   ?? null;
+              return (
+                <View key={lock.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
+                  <Text style={[s.tdLabel, { flex: 2.0, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                    {lock.lock_name}
+                  </Text>
+                  <Text style={[s.tdLabel, { flex: 1.4, color: C.gray700 }]}>
+                    {lock.steel_grade?.toUpperCase() ?? '—'}
+                  </Text>
+                  <Text style={[s.tdLabel, { flex: 0.6, textAlign: 'right' }]}>
+                    {qtySzt != null ? `${qtySzt}` : '—'}
+                  </Text>
+                  <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'right' }]}>
+                    {lenM != null ? `${lenM} m` : '—'}
+                  </Text>
+                  <Text style={[s.tdLabel, { flex: 0.7, textAlign: 'right', color: C.gray700 }]}>
+                    {formatNumber(kgPerM, 1)}
+                  </Text>
+                  <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                    {formatNumber(qMb, 1)}
+                  </Text>
+                  <Text style={[s.tdLabel, { flex: 1.1, textAlign: 'right', color: C.gray700 }]}>
+                    {formatEUR(lock.price_eur_mb)} EUR/mb
+                  </Text>
+                  <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                    {formatEUR(lock.total_eur)} EUR
+                  </Text>
+                </View>
+              );
+            })}
+
+            {/* Wiersz sumy */}
+            <View style={[s.tableBodyRow, { backgroundColor: C.gray100 }]}>
+              <Text style={[s.tdLabel, { flex: 2.0, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+                {t.lockTotalRow}
+              </Text>
+              <Text style={[s.tdLabel, { flex: 1.4, color: C.gray500, fontSize: 7 }]}>
+                {t.lockMassRow}: {formatNumber(locksTotalMassT, 3)} t
+              </Text>
+              <Text style={[s.tdLabel, { flex: 0.6 }]} />
+              <Text style={[s.tdLabel, { flex: 0.8 }]} />
+              <Text style={[s.tdLabel, { flex: 0.7 }]} />
+              <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+                {formatNumber(sortedLocks.reduce((s, l) => s + (l.quantity_mb ?? 0), 0), 1)}
+              </Text>
+              <Text style={[s.tdLabel, { flex: 1.1 }]} />
+              <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+                {formatEUR(locksTotalEUR)} EUR
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* ── CENA SPRZEDAŻY ── */}
         <View style={s.priceBox}>
@@ -344,47 +428,56 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
             {isEUR ? formatEUR(totalForClientEUR) : formatPLN(totalForClientPLN)}
             <Text style={s.priceSuffix}> {currency} {t.netSuffix}</Text>
           </Text>
-          <View style={s.priceRow}>
-            {(() => {
+
+          {/* ── Rozbicie ceny ── */}
+          <View style={[s.priceRow, { flexDirection: 'column', gap: 3 }]}>
+            {hasSheetPiles && (() => {
               const unitLabelT  = isEUR ? 'EUR/t'  : 'PLN/t';
               const unitLabelM2 = isEUR ? 'EUR/m²' : 'PLN/m²';
+              const sheetLabel  = lang === 'en' ? 'Sheet piles' : 'Grodzice';
+              const sheetVal    = isEUR ? totalSellEUR : totalSellPLN;
+
+              // Metryki grodzic (cena/t, cena/m²)
               const totalClient = isEUR ? totalForClientEUR : totalForClientPLN;
-              const pricePerT   = totalMassT      > 0 ? totalClient / totalMassT      : null;
-              const pricePerM2  = totalWallAreaM2 > 0 ? totalClient / totalWallAreaM2 : null;
+              // Dla DAP w cenie – pricePerT uwzględnia transport
+              const baseForMetrics = hasLocks
+                ? sheetVal  // gdy są zamki – nie wliczamy transportu do EUR/t grodzic
+                : (dPaidBy === 'dap_included' && deliveryCostPLN > 0 ? totalClient : sheetVal);
+              const pricePerT  = totalMassT      > 0 ? baseForMetrics / totalMassT      : null;
+              const pricePerM2 = totalWallAreaM2 > 0 ? sheetVal        / totalWallAreaM2 : null;
 
-              // Wskaźniki pochodne (cena/t, cena/m²) – Math.round, nie Math.ceil
-              function fmtT(v: number)  { return formatRound(v); }
-              function fmtM2(v: number) { return formatRound(v); }
+              const priced   = sortedItems.filter(i => i.sell_eur_t != null);
+              const allSame  = priced.length > 0 && priced.every(i => i.sell_eur_t === priced[0].sell_eur_t);
+              const perTLabel = allSame && priced.length > 0
+                ? `${formatRound(priced[0].sell_eur_t ?? 0)} ${unitLabelT}`
+                : pricePerT != null ? `${formatRound(pricePerT)} ${unitLabelT}` : null;
 
-              // Gdy DAP w cenie – pokaż efektywną cenę/t i /m²
-              if (dPaidBy === 'dap_included' && deliveryCostPLN > 0) {
-                return (
-                  <>
-                    {pricePerT  != null && <Text>{t.pricePerTon(unitLabelT).replace('{value}', fmtT(pricePerT))}</Text>}
-                    {pricePerM2 != null && <Text>{t.pricePerM2(unitLabelM2).replace('{value}', fmtM2(pricePerM2))}</Text>}
-                  </>
-                );
-              }
-              // Standardowo – ceny z pozycji (za tonę) + obliczone za m²
-              const priced = sortedItems.filter(item => item.sell_eur_t != null);
-              const allSame = priced.length > 0 && priced.every(i => i.sell_eur_t === priced[0].sell_eur_t);
-              if (allSame && priced.length > 0) {
-                return (
-                  <>
-                    <Text>{t.pricePerTon(unitLabelT).replace('{value}', formatRound(priced[0].sell_eur_t ?? 0))}</Text>
-                    {pricePerM2 != null && <Text>{t.pricePerM2(unitLabelM2).replace('{value}', fmtM2(pricePerM2))}</Text>}
-                  </>
-                );
-              }
               return (
                 <>
-                  {priced.map((item, i) => (
-                    <Text key={i}>{item.profile_name}: {formatRound(item.sell_eur_t ?? 0)} {unitLabelT}</Text>
-                  ))}
-                  {pricePerM2 != null && <Text>{t.pricePerM2(unitLabelM2).replace('{value}', fmtM2(pricePerM2))}</Text>}
+                  <Text>
+                    {sheetLabel}: {formatEUR(sheetVal)} {currency}
+                    {perTLabel ? `  ·  ${perTLabel}` : ''}
+                    {!hasLocks && pricePerM2 != null ? `  ·  ${formatRound(pricePerM2)} ${unitLabelM2}` : ''}
+                  </Text>
+                  {/* DAP w cenie – dostawa NIE jest pokazywana klientowi; widoczna tylko przy dap_extra */}
                 </>
               );
             })()}
+
+            {hasLocks && (
+              <>
+                <Text>
+                  {t.lockSectionTitle}: {formatEUR(isEUR ? locksTotalEUR : locksTotalPLN)} {currency}
+                </Text>
+                {!hasSheetPiles && (
+                  <Text style={{ fontSize: 7, color: C.blue200 }}>
+                    {t.lockMassRow}: {formatNumber(locksTotalMassT, 3)} t
+                  </Text>
+                )}
+              </>
+            )}
+
+            {/* DAP w cenie – dostawa wliczona w total, nie pokazujemy osobnej linii klientowi */}
           </View>
         </View>
 

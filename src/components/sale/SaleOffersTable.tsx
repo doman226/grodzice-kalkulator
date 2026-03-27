@@ -195,8 +195,12 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
 
                   {/* Masa */}
                   <td className="px-4 py-3 text-right text-gray-600">
-                    {offer.items
-                      ? formatNumber(offer.items.reduce((s, i) => s + (i.mass_t ?? 0), 0), 3)
+                    {(offer.items || offer.lock_items)
+                      ? formatNumber(
+                          (offer.items?.reduce((s, i) => s + (i.mass_t ?? 0), 0) ?? 0) +
+                          (offer.lock_items?.reduce((s, l) => s + (l.mass_t ?? 0), 0) ?? 0),
+                          3
+                        )
                       : '—'}
                   </td>
 
@@ -389,7 +393,50 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                               </tbody>
                             </table>
                           </div>
-                        ) : (
+                        ) : null}
+
+                        {/* Tabela zamków */}
+                        {offer.lock_items && offer.lock_items.length > 0 && (
+                          <div className="rounded-lg overflow-hidden border border-blue-200">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="bg-blue-700 text-white">
+                                  <th className="text-left px-3 py-2 font-semibold">🔗 Zamek</th>
+                                  <th className="text-right px-3 py-2 font-semibold">Ilość [mb]</th>
+                                  <th className="text-right px-3 py-2 font-semibold">EUR/mb</th>
+                                  <th className="text-right px-3 py-2 font-semibold">Wartość EUR</th>
+                                  <th className="text-right px-3 py-2 font-semibold">Masa [t]</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {offer.lock_items
+                                  .sort((a, b) => a.sort_order - b.sort_order)
+                                  .map((lock, i) => (
+                                  <tr key={lock.id} className={i % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
+                                    <td className="px-3 py-2 font-semibold text-gray-800">{lock.lock_name}</td>
+                                    <td className="px-3 py-2 text-right text-gray-600">{formatNumber(lock.quantity_mb, 1)}</td>
+                                    <td className="px-3 py-2 text-right text-gray-600">{formatEUR(lock.price_eur_mb)}</td>
+                                    <td className="px-3 py-2 text-right font-bold text-gray-900">{formatEUR(lock.total_eur)} EUR</td>
+                                    <td className="px-3 py-2 text-right text-gray-600">{formatNumber(lock.mass_t, 3)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot>
+                                <tr className="bg-blue-50 border-t border-blue-200">
+                                  <td className="px-3 py-2 font-semibold text-blue-900" colSpan={3}>Łącznie zamki</td>
+                                  <td className="px-3 py-2 text-right font-bold text-blue-900">
+                                    {formatEUR(offer.lock_items.reduce((s, l) => s + (l.total_eur ?? 0), 0))} EUR
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-semibold text-blue-900">
+                                    {formatNumber(offer.lock_items.reduce((s, l) => s + (l.mass_t ?? 0), 0), 3)} t
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        )}
+
+                        {!offer.items?.length && !offer.lock_items?.length && (
                           <p className="text-xs text-gray-400">Brak pozycji.</p>
                         )}
 

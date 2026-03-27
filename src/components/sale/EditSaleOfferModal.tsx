@@ -1,11 +1,22 @@
 import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import type { Client, SaleOffer, SaleOfferItem, SaleProfile } from '../../types';
+import type { Client, SaleOffer, SaleOfferItem, SaleProfile, SaleOfferLockItem } from '../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
 import ClientSearchInput from '../ClientSearchInput';
 
 interface Warehouse { id: string; name: string; }
 interface SalePrice { warehouse_id: string; profile_name: string; steel_grade: string; price_eur_t: number | null; }
+interface LockDef   { id: string; name: string; price_eur_mb: number; weight_kg_m: number; sort_order: number; }
+
+interface EditableLockItem {
+  uid: string;
+  lockName: string;
+  steelGrade: string;
+  quantitySzt: number;
+  lengthM: number;
+  priceEurMb: number;
+  weightKgM: number;  // z cennika – do wyliczenia mass_t przy zapisie
+}
 
 // ─── Stałe ───────────────────────────────────────────────────────────────────
 
@@ -73,6 +84,25 @@ function itemsFromOffer(offer: SaleOffer): EditableItem[] {
     }));
 }
 
+function lockItemsFromOffer(offer: SaleOffer): EditableLockItem[] {
+  if (!offer.lock_items || offer.lock_items.length === 0) return [];
+  return offer.lock_items
+    .slice()
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((item: SaleOfferLockItem) => ({
+      uid:         crypto.randomUUID(),
+      lockName:    item.lock_name,
+      steelGrade:  item.steel_grade ?? '',
+      // Jeśli stara oferta bez szt/długości – traktuj mb jako 1 szt × mb
+      quantitySzt: item.quantity_szt ?? 1,
+      lengthM:     item.length_m ?? item.quantity_mb,
+      priceEurMb:  item.price_eur_mb,
+      weightKgM:   item.mass_t > 0 && item.quantity_mb > 0
+        ? (item.mass_t * 1000) / item.quantity_mb
+        : 0,
+    }));
+}
+
 // ─── Komponent ───────────────────────────────────────────────────────────────
 
 export default function EditSaleOfferModal({
@@ -83,15 +113,18 @@ export default function EditSaleOfferModal({
   const [steelGrades, setSteelGrades] = useState<{ id: string; name: string }[]>([]);
   const [warehouses,  setWarehouses]  = useState<Warehouse[]>([]);
   const [prices,      setPrices]      = useState<SalePrice[]>([]);
+  const [lockDefs,    setLockDefs]    = useState<LockDef[]>([]);
   useEffect(() => {
     Promise.all([
       supabase.from('sale_steel_grades').select('id, name').order('sort_order'),
       supabase.from('sale_warehouses').select('id, name').order('name'),
       supabase.from('sale_prices').select('warehouse_id, profile_name, steel_grade, price_eur_t'),
-    ]).then(([gradesRes, warehousesRes, pricesRes]) => {
+      supabase.from('sale_locks').select('id, name, price_eur_mb, weight_kg_m, sort_order').eq('active', true).order('sort_order'),
+    ]).then(([gradesRes, warehousesRes, pricesRes, locksRes]) => {
       if (gradesRes.data)     setSteelGrades(gradesRes.data as { id: string; name: string }[]);
       if (warehousesRes.data) setWarehouses(warehousesRes.data as Warehouse[]);
       if (pricesRes.data)     setPrices(pricesRes.data as SalePrice[]);
+      if (locksRes.data)      setLockDefs(locksRes.data as LockDef[]);
     });
   }, []);
 
@@ -129,7 +162,8 @@ export default function EditSaleOfferModal({
   }
 
   // ── Pozycje ──
-  const [editItems, setEditItems] = useState<EditableItem[]>(() => itemsFromOffer(offer));
+  const [editItems,     setEditItems]     = useState<EditableItem[]>(() => itemsFromOffer(offer));
+  const [editLockItems, setEditLockItems] = useState<EditableLockItem[]>(() => lockItemsFromOffer(offer));
 
   // ── Podstawowe pola ──
   const [clientId,    setClientId]    = useState(offer.client_id ?? '');
@@ -205,6 +239,35 @@ export default function EditSaleOfferModal({
     }));
   }
 
+  // ── Zarządzanie zamkami ──
+  function addLockItem() {
+    if (!lockDefs.length) return;
+    const def = lockDefs[0];
+    setEditLockItems(prev => [...prev, {
+      uid:         crypto.randomUUID(),
+      lockName:    def.name,
+      steelGrade:  '',
+      quantitySzt: 10,
+      lengthM:     12,
+      priceEurMb:  def.price_eur_mb,
+      weightKgM:   def.weight_kg_m,
+    }]);
+  }
+  function removeLockItem(uid: string) {
+    setEditLockItems(prev => prev.filter(i => i.uid !== uid));
+  }
+  function updateLockItem(uid: string, patch: Partial<EditableLockItem>) {
+    setEditLockItems(prev => prev.map(item => {
+      if (item.uid !== uid) return item;
+      const updated = { ...item, ...patch };
+      if ('lockName' in patch) {
+        const def = lockDefs.find(l => l.name === patch.lockName);
+        if (def) { updated.priceEurMb = def.price_eur_mb; updated.weightKgM = def.weight_kg_m; }
+      }
+      return updated;
+    }));
+  }
+
   // ── Wyliczenia pozycji ──
   const itemResults = useMemo(() =>
     editItems.map(item => {
@@ -276,9 +339,9 @@ export default function EditSaleOfferModal({
   // ── Zapis ──
   async function handleSave() {
     if (!clientId) return setError('Wybierz klienta.');
-    if (editItems.length === 0) return setError('Dodaj przynajmniej jedną pozycję.');
-    const hasValidItem = itemResults.some((r, i) => r !== null && editItems[i].profileName);
-    if (!hasValidItem) return setError('Brak prawidłowych pozycji. Sprawdź nazwy profili.');
+    if (editItems.length === 0 && editLockItems.length === 0) return setError('Dodaj przynajmniej jedną pozycję (grodzice lub zamki).');
+    const hasValidItem = editItems.length === 0 || itemResults.some((r, i) => r !== null && editItems[i].profileName);
+    if (editItems.length > 0 && !hasValidItem) return setError('Brak prawidłowych pozycji grodzic. Sprawdź nazwy profili.');
     const itemsWithProfile = editItems.filter(i => i.profileName);
     const validGradeIds = steelGrades.map(g => g.id);
     const missingGrade = steelGrades.length > 0 && itemsWithProfile.some(i => !i.steelGrade || !validGradeIds.includes(i.steelGrade));
@@ -375,9 +438,41 @@ export default function EditSaleOfferModal({
       return setError('Błąd dodawania pozycji: ' + insertErr.message);
     }
 
+    // Zamki: usuń stare i wstaw nowe, pobierz wynik z ID
+    let savedLockItems: SaleOfferLockItem[] = [];
+    await supabase.from('sale_offer_lock_items').delete().eq('offer_id', offer.id);
+    if (editLockItems.length > 0) {
+      const { data: insertedLocks, error: locksErr } = await supabase
+        .from('sale_offer_lock_items')
+        .insert(editLockItems.map((item, idx) => {
+          const quantityMb = item.quantitySzt * item.lengthM;
+          const massT = item.weightKgM > 0 ? (quantityMb * item.weightKgM) / 1000 : 0;
+          return {
+            offer_id:     offer.id,
+            lock_name:    item.lockName,
+            steel_grade:  item.steelGrade || null,
+            quantity_szt: item.quantitySzt,
+            length_m:     item.lengthM,
+            quantity_mb:  quantityMb,
+            price_eur_mb: item.priceEurMb,
+            total_eur:    quantityMb * item.priceEurMb,
+            total_pln:    quantityMb * item.priceEurMb * exchangeRate,
+            mass_t:       massT,
+            sort_order:   idx,
+          };
+        }))
+        .select();
+      if (locksErr) {
+        setSaving(false);
+        return setError('Błąd zapisu zamków: ' + locksErr.message);
+      }
+      savedLockItems = (insertedLocks ?? []) as SaleOfferLockItem[];
+    }
+
     setSaving(false);
     const updatedOffer = data as SaleOffer;
-    updatedOffer.items = (insertedItems ?? []) as SaleOfferItem[];
+    updatedOffer.items      = (insertedItems ?? []) as SaleOfferItem[];
+    updatedOffer.lock_items = savedLockItems;
     onSaved(updatedOffer);
   }
 
@@ -575,6 +670,108 @@ export default function EditSaleOfferModal({
                 </span>
               </div>
             )}
+          </div>
+
+          {/* ── ZAMKI ── */}
+          <div className="border border-gray-200 rounded-xl overflow-hidden">
+            <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">🔗 Zamki</p>
+              <button onClick={addLockItem}
+                className="px-2 py-1 text-xs font-medium text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50">
+                + Dodaj zamek
+              </button>
+            </div>
+            <div className="p-4">
+              {editLockItems.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-2">Brak zamków · kliknij „Dodaj zamek"</p>
+              ) : (
+                <div className="space-y-2">
+                  {editLockItems.map((item, idx) => {
+                    const def      = lockDefs.find(l => l.name === item.lockName);
+                    const defPrice = def?.price_eur_mb ?? 0;
+                    const qMb      = item.quantitySzt * item.lengthM;
+                    const massT    = item.weightKgM > 0 ? (qMb * item.weightKgM) / 1000 : 0;
+
+                    return (
+                      <div key={item.uid} className="grid grid-cols-12 gap-2 items-end p-2 bg-gray-50 rounded-lg border border-gray-200">
+                        {/* Typ zamka */}
+                        <div className="col-span-3">
+                          {idx === 0 && <p className="text-xs text-gray-400 mb-1">Typ zamka</p>}
+                          <select value={item.lockName}
+                            onChange={e => updateLockItem(item.uid, { lockName: e.target.value })}
+                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            {lockDefs.map(l => (
+                              <option key={l.id} value={l.name}>{l.name}</option>
+                            ))}
+                            {!lockDefs.some(l => l.name === item.lockName) && (
+                              <option value={item.lockName}>{item.lockName}</option>
+                            )}
+                          </select>
+                        </div>
+                        {/* Gatunek */}
+                        <div className="col-span-2">
+                          {idx === 0 && <p className="text-xs text-gray-400 mb-1">Gatunek</p>}
+                          <select value={item.steelGrade}
+                            onChange={e => updateLockItem(item.uid, { steelGrade: e.target.value })}
+                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">—</option>
+                            {steelGrades.map(g => (
+                              <option key={g.id} value={g.id}>{g.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {/* Ilość szt. */}
+                        <div className="col-span-1">
+                          {idx === 0 && <p className="text-xs text-gray-400 mb-1">Szt.</p>}
+                          <input type="number" min={1} step={1} value={item.quantitySzt}
+                            onChange={e => updateLockItem(item.uid, { quantitySzt: Math.max(1, parseInt(e.target.value) || 1) })}
+                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                        {/* Długość */}
+                        <div className="col-span-1">
+                          {idx === 0 && <p className="text-xs text-gray-400 mb-1">Dł. [m]</p>}
+                          <input type="number" min={0.1} step={0.1} value={item.lengthM}
+                            onChange={e => updateLockItem(item.uid, { lengthM: Math.max(0.1, parseFloat(e.target.value) || 0.1) })}
+                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                        {/* Cena EUR/mb */}
+                        <div className="col-span-2">
+                          {idx === 0 && <p className="text-xs text-gray-400 mb-1">EUR/mb</p>}
+                          <input type="number" min={0} step={0.5} value={item.priceEurMb}
+                            onChange={e => updateLockItem(item.uid, { priceEurMb: parseFloat(e.target.value) || 0 })}
+                            className={`w-full border rounded-lg px-2 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                              item.priceEurMb !== defPrice && defPrice > 0 ? 'border-amber-400 bg-amber-50' : 'border-blue-300 bg-blue-50'
+                            }`} />
+                        </div>
+                        {/* Masa [t] */}
+                        <div className="col-span-2">
+                          {idx === 0 && <p className="text-xs text-gray-400 mb-1">Masa [t]</p>}
+                          <div className="bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right text-gray-600">
+                            {formatNumber(massT, 3)}
+                          </div>
+                        </div>
+                        {/* Usuń */}
+                        <div className="col-span-1 flex justify-end items-end">
+                          <button onClick={() => removeLockItem(item.uid)}
+                            className="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200"
+                            title="Usuń">✕</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Suma zamków */}
+                  {editLockItems.length > 0 && (
+                    <div className="flex justify-between text-sm font-semibold text-blue-900 pt-2 border-t border-gray-200 px-1">
+                      <span>Suma zamków:</span>
+                      <span>
+                        {formatEUR(editLockItems.reduce((s, item) => s + (item.quantitySzt * item.lengthM) * item.priceEurMb, 0))} EUR
+                        {' '}· {formatNumber(editLockItems.reduce((s, item) => s + (item.weightKgM > 0 ? (item.quantitySzt * item.lengthM) * item.weightKgM / 1000 : 0), 0), 3)} t
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ── Waluta i kurs EUR ── */}

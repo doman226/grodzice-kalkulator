@@ -88,6 +88,16 @@ export interface PdfStrings {
   validityLine2:  string;
   validityLabel:  (days: number) => string;
 
+  // Locks table
+  lockSectionTitle: string;
+  thLock:           string;
+  thLockQtySzt:     string;
+  thMb:             string;
+  thPricePerMb:     string;
+  thValueEUR:       string;
+  lockTotalRow:     string;
+  lockMassRow:      string;
+
   // Notes
   notesLabel: string;
 }
@@ -170,6 +180,15 @@ const pl: PdfStrings = {
   validityLine1:  label => `- Oferta ważna ${label} od daty wysłania i wymaga finalnego potwierdzenia.`,
   validityLine2:  '- Oferta nie rezerwuje dostępności magazynowych oraz możliwości produkcyjnych.',
   validityLabel:  days  => days === 1 ? '24h' : `${days} dni`,
+
+  lockSectionTitle: 'Zamki',
+  thLock:           'Zamek',
+  thLockQtySzt:     'Szt.',
+  thMb:             'mb łącznie',
+  thPricePerMb:     'Cena [EUR/mb]',
+  thValueEUR:       'Wartość [EUR]',
+  lockTotalRow:     'Łącznie zamki',
+  lockMassRow:      'Masa zamków',
 
   notesLabel: 'Uwagi',
 };
@@ -257,6 +276,15 @@ const en: PdfStrings = {
   validityLine1:  label => `- This quotation is valid for ${label} from the date of issue and requires final confirmation.`,
   validityLine2:  '- This quotation does not reserve stock availability or production capacity.',
   validityLabel:  days  => days === 1 ? '24 hours' : `${days} days`,
+
+  lockSectionTitle: 'Interlocks',
+  thLock:           'Interlock',
+  thLockQtySzt:     'Pcs.',
+  thMb:             'Total [lm]',
+  thPricePerMb:     'Price [EUR/lm]',
+  thValueEUR:       'Value [EUR]',
+  lockTotalRow:     'Total interlocks',
+  lockMassRow:      'Interlock mass',
 
   notesLabel: 'Notes',
 };

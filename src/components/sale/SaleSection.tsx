@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import type { Client, SaleOffer, SaleProfile } from '../../types';
+import type { Client, SaleOffer, SaleProfile, SaleLock } from '../../types';
 import SaleCalculator from './SaleCalculator';
 import SalePriceMatrix from './SalePriceMatrix';
 import SaleProfilesTable from './SaleProfilesTable';
@@ -20,6 +20,7 @@ interface Props {
 
 export default function SaleSection({ clients, onClientAdded, onClientsChange, activeTab, onTabChange, onOffersCountChange }: Props) {
   const [profiles, setProfiles]     = useState<SaleProfile[]>([]);
+  const [locks, setLocks]           = useState<SaleLock[]>([]);
   const [saleOffers, setSaleOffers] = useState<SaleOffer[]>([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState('');
@@ -29,19 +30,21 @@ export default function SaleSection({ clients, onClientAdded, onClientsChange, a
   async function loadData() {
     setLoading(true);
     setError('');
-    const [profilesRes, offersRes] = await Promise.all([
+    const [profilesRes, locksRes, offersRes] = await Promise.all([
       supabase.from('sale_profiles').select('*').order('name'),
+      supabase.from('sale_locks').select('*').eq('active', true).order('sort_order'),
       supabase
         .from('sale_offers')
-        .select('*, client:clients(*), items:sale_offer_items(*)')
+        .select('*, client:clients(*), items:sale_offer_items(*), lock_items:sale_offer_lock_items(*)')
         .is('deleted_at', null)
         .order('created_at', { ascending: false }),
     ]);
 
-    if (profilesRes.error || offersRes.error) {
+    if (profilesRes.error || locksRes.error || offersRes.error) {
       setError('Błąd ładowania danych.');
     } else {
       setProfiles(profilesRes.data as SaleProfile[]);
+      setLocks(locksRes.data as SaleLock[]);
       const offers = offersRes.data as SaleOffer[];
       setSaleOffers(offers);
       onOffersCountChange(offers.length);
@@ -79,6 +82,7 @@ export default function SaleSection({ clients, onClientAdded, onClientsChange, a
           {activeTab === 'calculator' && (
             <SaleCalculator
               clients={clients}
+              locks={locks}
               onClientAdded={onClientAdded}
               onOfferSaved={handleOfferSaved}
             />

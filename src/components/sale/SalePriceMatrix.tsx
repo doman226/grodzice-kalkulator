@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { SaleWarehouse, SaleSteeelGrade, SaleProfile, SalePrice } from '../../types';
+import SaleLocksTable from './SaleLocksTable';
+
+type PriceTab = 'grodzice' | 'zamki';
 
 // Typ klucza komórki edytowanej
 interface EditingCell {
@@ -10,6 +13,7 @@ interface EditingCell {
 }
 
 export default function SalePriceMatrix() {
+  const [priceTab, setPriceTab]       = useState<PriceTab>('grodzice');
   const [warehouses, setWarehouses]   = useState<SaleWarehouse[]>([]);
   const [grades, setGrades]           = useState<SaleSteeelGrade[]>([]);
   const [profiles, setProfiles]       = useState<SaleProfile[]>([]);
@@ -121,21 +125,45 @@ export default function SalePriceMatrix() {
     setTimeout(() => setToast(''), 2500);
   }
 
-  if (loading) return (
-    <div className="flex items-center justify-center py-16">
-      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-900" />
-    </div>
-  );
-
-  if (error) return (
-    <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-red-700 text-sm">{error}</div>
-  );
-
   const map = priceMap();
   const selectedWarehouse = warehouses.find(w => w.id === selectedWh);
 
   return (
     <div className="space-y-4">
+
+      {/* Zakładki Grodzice / Zamki */}
+      <div className="flex gap-1 border-b-2 border-gray-200">
+        {(['grodzice', 'zamki'] as PriceTab[]).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setPriceTab(tab)}
+            className={`px-5 py-2.5 text-sm font-semibold border-b-2 -mb-0.5 transition-colors capitalize ${
+              priceTab === tab
+                ? 'border-blue-700 text-blue-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            {tab === 'grodzice' ? '🏗 Grodzice' : '🔗 Zamki'}
+          </button>
+        ))}
+      </div>
+
+      {/* Zakładka: Zamki */}
+      {priceTab === 'zamki' && <SaleLocksTable />}
+
+      {/* Zakładka: Grodzice */}
+      {priceTab === 'grodzice' && <>
+
+      {loading && (
+        <div className="flex items-center justify-center py-16">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-900" />
+        </div>
+      )}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-red-700 text-sm">{error}</div>
+      )}
+
+      {!loading && !error && <>
 
       {/* Toast */}
       {toast && (
@@ -275,6 +303,9 @@ export default function SalePriceMatrix() {
       <div className="text-xs text-gray-400 text-right">
         Źródło: Pricelist Sheetpiles N · dane wg katalogu Intra BV 2025
       </div>
+
+      </>}  {/* koniec bloku !loading && !error */}
+      </>}  {/* koniec bloku Grodzice */}
     </div>
   );
 }

@@ -3,9 +3,9 @@ import { supabase } from '../../lib/supabase';
 import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
 import { fetchNBPRate, formatNBPDate } from '../../lib/nbp';
 import type { NBPRate } from '../../lib/nbp';
-import type { Client, SaleOffer, SaleWarehouse, SaleSteeelGrade, SaleProfile, SalePrice } from '../../types';
+import type { Client, SaleOffer, SaleWarehouse, SaleSteeelGrade, SaleProfile, SalePrice, SaleLock } from '../../types';
 import SaveSaleOfferModal from './SaveSaleOfferModal';
-import type { SaleItemSnapshot } from './SaveSaleOfferModal';
+import type { SaleItemSnapshot, LockSnapshot } from './SaveSaleOfferModal';
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
@@ -33,6 +33,22 @@ interface ItemResult {
   profile: SaleProfile | null;
 }
 
+interface SaleLockCalcItem {
+  uid: string;
+  lockName: string;
+  steelGrade: string;   // gatunek stali – informacyjnie
+  quantitySzt: number;  // liczba sztuk
+  lengthM: number;      // długość jednej sztuki [m]
+  priceEurMb: number;   // zawsze EUR – nie przeliczamy przy zmianie waluty
+}
+
+interface LockItemResult {
+  valid: boolean;
+  totalEUR: number;
+  totalPLN: number;
+  massT: number;
+}
+
 // ─── Pomocnicze ───────────────────────────────────────────────────────────────
 
 function marginColor(pct: number): string {
@@ -53,11 +69,12 @@ function marginLabel(pct: number): string {
 
 interface Props {
   clients: Client[];
+  locks: SaleLock[];
   onClientAdded: (c: Client) => void;
   onOfferSaved: (offer: SaleOffer) => void;
 }
 
-export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }: Props) {
+export default function SaleCalculator({ clients, locks, onClientAdded, onOfferSaved }: Props) {
   // --- Dane z bazy ---
   const [warehouses, setWarehouses] = useState<SaleWarehouse[]>([]);
   const [grades,     setGrades]     = useState<SaleSteeelGrade[]>([]);
@@ -75,6 +92,7 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
   const [currency, setCurrency]         = useState<'EUR' | 'PLN'>('EUR');
   const [applyAllSellPrice, setApplyAllSellPrice] = useState<number>(0);
   const [showSaveModal, setShowSaveModal]         = useState(false);
+  const [lockItems, setLockItems]                 = useState<SaleLockCalcItem[]>([]);
 
   // Dostawa
   const TRUCK_CAPACITY_T = 24.5;
@@ -132,24 +150,24 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
     setProfiles(prs);
     setPrices(sps);
 
-    // Inicjalizuj pierwszą pozycję gdy dane gotowe
-    if (whs.length && prs.length && grs.length) {
-      const defaultWh      = whs[0].id;
-      const defaultProfile = prs[0].name;
-      const defaultGrade   = grs[0].id;
-      const costPrice = sps.find(
-        p => p.warehouse_id === defaultWh && p.profile_name === defaultProfile && p.steel_grade === defaultGrade
-      )?.price_eur_t ?? 0;
-
+    // Dodaj domyślną (pustą) pozycję grodzicy – blok zawsze widoczny po starcie
+    if (whs.length > 0 && prs.length > 0 && grs.length > 0) {
+      const wh   = whs[0].id;
+      const prof = prs[0].name;
+      const gr   = grs[0].id;
+      const spMap: Record<string, Record<string, Record<string, number | null>>> = {};
+      for (const p of sps) {
+        if (!spMap[p.warehouse_id]) spMap[p.warehouse_id] = {};
+        if (!spMap[p.warehouse_id][p.profile_name]) spMap[p.warehouse_id][p.profile_name] = {};
+        spMap[p.warehouse_id][p.profile_name][p.steel_grade] = p.price_eur_t;
+      }
+      const costEurT = spMap[wh]?.[prof]?.[gr] ?? 0;
       setItems([{
         uid: crypto.randomUUID(),
-        warehouseId: defaultWh,
-        profileName: defaultProfile,
-        steelGrade: defaultGrade,
-        quantity: 10,
-        lengthM: 12,
+        warehouseId: wh, profileName: prof, steelGrade: gr,
+        quantity: 10, lengthM: 12,
         isPaired: false,
-        costPriceEurT: costPrice ?? 0,
+        costPriceEurT: costEurT,
         sellPriceEurT: 0,
       }]);
     }
@@ -216,6 +234,37 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
     setItems(prev => prev.map(i => ({ ...i, sellPriceEurT: applyAllSellPrice })));
   }
 
+  // --- Zarządzanie zamkami ---
+  function addLockItem() {
+    if (!locks.length) return;
+    const def = locks[0];
+    setLockItems(prev => [...prev, {
+      uid:         crypto.randomUUID(),
+      lockName:    def.name,
+      steelGrade:  grades[0]?.id ?? '',
+      quantitySzt: 10,
+      lengthM:     12,
+      priceEurMb:  def.price_eur_mb,
+    }]);
+  }
+
+  function removeLockItem(uid: string) {
+    setLockItems(prev => prev.filter(i => i.uid !== uid));
+  }
+
+  function updateLockItem(uid: string, patch: Partial<SaleLockCalcItem>) {
+    setLockItems(prev => prev.map(item => {
+      if (item.uid !== uid) return item;
+      const updated = { ...item, ...patch };
+      // przy zmianie typu zamka – auto-uzupełnij cenę z cennika
+      if ('lockName' in patch) {
+        const def = locks.find(l => l.name === patch.lockName);
+        if (def) updated.priceEurMb = def.price_eur_mb;
+      }
+      return updated;
+    }));
+  }
+
   // --- Obliczenia per pozycja ---
   const itemResults = useMemo((): ItemResult[] =>
     items.map(item => {
@@ -237,6 +286,33 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
     [items, profiles, currency, exchangeRate]
   );
 
+  // --- Obliczenia zamków ---
+  const lockResults = useMemo((): LockItemResult[] =>
+    lockItems.map(item => {
+      const def = locks.find(l => l.name === item.lockName);
+      const quantityMb = item.quantitySzt * item.lengthM;
+      if (!def || quantityMb <= 0 || item.priceEurMb <= 0) {
+        return { valid: false, totalEUR: 0, totalPLN: 0, massT: 0 };
+      }
+      const totalEUR = quantityMb * item.priceEurMb;
+      const totalPLN = totalEUR * exchangeRate;
+      const massT    = (quantityMb * def.weight_kg_m) / 1000;
+      return { valid: true, totalEUR, totalPLN, massT };
+    }),
+    [lockItems, locks, exchangeRate]
+  );
+
+  const lockTotals = useMemo(() => {
+    let totalEUR = 0, totalPLN = 0, totalMassT = 0;
+    for (const r of lockResults) {
+      if (!r.valid) continue;
+      totalEUR   += r.totalEUR;
+      totalPLN   += r.totalPLN;
+      totalMassT += r.massT;
+    }
+    return { totalEUR, totalPLN, totalMassT };
+  }, [lockResults]);
+
   // --- Sumy łączne ---
   const totals = useMemo(() => {
     let totalMassT = 0, totalWallAreaM2 = 0, totalCostEUR = 0, totalSellEUR = 0;
@@ -255,28 +331,35 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
     return { totalMassT, totalWallAreaM2, totalCostEUR, totalSellEUR, overallMarginPct, totalSellPLN, totalCostPLN, sellPerTon, sellPerM2 };
   }, [itemResults, exchangeRate]);
 
-  const isValid = totals.totalMassT > 0;
+  const isValid          = totals.totalMassT > 0;
   const hasAllSellPrices = items.every(i => i.sellPriceEurT > 0);
+  const hasValidLocks    = lockResults.some(r => r.valid);
+  // Można zapisać gdy: jest cokolwiek (grodzice lub zamki) i wszystkie grodzice mają ceny sprzedaży
+  const canSave = (isValid || hasValidLocks) && (items.length === 0 || hasAllSellPrices);
 
   // Obliczenia dostawy
+  // Masa łączna = grodzice + zamki (oba typy produktów ładowane na auto)
   // costPerTruck wpisywany jest w aktualnej walucie (EUR lub PLN)
   // totalCostPLN = zawsze PLN → do zapisu w DB i do totalForClientPLN
   const deliveryCalc = useMemo(() => {
-    if (!isValid) return null;
-    const autoTrucks   = Math.ceil(totals.totalMassT / TRUCK_CAPACITY_T);
-    const trucks       = typeof customDeliveryTrucks === 'number' && customDeliveryTrucks > 0
+    const combinedMassT = totals.totalMassT + lockTotals.totalMassT;
+    if (combinedMassT <= 0) return null;
+    const autoTrucks      = Math.ceil(combinedMassT / TRUCK_CAPACITY_T);
+    const trucks          = typeof customDeliveryTrucks === 'number' && customDeliveryTrucks > 0
       ? customDeliveryTrucks : autoTrucks;
-    const costPerTruck = typeof deliveryCostPerTruck === 'number' ? deliveryCostPerTruck : 0;
+    const costPerTruck    = typeof deliveryCostPerTruck === 'number' ? deliveryCostPerTruck : 0;
     const totalInCurrency = trucks * costPerTruck;
     const totalCostPLN    = currency === 'EUR'
       ? totalInCurrency * exchangeRate
       : totalInCurrency;
-    return { trucks, autoTrucks, costPerTruck, totalInCurrency, totalCostPLN };
-  }, [isValid, totals.totalMassT, deliveryCostPerTruck, customDeliveryTrucks, currency, exchangeRate]);
+    return { trucks, autoTrucks, costPerTruck, totalInCurrency, totalCostPLN, combinedMassT };
+  }, [totals.totalMassT, lockTotals.totalMassT, deliveryCostPerTruck, customDeliveryTrucks, currency, exchangeRate]);
 
   const deliveryCostCurrency  = (deliveryPaidBy === 'dap_included' && deliveryCalc) ? deliveryCalc.totalInCurrency : 0;
-  // Łącznie w wybranej walucie: towary + dostawa (obie w tej samej jednostce)
-  const totalForClientInCurrency = (currency === 'EUR' ? totals.totalSellEUR : totals.totalSellPLN) + deliveryCostCurrency;
+  // Łącznie w wybranej walucie: grodzice + zamki + dostawa
+  const grodziceSellCurrency  = currency === 'EUR' ? totals.totalSellEUR    : totals.totalSellPLN;
+  const lockSellCurrency      = currency === 'EUR' ? lockTotals.totalEUR    : lockTotals.totalPLN;
+  const totalForClientInCurrency = grodziceSellCurrency + lockSellCurrency + deliveryCostCurrency;
 
   // Handler zmiany waluty – konwertuje istniejące ceny pozycji do nowej waluty
   function handleCurrencyChange(newCurrency: 'EUR' | 'PLN') {
@@ -296,9 +379,8 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
     })));
     setCurrency(newCurrency);
   }
-  // Efektywna cena/t i /m² – uwzględnia transport DAP w cenie
-  const effectivePerTon = totals.totalMassT > 0 ? totalForClientInCurrency / totals.totalMassT : 0;
-  const effectivePerM2  = totals.totalWallAreaM2 > 0 ? totalForClientInCurrency / totals.totalWallAreaM2 : 0;
+  // Efektywna cena/t – tylko grodzice (bez zamków, transport pro-rata jeśli DAP)
+  const effectivePerTon = totals.totalMassT > 0 ? (grodziceSellCurrency + deliveryCostCurrency) / totals.totalMassT : 0;
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -390,15 +472,21 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
         </div>
       </div>
 
-      {/* ── POZYCJE WYCENY ── */}
+      {/* ── GRODZICE WYCENY ── */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-800">Pozycje wyceny</h2>
+          <h2 className="text-lg font-semibold text-gray-800">Grodzice wyceny</h2>
           <button onClick={addItem}
             className="px-3 py-1.5 text-sm font-medium text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors">
             + Dodaj pozycję
           </button>
         </div>
+
+        {items.length === 0 && (
+          <p className="text-sm text-gray-400 text-center py-6">
+            Brak grodzic · kliknij „Dodaj pozycję" aby dodać — lub zostaw puste dla oferty samych zamków
+          </p>
+        )}
 
         <div className="space-y-4">
           {items.map((item, idx) => {
@@ -481,11 +569,9 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
 
                   {/* Usuń */}
                   <div className="sm:col-span-1 flex justify-end">
-                    {items.length > 1 && (
-                      <button onClick={() => removeItem(item.uid)}
-                        className="w-9 h-9 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200 transition-colors"
-                        title="Usuń pozycję">✕</button>
-                    )}
+                    <button onClick={() => removeItem(item.uid)}
+                      className="w-9 h-9 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200 transition-colors"
+                      title="Usuń pozycję">✕</button>
                   </div>
                 </div>
 
@@ -555,18 +641,157 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
         </div>
       </div>
 
+      {/* ── ZAMKI ── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800">🔗 Zamki</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Cena za metr bieżący [EUR/mb] · wyliczenie niezależne od grodzic</p>
+          </div>
+          <button onClick={addLockItem}
+            className="px-3 py-1.5 text-sm font-medium text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors">
+            + Dodaj zamek
+          </button>
+        </div>
+
+        {lockItems.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-6">
+            Brak zamków · kliknij „Dodaj zamek" aby dodać pozycję
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {lockItems.map((item, idx) => {
+              const r      = lockResults[idx];
+              const def    = locks.find(l => l.name === item.lockName);
+              const defPrice = def?.price_eur_mb ?? 0;
+              const priceChanged = item.priceEurMb !== defPrice && defPrice > 0;
+
+              const quantityMb = item.quantitySzt * item.lengthM;
+
+              return (
+                <div key={item.uid} className="border border-gray-200 rounded-xl p-4 bg-gray-50">
+                  <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-end">
+
+                    {/* 1. Typ zamka */}
+                    <div className="sm:col-span-3">
+                      {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Typ zamka</label>}
+                      <select value={item.lockName}
+                        onChange={e => updateLockItem(item.uid, { lockName: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                        {locks.map(l => (
+                          <option key={l.id} value={l.name}>{l.name} ({l.weight_kg_m} kg/mb)</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* 2. Gatunek stali */}
+                    <div className="sm:col-span-2">
+                      {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Gatunek</label>}
+                      <select value={item.steelGrade}
+                        onChange={e => updateLockItem(item.uid, { steelGrade: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                        {grades.map(g => (
+                          <option key={g.id} value={g.id}>{g.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* 3. Ilość [szt.] */}
+                    <div className="sm:col-span-1">
+                      {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Ilość [szt.]</label>}
+                      <input type="number" min={1} step={1}
+                        value={item.quantitySzt}
+                        onChange={e => updateLockItem(item.uid, { quantitySzt: Math.max(1, parseInt(e.target.value) || 1) })}
+                        className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+
+                    {/* 4. Długość [m] */}
+                    <div className="sm:col-span-1">
+                      {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Dł. [m]</label>}
+                      <input type="number" min={0.1} step={0.1}
+                        value={item.lengthM}
+                        onChange={e => updateLockItem(item.uid, { lengthM: Math.max(0.1, parseFloat(e.target.value) || 0.1) })}
+                        className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+
+                    {/* mb (obliczone) */}
+                    <div className="sm:col-span-1">
+                      {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Łącznie [mb]</label>}
+                      <div className="bg-white border border-gray-200 rounded-lg px-2 py-2 text-sm text-right text-gray-600 min-h-[38px] flex items-center justify-end">
+                        {quantityMb > 0 ? formatNumber(quantityMb, 1) : <span className="text-gray-400">—</span>}
+                      </div>
+                    </div>
+
+                    {/* 5. Cena EUR/mb */}
+                    <div className="sm:col-span-2">
+                      {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Cena [EUR/mb]</label>}
+                      <input type="number" min={0} step={0.5}
+                        value={item.priceEurMb || ''}
+                        onChange={e => updateLockItem(item.uid, { priceEurMb: parseFloat(e.target.value) || 0 })}
+                        className={`w-full border rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold ${
+                          priceChanged ? 'border-amber-400 bg-amber-50' : 'border-blue-300 bg-blue-50'
+                        }`} />
+                      {priceChanged && (
+                        <button onClick={() => updateLockItem(item.uid, { priceEurMb: defPrice })}
+                          className="text-xs text-blue-600 underline mt-0.5">
+                          przywróć ({defPrice} EUR/mb)
+                        </button>
+                      )}
+                    </div>
+
+                    {/* 6. Masa [t] */}
+                    <div className="sm:col-span-1">
+                      {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Masa [t]</label>}
+                      <div className="bg-white border border-gray-200 rounded-lg px-2 py-2 text-sm text-right font-semibold text-gray-800 min-h-[38px] flex items-center justify-end">
+                        {r.valid ? formatNumber(r.massT, 3) : <span className="text-gray-400">—</span>}
+                      </div>
+                    </div>
+
+                    {/* Usuń */}
+                    <div className="sm:col-span-1 flex justify-end">
+                      <button onClick={() => removeLockItem(item.uid)}
+                        className="w-9 h-9 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200 transition-colors"
+                        title="Usuń zamek">✕</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Podsumowanie zamków */}
+            {lockTotals.totalEUR > 0 && (
+              <div className="mt-2 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-3">Podsumowanie zamków</p>
+                <div className="flex flex-wrap gap-8">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-0.5">Wartość łączna</p>
+                    <p className="text-2xl font-bold text-blue-900">{formatEUR(lockTotals.totalEUR)} EUR</p>
+                    <p className="text-sm text-blue-700 mt-0.5">≈ {formatPLN(lockTotals.totalPLN)} PLN</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-0.5">Masa zamków</p>
+                    <p className="text-2xl font-bold text-gray-800">{formatNumber(lockTotals.totalMassT, 3)} t</p>
+                    <p className="text-xs text-gray-400 mt-0.5">łącznie dla {lockItems.filter((_, i) => lockResults[i]?.valid).length} poz.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* ── WYNIKI ŁĄCZNE ── */}
-      {isValid && (
+      {(isValid || hasValidLocks) && (
         <div className="space-y-4">
 
           {/* Dane fizyczne */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Dane łączne</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <StatCard label="Masa łączna" value={formatNumber(totals.totalMassT, 3)} unit="t" />
-              <StatCard label="Powierzchnia ścianki" value={formatNumber(totals.totalWallAreaM2, 2)} unit="m²" />
+              <StatCard label="Masa grodzic" value={isValid ? formatNumber(totals.totalMassT, 3) : '—'} unit="t" />
+              <StatCard label="Masa zamków" value={hasValidLocks ? formatNumber(lockTotals.totalMassT, 3) : '—'} unit="t" />
+              <StatCard label="Powierzchnia ścianki" value={isValid ? formatNumber(totals.totalWallAreaM2, 2) : '—'} unit="m²" />
               <StatCard label="Cena sprzedaży / t" value={effectivePerTon > 0 ? formatEUR(effectivePerTon) : '—'} unit={`${currency}/t`} />
-              <StatCard label="Cena sprzedaży / m²" value={effectivePerM2 > 0 ? formatEUR(effectivePerM2) : '—'} unit={`${currency}/m²`} />
             </div>
             {items.length > 1 && (
               <div className="mt-4 pt-4 border-t border-gray-100 space-y-1">
@@ -586,8 +811,16 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
             )}
           </div>
 
-          {/* Koszt vs Sprzedaż vs Marża */}
-          {hasAllSellPrices && (
+          {/* Koszt vs Sprzedaż vs Marża – tylko gdy są grodzice */}
+          {isValid && hasAllSellPrices && (() => {
+            // Cena sprzedaży łącznie = grodzice + zamki (do wyświetlenia kwoty)
+            const combinedSellEUR  = totals.totalSellEUR + lockTotals.totalEUR;
+            const combinedSellPLN  = totals.totalSellPLN + lockTotals.totalPLN;
+            // Marża liczona TYLKO od grodzic (zamki bez kosztu własnego)
+            const grodziceProfit   = totals.totalSellEUR - totals.totalCostEUR;
+            const grodziceMargin   = totals.totalSellEUR > 0 ? (grodziceProfit / totals.totalSellEUR) * 100 : 0;
+            const hasLockRevenue   = lockTotals.totalEUR > 0;
+            return (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">
                 Koszt własny vs Sprzedaż
@@ -608,6 +841,9 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
                       ? `≈ ${formatEUR(totals.totalCostEUR)} EUR`
                       : `≈ ${formatPLN(totals.totalCostPLN)} PLN`}
                   </p>
+                  {hasLockRevenue && (
+                    <p className="text-xs text-gray-400 mt-1">tylko grodzice (zamki bez kosztu)</p>
+                  )}
                 </div>
 
                 {/* Sprzedaż */}
@@ -615,25 +851,33 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
                   <p className="text-xs font-medium text-blue-300 uppercase tracking-wide mb-2">Cena sprzedaży</p>
                   <p className="text-2xl font-bold">
                     {currency === 'EUR'
-                      ? `${formatEUR(totals.totalSellEUR)} EUR`
-                      : `${formatPLN(totals.totalSellPLN)} PLN`}
+                      ? `${formatEUR(combinedSellEUR)} EUR`
+                      : `${formatPLN(combinedSellPLN)} PLN`}
                   </p>
                   {currency === 'EUR'
-                    ? <p className="text-sm text-blue-300 mt-1">≈ {formatPLN(totals.totalSellPLN)} PLN</p>
-                    : <p className="text-sm text-blue-300 mt-1">= {formatEUR(totals.totalSellEUR)} EUR</p>
+                    ? <p className="text-sm text-blue-300 mt-1">≈ {formatPLN(combinedSellPLN)} PLN</p>
+                    : <p className="text-sm text-blue-300 mt-1">= {formatEUR(combinedSellEUR)} EUR</p>
                   }
+                  {hasLockRevenue && (
+                    <p className="text-xs text-blue-400 mt-1">
+                      grodzice {formatEUR(totals.totalSellEUR)} + zamki {formatEUR(lockTotals.totalEUR)} EUR
+                    </p>
+                  )}
                 </div>
 
                 {/* Marża */}
-                <div className={`rounded-xl border p-4 ${marginColor(totals.overallMarginPct)}`}>
+                <div className={`rounded-xl border p-4 ${marginColor(grodziceMargin)}`}>
                   <p className="text-xs font-medium uppercase tracking-wide mb-2 opacity-70">Marża łączna</p>
-                  <p className="text-2xl font-bold">{totals.overallMarginPct.toFixed(1)}%</p>
-                  <p className="text-sm mt-1 font-medium">{marginLabel(totals.overallMarginPct)}</p>
+                  <p className="text-2xl font-bold">{grodziceMargin.toFixed(1)}%</p>
+                  <p className="text-sm mt-1 font-medium">{marginLabel(grodziceMargin)}</p>
                   <p className="text-xs mt-1 opacity-70">
                     zysk: {currency === 'PLN'
-                      ? `${formatPLN((totals.totalSellEUR - totals.totalCostEUR) * exchangeRate)} PLN`
-                      : `${formatEUR(totals.totalSellEUR - totals.totalCostEUR)} EUR`}
+                      ? `${formatPLN(grodziceProfit * exchangeRate)} PLN`
+                      : `${formatEUR(grodziceProfit)} EUR`}
                   </p>
+                  {hasLockRevenue && (
+                    <p className="text-xs mt-1 opacity-60">tylko grodzice (zamki bez kosztu własnego)</p>
+                  )}
                 </div>
               </div>
 
@@ -677,9 +921,10 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
 
-          {!hasAllSellPrices && (
+          {isValid && !hasAllSellPrices && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-yellow-700 text-sm text-center">
               Wpisz ceny sprzedaży dla wszystkich pozycji, aby zobaczyć podsumowanie marży.
             </div>
@@ -688,9 +933,33 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
           {/* ── DOSTAWA ── */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-1">Koszty dostawy</h2>
+            <p className="text-xs text-gray-400 mb-1">
+              Ładowność auta: <strong className="text-gray-600">24,5 t</strong>
+              {deliveryCalc ? (
+                <>
+                  {' · '}Masa łączna:{' '}
+                  <strong className="text-gray-700">{formatNumber(deliveryCalc.combinedMassT, 3)} t</strong>
+                  {isValid && hasValidLocks && (
+                    <span>
+                      {' '}(grodzice {formatNumber(totals.totalMassT, 3)} t + zamki {formatNumber(lockTotals.totalMassT, 3)} t)
+                    </span>
+                  )}
+                  {' · '}Szacowane auta:{' '}
+                  <strong className="text-gray-700">{deliveryCalc.autoTrucks}</strong>
+                </>
+              ) : (
+                <span> · Masa łączna: <strong className="text-gray-500">—</strong> (brak pozycji)</span>
+              )}
+            </p>
             <p className="text-xs text-gray-400 mb-4">
-              Ładowność auta: 24,5 t · Szacowana liczba aut:{' '}
-              <strong className="text-gray-700">{deliveryCalc?.autoTrucks ?? '—'}</strong>
+              {deliveryCalc && deliveryCalc.combinedMassT > 0 && (
+                <>
+                  {Math.ceil(deliveryCalc.combinedMassT / TRUCK_CAPACITY_T) === 1
+                    ? `${formatNumber(deliveryCalc.combinedMassT, 3)} t mieści się na 1 aucie`
+                    : `${formatNumber(deliveryCalc.combinedMassT, 3)} t ÷ 24,5 t = ${deliveryCalc.autoTrucks} aut (zaokrąglone w górę)`
+                  }
+                </>
+              )}
             </p>
 
             {/* Opcja dostawy – 3 przyciski */}
@@ -729,7 +998,12 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
                     onChange={e => setCustomDeliveryTrucks(Math.max(1, parseInt(e.target.value) || 1))}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <p className="text-xs text-gray-400 mt-1">Szacunek: {deliveryCalc?.autoTrucks ?? '—'} aut</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Auto-szacunek z masy: {deliveryCalc?.autoTrucks ?? '—'} aut
+                    {deliveryCalc && typeof customDeliveryTrucks === 'number' && customDeliveryTrucks > 0
+                      && customDeliveryTrucks !== deliveryCalc.autoTrucks
+                      && <span className="text-amber-500 ml-1">(zmienione ręcznie)</span>}
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -794,8 +1068,8 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
                     </p>
                     <p className="text-blue-300 text-xs mt-0.5">
                       {currency === 'EUR'
-                        ? `towary ${formatEUR(totals.totalSellEUR)} EUR + dostawa ${formatEUR(deliveryCalc.totalInCurrency)} EUR`
-                        : `towary ${formatPLN(totals.totalSellPLN)} PLN + dostawa ${formatPLN(deliveryCalc.totalInCurrency)} PLN`}
+                        ? `grodzice ${formatEUR(totals.totalSellEUR)}${lockTotals.totalEUR > 0 ? ` + zamki ${formatEUR(lockTotals.totalEUR)}` : ''} + dostawa ${formatEUR(deliveryCalc.totalInCurrency)} EUR`
+                        : `grodzice ${formatPLN(totals.totalSellPLN)}${lockTotals.totalPLN > 0 ? ` + zamki ${formatPLN(lockTotals.totalPLN)}` : ''} + dostawa ${formatPLN(deliveryCalc.totalInCurrency)} PLN`}
                     </p>
                   </div>
                 )}
@@ -803,8 +1077,17 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
                   <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
                     <p className="text-blue-200 text-xs mb-0.5">Kwota sprzedaży (na ofercie)</p>
                     <p className="text-2xl font-bold">
-                      {currency === 'EUR' ? `${formatEUR(totals.totalSellEUR)} EUR` : `${formatPLN(totals.totalSellPLN)} PLN`}
+                      {currency === 'EUR'
+                        ? `${formatEUR(grodziceSellCurrency + lockSellCurrency)} EUR`
+                        : `${formatPLN(grodziceSellCurrency + lockSellCurrency)} PLN`}
                     </p>
+                    {lockTotals.totalEUR > 0 && (
+                      <p className="text-blue-300 text-xs mt-0.5">
+                        {currency === 'EUR'
+                          ? `grodzice ${formatEUR(totals.totalSellEUR)} + zamki ${formatEUR(lockTotals.totalEUR)} EUR`
+                          : `grodzice ${formatPLN(totals.totalSellPLN)} + zamki ${formatPLN(lockTotals.totalPLN)} PLN`}
+                      </p>
+                    )}
                     <p className="text-orange-300 text-xs mt-0.5">
                       + {currency === 'EUR' ? `${formatEUR(deliveryCalc.totalInCurrency)} EUR` : `${formatPLN(deliveryCalc.totalInCurrency)} PLN`} dostawa (refaktura)
                     </p>
@@ -817,9 +1100,9 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
           {/* Przycisk zapisu oferty */}
           <button
             onClick={() => setShowSaveModal(true)}
-            disabled={!hasAllSellPrices}
+            disabled={!canSave}
             className="w-full py-3 bg-green-700 hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl shadow-sm transition-colors"
-            title={!hasAllSellPrices ? 'Wpisz ceny sprzedaży dla wszystkich pozycji' : ''}
+            title={!canSave ? 'Wpisz ceny sprzedaży dla wszystkich pozycji lub dodaj zamki' : ''}
           >
             💾 Zapisz jako ofertę SP
           </button>
@@ -853,10 +1136,29 @@ export default function SaleCalculator({ clients, onClientAdded, onOfferSaved }:
           })
           .filter((s): s is SaleItemSnapshot => s !== null);
 
+        const lockSnapshot: LockSnapshot[] = lockItems
+          .map((item, idx) => {
+            const r = lockResults[idx];
+            if (!r.valid) return null;
+            return {
+              lockName:    item.lockName,
+              steelGrade:  item.steelGrade,
+              quantitySzt: item.quantitySzt,
+              lengthM:     item.lengthM,
+              quantityMb:  item.quantitySzt * item.lengthM,
+              priceEurMb:  item.priceEurMb,
+              totalEUR:    r.totalEUR,
+              totalPLN:    r.totalPLN,
+              massT:       r.massT,
+            } satisfies LockSnapshot;
+          })
+          .filter((s): s is LockSnapshot => s !== null);
+
         return (
           <SaveSaleOfferModal
             clients={clients}
             items={snapshot}
+            lockItems={lockSnapshot}
             totals={totals}
             currency={currency}
             exchangeRate={exchangeRate}

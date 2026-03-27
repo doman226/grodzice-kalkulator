@@ -1,12 +1,25 @@
 import { useState } from 'react';
 import { supabase, fetchNipData } from '../../lib/supabase';
-import type { Client, SaleOffer, SaleOfferItem, OfferStatus } from '../../types';
+import type { Client, SaleOffer, SaleOfferItem, SaleOfferLockItem, OfferStatus } from '../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
 import ClientSearchInput from '../ClientSearchInput';
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
-/** Snapshot jednej pozycji – obliczona przez kalkulator */
+/** Snapshot jednej pozycji zamka – obliczona przez kalkulator */
+export interface LockSnapshot {
+  lockName: string;
+  steelGrade: string;
+  quantitySzt: number;
+  lengthM: number;
+  quantityMb: number;   // = quantitySzt × lengthM
+  priceEurMb: number;
+  totalEUR: number;
+  totalPLN: number;
+  massT: number;
+}
+
+/** Snapshot jednej pozycji grodzicy – obliczona przez kalkulator */
 export interface SaleItemSnapshot {
   warehouseId: string;
   warehouseName: string;
@@ -46,6 +59,7 @@ interface DeliveryData {
 interface Props {
   clients: Client[];
   items: SaleItemSnapshot[];
+  lockItems: LockSnapshot[];
   totals: Totals;
   currency: 'EUR' | 'PLN';
   exchangeRate: number;
@@ -75,7 +89,7 @@ const WAREHOUSE_DELIVERY_OPTIONS = [
 // ─── Komponent ────────────────────────────────────────────────────────────────
 
 export default function SaveSaleOfferModal({
-  clients, items, totals, currency, exchangeRate, nbpDate, delivery,
+  clients, items, lockItems, totals, currency, exchangeRate, nbpDate, delivery,
   onSaved, onClose, onClientAdded,
 }: Props) {
   // ── Podstawowe pola ──
@@ -219,8 +233,36 @@ export default function SaveSaleOfferModal({
       return setError('Błąd zapisu pozycji – oferta anulowana: ' + itemsErr.message);
     }
 
+    // Zapisz zamki (jeśli są) i pobierz wynik z przypisanymi ID
+    let savedLockItems: SaleOfferLockItem[] = [];
+    if (lockItems.length > 0) {
+      const { data: insertedLocks, error: locksErr } = await supabase
+        .from('sale_offer_lock_items')
+        .insert(lockItems.map((item, idx) => ({
+          offer_id:     savedOffer.id,
+          lock_name:    item.lockName,
+          steel_grade:  item.steelGrade || null,
+          quantity_szt: item.quantitySzt,
+          length_m:     item.lengthM,
+          quantity_mb:  item.quantityMb,
+          price_eur_mb: item.priceEurMb,
+          total_eur:    item.totalEUR,
+          total_pln:    item.totalPLN,
+          mass_t:       item.massT,
+          sort_order:   idx,
+        })))
+        .select();
+      if (locksErr) {
+        await supabase.from('sale_offers').delete().eq('id', savedOffer.id);
+        setSaving(false);
+        return setError('Błąd zapisu zamków – oferta anulowana: ' + locksErr.message);
+      }
+      savedLockItems = (insertedLocks ?? []) as SaleOfferLockItem[];
+    }
+
     setSaving(false);
-    savedOffer.items = (insertedItems ?? []) as SaleOfferItem[];
+    savedOffer.items      = (insertedItems ?? []) as SaleOfferItem[];
+    savedOffer.lock_items = savedLockItems;
     onSaved(savedOffer);
   }
 
@@ -244,22 +286,49 @@ export default function SaveSaleOfferModal({
 
           {/* ── Podsumowanie pozycji ── */}
           <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-            <p className="text-xs text-blue-700 font-medium uppercase tracking-wide mb-2">
-              Pozycje ({items.length})
-            </p>
-            <div className="space-y-1 mb-3">
-              {items.map((item, idx) => (
-                <div key={idx} className="flex justify-between text-sm">
-                  <span className="text-gray-600">
-                    {item.profileName}
-                    {item.isPaired && <span className="text-blue-600 ml-1 text-xs">×2</span>}
-                    {' '}– {item.quantity} szt. × {item.lengthM} m
-                    <span className="text-gray-400 ml-1">({item.steelGrade.toUpperCase()}) · {item.warehouseName}</span>
-                  </span>
-                  <span className="font-medium text-gray-800">{formatNumber(item.massT, 3)} t</span>
+            {/* Grodzice */}
+            {items.length > 0 && (
+              <>
+                <p className="text-xs text-blue-700 font-medium uppercase tracking-wide mb-2">
+                  Grodzice ({items.length} poz.)
+                </p>
+                <div className="space-y-1 mb-3">
+                  {items.map((item, idx) => (
+                    <div key={idx} className="flex justify-between text-sm">
+                      <span className="text-gray-600">
+                        {item.profileName}
+                        {item.isPaired && <span className="text-blue-600 ml-1 text-xs">×2</span>}
+                        {' '}– {item.quantity} szt. × {item.lengthM} m
+                        <span className="text-gray-400 ml-1">({item.steelGrade.toUpperCase()}) · {item.warehouseName}</span>
+                      </span>
+                      <span className="font-medium text-gray-800">{formatNumber(item.massT, 3)} t</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </>
+            )}
+
+            {/* Zamki */}
+            {lockItems.length > 0 && (
+              <>
+                <p className="text-xs text-blue-700 font-medium uppercase tracking-wide mb-2 mt-2">
+                  🔗 Zamki ({lockItems.length} poz.)
+                </p>
+                <div className="space-y-1 mb-3">
+                  {lockItems.map((item, idx) => (
+                    <div key={idx} className="flex justify-between text-sm">
+                      <span className="text-gray-600">
+                        {item.lockName} – {item.quantityMb} mb × {item.priceEurMb} EUR/mb
+                      </span>
+                      <span className="font-medium text-gray-800">
+                        {formatEUR(item.totalEUR)} EUR
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
             <div className="pt-2 border-t border-blue-200 grid grid-cols-2 gap-2 text-sm">
               <div><span className="text-gray-500">Masa łączna:</span> <strong>{formatNumber(totals.totalMassT, 3)} t</strong></div>
               <div><span className="text-gray-500">Kurs EUR:</span> <strong>{exchangeRate.toFixed(4)} PLN{nbpDate ? ' (NBP)' : ' (ręczny)'}</strong></div>

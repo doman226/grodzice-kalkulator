@@ -75,6 +75,7 @@ export interface SaleOffer {
   updated_at: string;
   deleted_at?: string | null;
   items?: SaleOfferItem[];
+  lock_items?: SaleOfferLockItem[];
 }
 
 export interface SaleOfferItem {
@@ -96,6 +97,33 @@ export interface SaleOfferItem {
   sell_eur_total?: number;
   sell_pln_total?: number;
   margin_pct?: number;
+  sort_order: number;
+}
+
+// ─── Zamki (sprzedaż) ────────────────────────────────────────────────────────
+
+export interface SaleLock {
+  id: string;
+  name: string;
+  price_eur_mb: number;   // cena EUR za 1 mb
+  weight_kg_m: number;    // masa kg/mb
+  sort_order: number;
+  active: boolean;
+  updated_at: string;
+}
+
+export interface SaleOfferLockItem {
+  id: string;
+  offer_id: string;
+  lock_name: string;
+  steel_grade?: string | null;   // gatunek stali (informacyjnie)
+  quantity_szt?: number | null;  // liczba sztuk
+  length_m?: number | null;      // długość jednej sztuki [m]
+  quantity_mb: number;           // szt × długość [mb]
+  price_eur_mb: number;          // cena EUR/mb (snapshot)
+  total_eur: number;             // quantity_mb × price_eur_mb
+  total_pln: number;             // total_eur × exchange_rate
+  mass_t: number;                // quantity_mb × weight_kg_m / 1000
   sort_order: number;
 }
 
