@@ -14,8 +14,11 @@ export interface LockSnapshot {
   lengthM: number;
   quantityMb: number;   // = quantitySzt × lengthM
   priceEurMb: number;
+  sellPriceEurMb?: number;
   totalEUR: number;
   totalPLN: number;
+  totalSellEUR?: number;
+  totalSellPLN?: number;
   massT: number;
 }
 
