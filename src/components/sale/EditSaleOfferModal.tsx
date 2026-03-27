@@ -669,6 +669,17 @@ export default function EditSaleOfferModal({
                   </div>
                 );
               })}
+              {/* Suma grodzic */}
+              {itemResults.some(r => r !== null) && (
+                <div className="flex justify-between text-sm font-semibold text-blue-900 pt-2 border-t border-gray-200 px-1">
+                  <span>Suma grodzic:</span>
+                  <span className="flex gap-4">
+                    <span className="text-gray-600 font-normal">Koszt: {formatEUR(totals.totalCostEUR)} EUR</span>
+                    <span>Sprzedaż: {formatEUR(totals.totalSellEUR)} EUR</span>
+                    <span className="text-gray-500 font-normal">· {formatNumber(totals.totalMassT, 3)} t</span>
+                  </span>
+                </div>
+              )}
             </div>
 
           </div>
