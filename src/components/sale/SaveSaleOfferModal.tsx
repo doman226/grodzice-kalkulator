@@ -313,7 +313,9 @@ export default function SaveSaleOfferModal({
                         {' '}– {item.quantity} szt. × {item.lengthM} m
                         <span className="text-gray-400 ml-1">({item.steelGrade.toUpperCase()}) · {item.warehouseName}</span>
                       </span>
-                      <span className="font-medium text-gray-800">{formatNumber(item.massT, 3)} t</span>
+                      <span className="font-medium text-gray-800">
+                        {formatNumber(item.massT, 3)} t · {formatEUR(item.sellEurTotal)} EUR
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -333,7 +335,7 @@ export default function SaveSaleOfferModal({
                         {item.lockName} – {item.quantityMb.toFixed(1)} mb × {item.priceEurMb} EUR/mb (koszt) / {item.sellPriceEurMb ?? item.priceEurMb} EUR/mb (sprzedaż)
                       </span>
                       <span className="font-medium text-gray-800">
-                        {formatEUR(item.totalEUR)} EUR
+                        {formatNumber(item.massT, 3)} t · {formatEUR(item.totalSellEUR ?? item.totalEUR)} EUR
                       </span>
                     </div>
                   ))}
@@ -342,7 +344,7 @@ export default function SaveSaleOfferModal({
             )}
 
             <div className="pt-2 border-t border-blue-200 grid grid-cols-2 gap-2 text-sm">
-              <div><span className="text-gray-500">Masa łączna:</span> <strong>{formatNumber(totals.totalMassT, 3)} t</strong></div>
+              <div><span className="text-gray-500">Masa łączna:</span> <strong>{formatNumber(totals.totalMassT + lockItems.reduce((s, i) => s + i.massT, 0), 3)} t</strong></div>
               <div><span className="text-gray-500">Kurs EUR:</span> <strong>{exchangeRate.toFixed(4)} PLN{nbpDate ? ' (NBP)' : ' (ręczny)'}</strong></div>
             </div>
             <div className="pt-2 border-t border-blue-200 mt-2 space-y-1">
