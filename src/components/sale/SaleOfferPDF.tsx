@@ -207,8 +207,8 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
   const totalSellPLN = sortedItems.reduce((sum, i) => sum + (i.sell_pln_total ?? 0), 0);
 
   // Sumy zamków – muszą być zdefiniowane PRZED totalForClient*
-  const locksTotalEUR   = sortedLocks.reduce((sum, l) => sum + (l.total_eur ?? 0), 0);
-  const locksTotalPLN   = sortedLocks.reduce((sum, l) => sum + (l.total_pln ?? 0), 0);
+  const locksTotalEUR   = sortedLocks.reduce((sum, l) => sum + (l.sell_eur_total ?? l.total_eur ?? 0), 0);
+  const locksTotalPLN   = sortedLocks.reduce((sum, l) => sum + (l.sell_pln_total ?? l.total_pln ?? 0), 0);
   const locksTotalMassT = sortedLocks.reduce((sum, l) => sum + (l.mass_t   ?? 0), 0);
 
   // delivery_cost_total zawsze w PLN → przelicz na EUR jeśli potrzeba
@@ -393,10 +393,10 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
                     {formatNumber(qMb, 1)}
                   </Text>
                   <Text style={[s.tdLabel, { flex: 1.1, textAlign: 'right', color: C.gray700 }]}>
-                    {formatEUR(lock.price_eur_mb)} EUR/mb
+                    {formatEUR(lock.sell_price_eur_mb ?? lock.price_eur_mb)} EUR/mb
                   </Text>
                   <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
-                    {formatEUR(lock.total_eur)} EUR
+                    {formatEUR(lock.sell_eur_total ?? lock.total_eur)} EUR
                   </Text>
                 </View>
               );
