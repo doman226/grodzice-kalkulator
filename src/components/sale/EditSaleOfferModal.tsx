@@ -335,18 +335,25 @@ export default function EditSaleOfferModal({
   // ── Koszty transportu (identyczna logika jak SaleCalculator) ──
   const TRUCK_CAPACITY_T = 24.5;
   const deliveryCalc = useMemo(() => {
-    if (totals.totalMassT <= 0) return null;
-    const autoTrucks   = Math.ceil(totals.totalMassT / TRUCK_CAPACITY_T);
+    // Masa łączna = grodzice + zamki (przy ofercie samych zamków totals.totalMassT = 0)
+    const combinedMassT = totals.totalMassT + lockTotals.totalEUR === 0
+      ? totals.totalMassT
+      : totals.totalMassT + editLockItems.reduce((s, item) => {
+          const qMb = item.quantitySzt * item.lengthM;
+          return s + (item.weightKgM > 0 ? qMb * item.weightKgM / 1000 : 0);
+        }, 0);
+    if (combinedMassT <= 0 && typeof deliveryCostPerTruck !== 'number') return null;
+    const autoTrucks   = combinedMassT > 0 ? Math.ceil(combinedMassT / TRUCK_CAPACITY_T) : 1;
     const manualTrucks = typeof deliveryTrucks === 'number' && deliveryTrucks > 0 ? deliveryTrucks : null;
     const trucks       = manualTrucks ?? autoTrucks;
     const cpt          = typeof deliveryCostPerTruck === 'number' ? deliveryCostPerTruck : 0;
     const totalInCurrency = trucks * cpt;
     const totalCostPLN    = currency === 'EUR' ? totalInCurrency * exchangeRate : totalInCurrency;
-    return { trucks, autoTrucks, costPerTruck: cpt, totalInCurrency, totalCostPLN };
-  }, [totals.totalMassT, deliveryTrucks, deliveryCostPerTruck, currency, exchangeRate]);
+    return { trucks, autoTrucks, costPerTruck: cpt, totalInCurrency, totalCostPLN, combinedMassT };
+  }, [totals.totalMassT, lockTotals.totalEUR, editLockItems, deliveryTrucks, deliveryCostPerTruck, currency, exchangeRate]);
 
   const deliveryCostCurrency     = (deliveryPaidBy === 'dap_included' && deliveryCalc) ? deliveryCalc.totalInCurrency : 0;
-  const totalForClientInCurrency = (isEUR ? totals.totalSellEUR : totals.totalSellPLN) + deliveryCostCurrency;
+  const totalForClientInCurrency = (isEUR ? totals.totalSellEUR + lockTotals.totalEUR : totals.totalSellPLN + lockTotals.totalPLN) + deliveryCostCurrency;
 
   // ── Zapis ──
   async function handleSave() {
