@@ -15,6 +15,7 @@ interface EditableLockItem {
   quantitySzt: number;
   lengthM: number;
   priceEurMb: number;
+  sellPriceEurMb: number;   // cena sprzedaży [EUR/mb]
   weightKgM: number;  // z cennika – do wyliczenia mass_t przy zapisie
 }
 
@@ -96,8 +97,9 @@ function lockItemsFromOffer(offer: SaleOffer): EditableLockItem[] {
       // Jeśli stara oferta bez szt/długości – traktuj mb jako 1 szt × mb
       quantitySzt: item.quantity_szt ?? 1,
       lengthM:     item.length_m ?? item.quantity_mb,
-      priceEurMb:  item.price_eur_mb,
-      weightKgM:   item.mass_t > 0 && item.quantity_mb > 0
+      priceEurMb:     item.price_eur_mb,
+      sellPriceEurMb: item.sell_price_eur_mb ?? item.price_eur_mb ?? 0,
+      weightKgM:      item.mass_t > 0 && item.quantity_mb > 0
         ? (item.mass_t * 1000) / item.quantity_mb
         : 0,
     }));
@@ -244,13 +246,14 @@ export default function EditSaleOfferModal({
     if (!lockDefs.length) return;
     const def = lockDefs[0];
     setEditLockItems(prev => [...prev, {
-      uid:         crypto.randomUUID(),
-      lockName:    def.name,
-      steelGrade:  '',
-      quantitySzt: 10,
-      lengthM:     12,
-      priceEurMb:  def.price_eur_mb,
-      weightKgM:   def.weight_kg_m,
+      uid:            crypto.randomUUID(),
+      lockName:       def.name,
+      steelGrade:     '',
+      quantitySzt:    10,
+      lengthM:        12,
+      priceEurMb:     def.price_eur_mb,
+      sellPriceEurMb: def.price_eur_mb ?? 0,
+      weightKgM:      def.weight_kg_m,
     }]);
   }
   function removeLockItem(uid: string) {
@@ -262,7 +265,7 @@ export default function EditSaleOfferModal({
       const updated = { ...item, ...patch };
       if ('lockName' in patch) {
         const def = lockDefs.find(l => l.name === patch.lockName);
-        if (def) { updated.priceEurMb = def.price_eur_mb; updated.weightKgM = def.weight_kg_m; }
+        if (def) { updated.priceEurMb = def.price_eur_mb; updated.sellPriceEurMb = def.price_eur_mb; updated.weightKgM = def.weight_kg_m; }
       }
       return updated;
     }));
@@ -301,14 +304,17 @@ export default function EditSaleOfferModal({
 
   // Sumy zamków – do wliczenia do total_sell_eur/pln przy zapisie
   const lockTotals = useMemo(() => {
-    let totalEUR = 0, totalPLN = 0;
+    let totalEUR = 0, totalPLN = 0, totalSellEUR = 0, totalSellPLN = 0;
     for (const item of editLockItems) {
-      const qMb = item.quantitySzt * item.lengthM;
-      const eur = qMb * item.priceEurMb;
-      totalEUR += eur;
-      totalPLN += eur * exchangeRate;
+      const qMb  = item.quantitySzt * item.lengthM;
+      const eur  = qMb * item.priceEurMb;
+      const sell = qMb * item.sellPriceEurMb;
+      totalEUR     += eur;
+      totalPLN     += eur * exchangeRate;
+      totalSellEUR += sell;
+      totalSellPLN += sell * exchangeRate;
     }
-    return { totalEUR, totalPLN };
+    return { totalEUR, totalPLN, totalSellEUR, totalSellPLN };
   }, [editLockItems, exchangeRate]);
 
   const isEUR = currency === 'EUR';
@@ -353,7 +359,10 @@ export default function EditSaleOfferModal({
   }, [totals.totalMassT, lockTotals.totalEUR, editLockItems, deliveryTrucks, deliveryCostPerTruck, currency, exchangeRate]);
 
   const deliveryCostCurrency     = (deliveryPaidBy === 'dap_included' && deliveryCalc) ? deliveryCalc.totalInCurrency : 0;
-  const totalForClientInCurrency = (isEUR ? totals.totalSellEUR + lockTotals.totalEUR : totals.totalSellPLN + lockTotals.totalPLN) + deliveryCostCurrency;
+  const totalForClientInCurrency = (isEUR
+    ? totals.totalSellEUR + lockTotals.totalSellEUR
+    : totals.totalSellPLN + lockTotals.totalSellPLN
+  ) + deliveryCostCurrency;
 
   // ── Zapis ──
   async function handleSave() {
@@ -386,8 +395,8 @@ export default function EditSaleOfferModal({
         currency,
         exchange_rate:             exchangeRate,
         total_cost_eur:            totals.totalCostEUR,
-        total_sell_eur:            totals.totalSellEUR + lockTotals.totalEUR,
-        total_sell_pln:            totals.totalSellPLN + lockTotals.totalPLN,
+        total_sell_eur:            totals.totalSellEUR + lockTotals.totalSellEUR,
+        total_sell_pln:            totals.totalSellPLN + lockTotals.totalSellPLN,
         margin_pct:                totals.overallMarginPct,
         delivery_trucks:           hasTransport ? deliveryCalc!.trucks         : null,
         delivery_cost_per_truck:   hasTransport ? deliveryCalc!.costPerTruck   : null,
@@ -473,11 +482,14 @@ export default function EditSaleOfferModal({
             quantity_szt: item.quantitySzt,
             length_m:     item.lengthM,
             quantity_mb:  quantityMb,
-            price_eur_mb: item.priceEurMb,
-            total_eur:    quantityMb * item.priceEurMb,
-            total_pln:    quantityMb * item.priceEurMb * exchangeRate,
-            mass_t:       massT,
-            sort_order:   idx,
+            price_eur_mb:     item.priceEurMb,
+            total_eur:        quantityMb * item.priceEurMb,
+            total_pln:        quantityMb * item.priceEurMb * exchangeRate,
+            sell_price_eur_mb: item.sellPriceEurMb,
+            sell_eur_total:   quantityMb * item.sellPriceEurMb,
+            sell_pln_total:   quantityMb * item.sellPriceEurMb * exchangeRate,
+            mass_t:           massT,
+            sort_order:       idx,
           };
         }))
         .select();
@@ -711,68 +723,100 @@ export default function EditSaleOfferModal({
                     const massT    = item.weightKgM > 0 ? (qMb * item.weightKgM) / 1000 : 0;
 
                     return (
-                      <div key={item.uid} className="grid grid-cols-12 gap-2 items-end p-2 bg-gray-50 rounded-lg border border-gray-200">
-                        {/* Typ zamka */}
-                        <div className="col-span-3">
-                          {idx === 0 && <p className="text-xs text-gray-400 mb-1">Typ zamka</p>}
-                          <select value={item.lockName}
-                            onChange={e => updateLockItem(item.uid, { lockName: e.target.value })}
-                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            {lockDefs.map(l => (
-                              <option key={l.id} value={l.name}>{l.name}</option>
-                            ))}
-                            {!lockDefs.some(l => l.name === item.lockName) && (
-                              <option value={item.lockName}>{item.lockName}</option>
-                            )}
-                          </select>
-                        </div>
-                        {/* Gatunek */}
-                        <div className="col-span-2">
-                          {idx === 0 && <p className="text-xs text-gray-400 mb-1">Gatunek</p>}
-                          <select value={item.steelGrade}
-                            onChange={e => updateLockItem(item.uid, { steelGrade: e.target.value })}
-                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="">—</option>
-                            {steelGrades.map(g => (
-                              <option key={g.id} value={g.id}>{g.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                        {/* Ilość szt. */}
-                        <div className="col-span-1">
-                          {idx === 0 && <p className="text-xs text-gray-400 mb-1">Szt.</p>}
-                          <input type="number" min={1} step={1} value={item.quantitySzt}
-                            onChange={e => updateLockItem(item.uid, { quantitySzt: Math.max(1, parseInt(e.target.value) || 1) })}
-                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                        </div>
-                        {/* Długość */}
-                        <div className="col-span-1">
-                          {idx === 0 && <p className="text-xs text-gray-400 mb-1">Dł. [m]</p>}
-                          <input type="number" min={0.1} step={0.1} value={item.lengthM}
-                            onChange={e => updateLockItem(item.uid, { lengthM: Math.max(0.1, parseFloat(e.target.value) || 0.1) })}
-                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                        </div>
-                        {/* Cena EUR/mb */}
-                        <div className="col-span-2">
-                          {idx === 0 && <p className="text-xs text-gray-400 mb-1">EUR/mb</p>}
-                          <input type="number" min={0} step={0.5} value={item.priceEurMb}
-                            onChange={e => updateLockItem(item.uid, { priceEurMb: parseFloat(e.target.value) || 0 })}
-                            className={`w-full border rounded-lg px-2 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                              item.priceEurMb !== defPrice && defPrice > 0 ? 'border-amber-400 bg-amber-50' : 'border-blue-300 bg-blue-50'
-                            }`} />
-                        </div>
-                        {/* Masa [t] */}
-                        <div className="col-span-2">
-                          {idx === 0 && <p className="text-xs text-gray-400 mb-1">Masa [t]</p>}
-                          <div className="bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right text-gray-600">
-                            {formatNumber(massT, 3)}
+                      <div key={item.uid} className="p-2 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+                        {/* Wiersz 1: typ, gatunek, szt., długość, cena koszt, masa, usuń */}
+                        <div className="grid grid-cols-12 gap-2 items-end">
+                          {/* Typ zamka */}
+                          <div className="col-span-3">
+                            {idx === 0 && <p className="text-xs text-gray-400 mb-1">Typ zamka</p>}
+                            <select value={item.lockName}
+                              onChange={e => updateLockItem(item.uid, { lockName: e.target.value })}
+                              className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                              {lockDefs.map(l => (
+                                <option key={l.id} value={l.name}>{l.name}</option>
+                              ))}
+                              {!lockDefs.some(l => l.name === item.lockName) && (
+                                <option value={item.lockName}>{item.lockName}</option>
+                              )}
+                            </select>
+                          </div>
+                          {/* Gatunek */}
+                          <div className="col-span-2">
+                            {idx === 0 && <p className="text-xs text-gray-400 mb-1">Gatunek</p>}
+                            <select value={item.steelGrade}
+                              onChange={e => updateLockItem(item.uid, { steelGrade: e.target.value })}
+                              className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                              <option value="">—</option>
+                              {steelGrades.map(g => (
+                                <option key={g.id} value={g.id}>{g.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          {/* Ilość szt. */}
+                          <div className="col-span-1">
+                            {idx === 0 && <p className="text-xs text-gray-400 mb-1">Szt.</p>}
+                            <input type="number" min={1} step={1} value={item.quantitySzt}
+                              onChange={e => updateLockItem(item.uid, { quantitySzt: Math.max(1, parseInt(e.target.value) || 1) })}
+                              className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                          </div>
+                          {/* Długość */}
+                          <div className="col-span-1">
+                            {idx === 0 && <p className="text-xs text-gray-400 mb-1">Dł. [m]</p>}
+                            <input type="number" min={0.1} step={0.1} value={item.lengthM}
+                              onChange={e => updateLockItem(item.uid, { lengthM: Math.max(0.1, parseFloat(e.target.value) || 0.1) })}
+                              className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                          </div>
+                          {/* Cena EUR/mb (koszt) */}
+                          <div className="col-span-2">
+                            {idx === 0 && <p className="text-xs text-gray-400 mb-1">Koszt EUR/mb</p>}
+                            <input type="number" min={0} step={0.5} value={item.priceEurMb}
+                              onChange={e => updateLockItem(item.uid, { priceEurMb: parseFloat(e.target.value) || 0 })}
+                              className={`w-full border rounded-lg px-2 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                item.priceEurMb !== defPrice && defPrice > 0 ? 'border-amber-400 bg-amber-50' : 'border-blue-300 bg-blue-50'
+                              }`} />
+                          </div>
+                          {/* Masa [t] */}
+                          <div className="col-span-2">
+                            {idx === 0 && <p className="text-xs text-gray-400 mb-1">Masa [t]</p>}
+                            <div className="bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right text-gray-600">
+                              {formatNumber(massT, 3)}
+                            </div>
+                          </div>
+                          {/* Usuń */}
+                          <div className="col-span-1 flex justify-end items-end">
+                            <button onClick={() => removeLockItem(item.uid)}
+                              className="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200"
+                              title="Usuń">✕</button>
                           </div>
                         </div>
-                        {/* Usuń */}
-                        <div className="col-span-1 flex justify-end items-end">
-                          <button onClick={() => removeLockItem(item.uid)}
-                            className="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200"
-                            title="Usuń">✕</button>
+                        {/* Wiersz 2: cena sprzedaży */}
+                        <div className="pt-1 border-t border-gray-100 flex items-center gap-4">
+                          {/* Cena sprzedaży [EUR/mb] */}
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs text-gray-500">Cena sprzedaży [EUR/mb]</label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number" min={0} step={0.01}
+                                value={item.sellPriceEurMb}
+                                onChange={e => updateLockItem(item.uid, { sellPriceEurMb: parseFloat(e.target.value) || 0 })}
+                                className="w-24 border rounded px-2 py-1 text-sm border-blue-400"
+                              />
+                              {(() => {
+                                const marginPct = item.priceEurMb > 0
+                                  ? ((item.sellPriceEurMb - item.priceEurMb) / item.priceEurMb) * 100
+                                  : null;
+                                return marginPct !== null ? (
+                                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                    marginPct >= 10 ? 'bg-green-100 text-green-700' :
+                                    marginPct >= 0  ? 'bg-yellow-100 text-yellow-700' :
+                                                       'bg-red-100 text-red-700'
+                                  }`}>
+                                    {marginPct.toFixed(1)}%
+                                  </span>
+                                ) : null;
+                              })()}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     );
@@ -781,9 +825,10 @@ export default function EditSaleOfferModal({
                   {editLockItems.length > 0 && (
                     <div className="flex justify-between text-sm font-semibold text-blue-900 pt-2 border-t border-gray-200 px-1">
                       <span>Suma zamków:</span>
-                      <span>
-                        {formatEUR(editLockItems.reduce((s, item) => s + (item.quantitySzt * item.lengthM) * item.priceEurMb, 0))} EUR
-                        {' '}· {formatNumber(editLockItems.reduce((s, item) => s + (item.weightKgM > 0 ? (item.quantitySzt * item.lengthM) * item.weightKgM / 1000 : 0), 0), 3)} t
+                      <span className="flex gap-4">
+                        <span className="text-gray-600 font-normal">Koszt: {formatEUR(lockTotals.totalEUR)} EUR</span>
+                        <span>Sprzedaż: {formatEUR(lockTotals.totalSellEUR)} EUR</span>
+                        <span className="text-gray-500 font-normal">· {formatNumber(editLockItems.reduce((s, item) => s + (item.weightKgM > 0 ? (item.quantitySzt * item.lengthM) * item.weightKgM / 1000 : 0), 0), 3)} t</span>
                       </span>
                     </div>
                   )}
