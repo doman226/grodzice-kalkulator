@@ -40,12 +40,16 @@ interface SaleLockCalcItem {
   quantitySzt: number;  // liczba sztuk
   lengthM: number;      // długość jednej sztuki [m]
   priceEurMb: number;   // zawsze EUR – nie przeliczamy przy zmianie waluty
+  sellPriceEurMb: number;
 }
 
 interface LockItemResult {
   valid: boolean;
   totalEUR: number;
   totalPLN: number;
+  totalSellEUR: number;
+  totalSellPLN: number;
+  marginPct: number | null;
   massT: number;
 }
 
@@ -239,12 +243,13 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
     if (!locks.length) return;
     const def = locks[0];
     setLockItems(prev => [...prev, {
-      uid:         crypto.randomUUID(),
-      lockName:    def.name,
-      steelGrade:  grades[0]?.id ?? '',
-      quantitySzt: 10,
-      lengthM:     12,
-      priceEurMb:  def.price_eur_mb,
+      uid:            crypto.randomUUID(),
+      lockName:       def.name,
+      steelGrade:     grades[0]?.id ?? '',
+      quantitySzt:    10,
+      lengthM:        12,
+      priceEurMb:     def.price_eur_mb,
+      sellPriceEurMb: def.price_eur_mb,
     }]);
   }
 
@@ -259,7 +264,10 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
       // przy zmianie typu zamka – auto-uzupełnij cenę z cennika
       if ('lockName' in patch) {
         const def = locks.find(l => l.name === patch.lockName);
-        if (def) updated.priceEurMb = def.price_eur_mb;
+        if (def) {
+          updated.priceEurMb     = def.price_eur_mb;
+          updated.sellPriceEurMb = def.price_eur_mb;
+        }
       }
       return updated;
     }));
@@ -292,25 +300,32 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
       const def = locks.find(l => l.name === item.lockName);
       const quantityMb = item.quantitySzt * item.lengthM;
       if (!def || quantityMb <= 0 || item.priceEurMb <= 0) {
-        return { valid: false, totalEUR: 0, totalPLN: 0, massT: 0 };
+        return { valid: false, totalEUR: 0, totalPLN: 0, totalSellEUR: 0, totalSellPLN: 0, marginPct: null, massT: 0 };
       }
-      const totalEUR = quantityMb * item.priceEurMb;
-      const totalPLN = totalEUR * exchangeRate;
-      const massT    = (quantityMb * def.weight_kg_m) / 1000;
-      return { valid: true, totalEUR, totalPLN, massT };
+      const totalEUR     = quantityMb * item.priceEurMb;
+      const totalPLN     = totalEUR * exchangeRate;
+      const totalSellEUR = quantityMb * item.sellPriceEurMb;
+      const totalSellPLN = totalSellEUR * exchangeRate;
+      const marginPct    = item.priceEurMb > 0
+        ? ((item.sellPriceEurMb - item.priceEurMb) / item.priceEurMb) * 100
+        : null;
+      const massT        = (quantityMb * def.weight_kg_m) / 1000;
+      return { valid: true, totalEUR, totalPLN, totalSellEUR, totalSellPLN, marginPct, massT };
     }),
     [lockItems, locks, exchangeRate]
   );
 
   const lockTotals = useMemo(() => {
-    let totalEUR = 0, totalPLN = 0, totalMassT = 0;
+    let totalEUR = 0, totalPLN = 0, totalSellEUR = 0, totalSellPLN = 0, totalMassT = 0;
     for (const r of lockResults) {
       if (!r.valid) continue;
-      totalEUR   += r.totalEUR;
-      totalPLN   += r.totalPLN;
-      totalMassT += r.massT;
+      totalEUR     += r.totalEUR;
+      totalPLN     += r.totalPLN;
+      totalSellEUR += r.totalSellEUR;
+      totalSellPLN += r.totalSellPLN;
+      totalMassT   += r.massT;
     }
-    return { totalEUR, totalPLN, totalMassT };
+    return { totalEUR, totalPLN, totalSellEUR, totalSellPLN, totalMassT };
   }, [lockResults]);
 
   // --- Sumy łączne ---
@@ -358,7 +373,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
   const deliveryCostCurrency  = (deliveryPaidBy === 'dap_included' && deliveryCalc) ? deliveryCalc.totalInCurrency : 0;
   // Łącznie w wybranej walucie: grodzice + zamki + dostawa
   const grodziceSellCurrency  = currency === 'EUR' ? totals.totalSellEUR    : totals.totalSellPLN;
-  const lockSellCurrency      = currency === 'EUR' ? lockTotals.totalEUR    : lockTotals.totalPLN;
+  const lockSellCurrency      = currency === 'EUR' ? lockTotals.totalSellEUR : lockTotals.totalSellPLN;
   const totalForClientInCurrency = grodziceSellCurrency + lockSellCurrency + deliveryCostCurrency;
 
   // Handler zmiany waluty – konwertuje istniejące ceny pozycji do nowej waluty
@@ -722,20 +737,42 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                       </div>
                     </div>
 
-                    {/* 5. Cena EUR/mb */}
+                    {/* 5. Cena kosztu EUR/mb */}
                     <div className="sm:col-span-2">
-                      {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Cena [EUR/mb]</label>}
+                      {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Cena kosztu [EUR/mb]</label>}
                       <input type="number" min={0} step={0.5}
                         value={item.priceEurMb || ''}
                         onChange={e => updateLockItem(item.uid, { priceEurMb: parseFloat(e.target.value) || 0 })}
                         className={`w-full border rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold ${
-                          priceChanged ? 'border-amber-400 bg-amber-50' : 'border-blue-300 bg-blue-50'
+                          priceChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'
                         }`} />
                       {priceChanged && (
                         <button onClick={() => updateLockItem(item.uid, { priceEurMb: defPrice })}
                           className="text-xs text-blue-600 underline mt-0.5">
                           przywróć ({defPrice} EUR/mb)
                         </button>
+                      )}
+                    </div>
+
+                    {/* 5b. Cena sprzedaży EUR/mb */}
+                    <div className="sm:col-span-2">
+                      {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Cena sprzedaży [EUR/mb]</label>}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number" min={0} step={0.01}
+                          value={item.sellPriceEurMb}
+                          onChange={e => updateLockItem(item.uid, { sellPriceEurMb: parseFloat(e.target.value) || 0 })}
+                          className="w-full border rounded px-2 py-2 text-sm border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      {r.valid && r.marginPct !== null && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap inline-block mt-0.5 ${
+                          r.marginPct >= 10 ? 'bg-green-100 text-green-700' :
+                          r.marginPct >= 0  ? 'bg-yellow-100 text-yellow-700' :
+                                              'bg-red-100 text-red-700'
+                        }`}>
+                          {r.marginPct.toFixed(1)}% {r.marginPct >= 10 ? 'dobra marża' : r.marginPct >= 0 ? 'niska marża' : 'strata'}
+                        </span>
                       )}
                     </div>
 
@@ -764,9 +801,10 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                 <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-3">Podsumowanie zamków</p>
                 <div className="flex flex-wrap gap-8">
                   <div>
-                    <p className="text-xs text-gray-500 mb-0.5">Wartość łączna</p>
-                    <p className="text-2xl font-bold text-blue-900">{formatEUR(lockTotals.totalEUR)} EUR</p>
-                    <p className="text-sm text-blue-700 mt-0.5">≈ {formatPLN(lockTotals.totalPLN)} PLN</p>
+                    <p className="text-xs text-gray-500 mb-0.5">Wartość sprzedaży</p>
+                    <p className="text-2xl font-bold text-blue-900">{formatEUR(lockTotals.totalSellEUR)} EUR</p>
+                    <p className="text-sm text-blue-700 mt-0.5">≈ {formatPLN(lockTotals.totalSellPLN)} PLN</p>
+                    <p className="text-xs text-gray-400 mt-0.5">koszt: {formatEUR(lockTotals.totalEUR)} EUR</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 mb-0.5">Masa zamków</p>
@@ -813,13 +851,18 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
 
           {/* Koszt vs Sprzedaż vs Marża – tylko gdy są grodzice */}
           {isValid && hasAllSellPrices && (() => {
-            // Cena sprzedaży łącznie = grodzice + zamki (do wyświetlenia kwoty)
-            const combinedSellEUR  = totals.totalSellEUR + lockTotals.totalEUR;
-            const combinedSellPLN  = totals.totalSellPLN + lockTotals.totalPLN;
-            // Marża liczona TYLKO od grodzic (zamki bez kosztu własnego)
+            // Cena sprzedaży łącznie = grodzice + zamki (sell price)
+            const combinedSellEUR  = totals.totalSellEUR + lockTotals.totalSellEUR;
+            const combinedSellPLN  = totals.totalSellPLN + lockTotals.totalSellPLN;
+            // Koszt własny łącznie = grodzice + zamki (cost price)
+            const combinedCostEUR  = totals.totalCostEUR + lockTotals.totalEUR;
+            // Marża łącznie (grodzice + zamki)
+            const combinedProfit   = combinedSellEUR - combinedCostEUR;
+            const combinedMargin   = combinedSellEUR > 0 ? (combinedProfit / combinedSellEUR) * 100 : 0;
+            // Marża tylko grodzice (do osobnego wyświetlenia gdy są zamki)
             const grodziceProfit   = totals.totalSellEUR - totals.totalCostEUR;
             const grodziceMargin   = totals.totalSellEUR > 0 ? (grodziceProfit / totals.totalSellEUR) * 100 : 0;
-            const hasLockRevenue   = lockTotals.totalEUR > 0;
+            const hasLockRevenue   = lockTotals.totalSellEUR > 0;
             return (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">
@@ -833,16 +876,18 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Koszt własny</p>
                   <p className="text-2xl font-bold text-gray-700">
                     {currency === 'PLN'
-                      ? `${formatPLN(totals.totalCostPLN)} PLN`
-                      : `${formatEUR(totals.totalCostEUR)} EUR`}
+                      ? `${formatPLN(combinedCostEUR * exchangeRate)} PLN`
+                      : `${formatEUR(combinedCostEUR)} EUR`}
                   </p>
                   <p className="text-sm text-gray-400 mt-1">
                     {currency === 'PLN'
-                      ? `≈ ${formatEUR(totals.totalCostEUR)} EUR`
-                      : `≈ ${formatPLN(totals.totalCostPLN)} PLN`}
+                      ? `≈ ${formatEUR(combinedCostEUR)} EUR`
+                      : `≈ ${formatPLN(combinedCostEUR * exchangeRate)} PLN`}
                   </p>
                   {hasLockRevenue && (
-                    <p className="text-xs text-gray-400 mt-1">tylko grodzice (zamki bez kosztu)</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      grodzice {formatEUR(totals.totalCostEUR)} + zamki {formatEUR(lockTotals.totalEUR)} EUR
+                    </p>
                   )}
                 </div>
 
@@ -860,23 +905,25 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                   }
                   {hasLockRevenue && (
                     <p className="text-xs text-blue-400 mt-1">
-                      grodzice {formatEUR(totals.totalSellEUR)} + zamki {formatEUR(lockTotals.totalEUR)} EUR
+                      grodzice {formatEUR(totals.totalSellEUR)} + zamki {formatEUR(lockTotals.totalSellEUR)} EUR
                     </p>
                   )}
                 </div>
 
                 {/* Marża */}
-                <div className={`rounded-xl border p-4 ${marginColor(grodziceMargin)}`}>
+                <div className={`rounded-xl border p-4 ${marginColor(combinedMargin)}`}>
                   <p className="text-xs font-medium uppercase tracking-wide mb-2 opacity-70">Marża łączna</p>
-                  <p className="text-2xl font-bold">{grodziceMargin.toFixed(1)}%</p>
-                  <p className="text-sm mt-1 font-medium">{marginLabel(grodziceMargin)}</p>
+                  <p className="text-2xl font-bold">{combinedMargin.toFixed(1)}%</p>
+                  <p className="text-sm mt-1 font-medium">{marginLabel(combinedMargin)}</p>
                   <p className="text-xs mt-1 opacity-70">
                     zysk: {currency === 'PLN'
-                      ? `${formatPLN(grodziceProfit * exchangeRate)} PLN`
-                      : `${formatEUR(grodziceProfit)} EUR`}
+                      ? `${formatPLN(combinedProfit * exchangeRate)} PLN`
+                      : `${formatEUR(combinedProfit)} EUR`}
                   </p>
                   {hasLockRevenue && (
-                    <p className="text-xs mt-1 opacity-60">tylko grodzice (zamki bez kosztu własnego)</p>
+                    <p className="text-xs mt-1 opacity-60">
+                      grodzice {grodziceMargin.toFixed(1)}% · zamki uwzględnione
+                    </p>
                   )}
                 </div>
               </div>
@@ -1068,8 +1115,8 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                     </p>
                     <p className="text-blue-300 text-xs mt-0.5">
                       {currency === 'EUR'
-                        ? `grodzice ${formatEUR(totals.totalSellEUR)}${lockTotals.totalEUR > 0 ? ` + zamki ${formatEUR(lockTotals.totalEUR)}` : ''} + dostawa ${formatEUR(deliveryCalc.totalInCurrency)} EUR`
-                        : `grodzice ${formatPLN(totals.totalSellPLN)}${lockTotals.totalPLN > 0 ? ` + zamki ${formatPLN(lockTotals.totalPLN)}` : ''} + dostawa ${formatPLN(deliveryCalc.totalInCurrency)} PLN`}
+                        ? `grodzice ${formatEUR(totals.totalSellEUR)}${lockTotals.totalSellEUR > 0 ? ` + zamki ${formatEUR(lockTotals.totalSellEUR)}` : ''} + dostawa ${formatEUR(deliveryCalc.totalInCurrency)} EUR`
+                        : `grodzice ${formatPLN(totals.totalSellPLN)}${lockTotals.totalSellPLN > 0 ? ` + zamki ${formatPLN(lockTotals.totalSellPLN)}` : ''} + dostawa ${formatPLN(deliveryCalc.totalInCurrency)} PLN`}
                     </p>
                   </div>
                 )}
@@ -1081,11 +1128,11 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                         ? `${formatEUR(grodziceSellCurrency + lockSellCurrency)} EUR`
                         : `${formatPLN(grodziceSellCurrency + lockSellCurrency)} PLN`}
                     </p>
-                    {lockTotals.totalEUR > 0 && (
+                    {lockTotals.totalSellEUR > 0 && (
                       <p className="text-blue-300 text-xs mt-0.5">
                         {currency === 'EUR'
-                          ? `grodzice ${formatEUR(totals.totalSellEUR)} + zamki ${formatEUR(lockTotals.totalEUR)} EUR`
-                          : `grodzice ${formatPLN(totals.totalSellPLN)} + zamki ${formatPLN(lockTotals.totalPLN)} PLN`}
+                          ? `grodzice ${formatEUR(totals.totalSellEUR)} + zamki ${formatEUR(lockTotals.totalSellEUR)} EUR`
+                          : `grodzice ${formatPLN(totals.totalSellPLN)} + zamki ${formatPLN(lockTotals.totalSellPLN)} PLN`}
                       </p>
                     )}
                     <p className="text-orange-300 text-xs mt-0.5">
@@ -1141,16 +1188,19 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
             const r = lockResults[idx];
             if (!r.valid) return null;
             return {
-              lockName:    item.lockName,
-              steelGrade:  item.steelGrade,
-              quantitySzt: item.quantitySzt,
-              lengthM:     item.lengthM,
-              quantityMb:  item.quantitySzt * item.lengthM,
-              priceEurMb:  item.priceEurMb,
-              totalEUR:    r.totalEUR,
-              totalPLN:    r.totalPLN,
-              massT:       r.massT,
-            } satisfies LockSnapshot;
+              lockName:       item.lockName,
+              steelGrade:     item.steelGrade,
+              quantitySzt:    item.quantitySzt,
+              lengthM:        item.lengthM,
+              quantityMb:     item.quantitySzt * item.lengthM,
+              priceEurMb:     item.priceEurMb,
+              totalEUR:       r.totalEUR,
+              totalPLN:       r.totalPLN,
+              massT:          r.massT,
+              sellPriceEurMb: item.sellPriceEurMb,
+              totalSellEUR:   r.totalSellEUR,
+              totalSellPLN:   r.totalSellPLN,
+            } as LockSnapshot;
           })
           .filter((s): s is LockSnapshot => s !== null);
 
