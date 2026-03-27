@@ -183,8 +183,6 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
   const exchRate    = offer.exchange_rate ?? 4.25;
   const isEUR       = currency === 'EUR';
 
-  const totalSellEUR = offer.total_sell_eur ?? 0;
-  const totalSellPLN = offer.total_sell_pln ?? 0;
   // backward compat: 'intra' (stare) = dap_included
   const dPaidByRaw = offer.delivery_paid_by as string | undefined;
   const dPaidBy = dPaidByRaw === 'intra' ? 'dap_included'
@@ -203,6 +201,11 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
   const totalMassT      = sortedItems.reduce((sum, i) => sum + (i.mass_t       ?? 0), 0);
   const totalWallAreaM2 = sortedItems.reduce((sum, i) => sum + (i.wall_area_m2 ?? 0), 0);
 
+  // Grodzice: sumujemy z pozycji (nie z offer.total_sell_eur) – offer.total_sell_eur może zawierać
+  // wartość zamków, co prowadziłoby do podwójnego liczenia przy dodawaniu locksTotalEUR poniżej.
+  const totalSellEUR = sortedItems.reduce((sum, i) => sum + (i.sell_eur_total ?? 0), 0);
+  const totalSellPLN = sortedItems.reduce((sum, i) => sum + (i.sell_pln_total ?? 0), 0);
+
   // Sumy zamków – muszą być zdefiniowane PRZED totalForClient*
   const locksTotalEUR   = sortedLocks.reduce((sum, l) => sum + (l.total_eur ?? 0), 0);
   const locksTotalPLN   = sortedLocks.reduce((sum, l) => sum + (l.total_pln ?? 0), 0);
@@ -212,7 +215,7 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
   const deliveryCostPLN = (dPaidBy === 'dap_included' && (offer.delivery_cost_total ?? 0) > 0)
     ? (offer.delivery_cost_total ?? 0) : 0;
   const deliveryCostEUR = exchRate > 0 ? deliveryCostPLN / exchRate : 0;
-  // Cena dla klienta = grodzice + zamki + transport (gdy DAP w cenie)
+  // Cena dla klienta = grodzice (z pozycji) + zamki + transport (gdy DAP w cenie)
   const totalForClientEUR = totalSellEUR + locksTotalEUR + deliveryCostEUR;
   const totalForClientPLN = totalSellPLN + locksTotalPLN + deliveryCostPLN;
 
