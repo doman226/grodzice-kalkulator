@@ -469,7 +469,7 @@ const rental_pl: RentalPdfStrings = {
   valueRecharge:       'Refaktura kosztów transportu na klienta',
 
   sectionRentalTerms: 'Warunki dzierżawy:',
-  rentalTerm1: '1) Oferowana cena jest ceną z transportami po stronie Intra: magazyn→budowa. Zwrot do magazynu Intra BV (Cieśle 42 k. Wrocławia) jest obowiązkiem i kosztem Klienta.',
+  rentalTerm1: '1) Oferowana cena jest ceną z transportami po stronie Intra: magazyn - budowa. Zwrot do magazynu Intra BV (Cieśle 42 k. Wrocławia) jest obowiązkiem i kosztem Klienta.',
   rentalTerm1Fca: '1) Transport grodzic po stronie Klienta (FCA – odbiór własny). Zwrot do magazynu Intra BV (Cieśle 42 k. Wrocławia) jest obowiązkiem i kosztem Klienta.',
   rentalTerm2: '2) Na budowie grodzice muszą zostać rozładowane i załadowane na koszt Klienta.',
   rentalTerm3: '3) Podane ceny są cenami netto.',
