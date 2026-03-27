@@ -180,8 +180,8 @@ export default function SaveSaleOfferModal({
         currency,
         exchange_rate:             exchangeRate,
         total_cost_eur:            totals.totalCostEUR,
-        total_sell_eur:            totals.totalSellEUR + lockTotalEUR,
-        total_sell_pln:            totals.totalSellPLN + lockTotalPLN,
+        total_sell_eur:            totals.totalSellEUR + lockTotalSellEUR,
+        total_sell_pln:            totals.totalSellPLN + lockTotalSellPLN,
         margin_pct:                totals.overallMarginPct,
         delivery_trucks:           delivery?.trucks          ?? null,
         delivery_cost_per_truck:   delivery?.costPerTruck    ?? null,
@@ -248,11 +248,14 @@ export default function SaveSaleOfferModal({
           quantity_szt: item.quantitySzt,
           length_m:     item.lengthM,
           quantity_mb:  item.quantityMb,
-          price_eur_mb: item.priceEurMb,
-          total_eur:    item.totalEUR,
-          total_pln:    item.totalPLN,
-          mass_t:       item.massT,
-          sort_order:   idx,
+          price_eur_mb:      item.priceEurMb,
+          sell_price_eur_mb: item.sellPriceEurMb,
+          total_eur:         item.totalEUR,
+          total_pln:         item.totalPLN,
+          sell_eur_total:    item.totalSellEUR,
+          sell_pln_total:    item.totalSellPLN,
+          mass_t:            item.massT,
+          sort_order:        idx,
         })))
         .select();
       if (locksErr) {
@@ -269,16 +272,16 @@ export default function SaveSaleOfferModal({
     onSaved(savedOffer);
   }
 
-  // Sumy zamków – potrzebne zarówno w handleSave() jak i w podglądzie JSX
-  const lockTotalEUR = lockItems.reduce((s, i) => s + i.totalEUR, 0);
-  const lockTotalPLN = lockItems.reduce((s, i) => s + i.totalPLN, 0);
+  // Sumy zamków (sell) – potrzebne zarówno w handleSave() jak i w podglądzie JSX
+  const lockTotalSellEUR = lockItems.reduce((s, i) => s + (i.totalSellEUR ?? 0), 0);
+  const lockTotalSellPLN = lockItems.reduce((s, i) => s + (i.totalSellPLN ?? 0), 0);
 
   const deliveryCostCurrency   = delivery?.paidBy === 'dap_included'
     ? (currency === 'EUR' ? delivery.totalCostPLN / exchangeRate : delivery.totalCostPLN)
     : 0;
   const totalForClientCurrency = (currency === 'EUR'
-    ? totals.totalSellEUR + lockTotalEUR
-    : totals.totalSellPLN + lockTotalPLN) + deliveryCostCurrency;
+    ? totals.totalSellEUR + lockTotalSellEUR
+    : totals.totalSellPLN + lockTotalSellPLN) + deliveryCostCurrency;
   const year = new Date().getFullYear();
 
   return (
@@ -327,7 +330,7 @@ export default function SaveSaleOfferModal({
                   {lockItems.map((item, idx) => (
                     <div key={idx} className="flex justify-between text-sm">
                       <span className="text-gray-600">
-                        {item.lockName} – {item.quantityMb} mb × {item.priceEurMb} EUR/mb
+                        {item.lockName} – {item.quantityMb.toFixed(1)} mb × {item.priceEurMb} EUR/mb (koszt) / {item.sellPriceEurMb ?? item.priceEurMb} EUR/mb (sprzedaż)
                       </span>
                       <span className="font-medium text-gray-800">
                         {formatEUR(item.totalEUR)} EUR
@@ -345,11 +348,11 @@ export default function SaveSaleOfferModal({
             <div className="pt-2 border-t border-blue-200 mt-2 space-y-1">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Wartość sprzedaży (EUR):</span>
-                <strong>{formatEUR(totals.totalSellEUR + lockTotalEUR)} EUR</strong>
+                <strong>{formatEUR(totals.totalSellEUR + lockTotalSellEUR)} EUR</strong>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Wartość sprzedaży (PLN):</span>
-                <strong>{formatPLN(totals.totalSellPLN + lockTotalPLN)} PLN</strong>
+                <strong>{formatPLN(totals.totalSellPLN + lockTotalSellPLN)} PLN</strong>
               </div>
               <div className="flex justify-between text-sm pt-1 border-t border-blue-200">
                 <span className="text-gray-600 font-medium">Marża łączna:</span>
