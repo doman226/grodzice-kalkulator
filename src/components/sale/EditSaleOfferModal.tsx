@@ -671,34 +671,6 @@ export default function EditSaleOfferModal({
               })}
             </div>
 
-            {/* Podsumowanie pozycji */}
-            {totals.totalMassT > 0 && (
-              <div className="mt-3 flex flex-wrap gap-4 text-sm px-1">
-                <span className="text-gray-500">Masa łączna: <strong className="text-gray-800">{formatNumber(totals.totalMassT, 3)} t</strong></span>
-                <span className="text-gray-500">Towary:
-                  <strong className="text-blue-900 ml-1">
-                    {isEUR ? `${formatEUR(totals.totalSellEUR)} EUR` : `${formatPLN(totals.totalSellPLN)} PLN`}
-                  </strong>
-                </span>
-                {deliveryPaidBy === 'dap_included' && deliveryCostCurrency > 0 && (
-                  <span className="text-gray-500">+ Transport:
-                    <strong className="text-blue-900 ml-1">
-                      {isEUR ? `${formatEUR(deliveryCostCurrency)} EUR` : `${formatPLN(deliveryCostCurrency)} PLN`}
-                    </strong>
-                  </span>
-                )}
-                {deliveryPaidBy === 'dap_included' && deliveryCostCurrency > 0 && (
-                  <span className="font-semibold text-blue-900">
-                    = {isEUR ? `${formatEUR(totalForClientInCurrency)} EUR` : `${formatPLN(totalForClientInCurrency)} PLN`}
-                  </span>
-                )}
-                <span className={`font-semibold ${
-                  totals.overallMarginPct < 0 ? 'text-red-600' : totals.overallMarginPct < 5 ? 'text-orange-600' : 'text-green-700'
-                }`}>
-                  Marża: {totals.overallMarginPct.toFixed(1)}%
-                </span>
-              </div>
-            )}
           </div>
 
           {/* ── ZAMKI ── */}
@@ -835,6 +807,73 @@ export default function EditSaleOfferModal({
               )}
             </div>
           </div>
+
+          {/* ── Podsumowanie oferty ── */}
+          {(totals.totalMassT > 0 || editLockItems.length > 0) && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
+              <p className="text-xs font-semibold text-blue-900 uppercase tracking-wide mb-1">Podsumowanie</p>
+              <div className="pt-1 border-t border-blue-200 grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-gray-500">Masa łączna:</span>{' '}
+                  <strong>{formatNumber(
+                    totals.totalMassT + editLockItems.reduce((s, item) => s + (item.weightKgM > 0 ? (item.quantitySzt * item.lengthM) * item.weightKgM / 1000 : 0), 0),
+                    3
+                  )} t</strong>
+                </div>
+                <div>
+                  <span className="text-gray-500">Kurs EUR:</span>{' '}
+                  <strong>{exchangeRate.toFixed(4)} PLN</strong>
+                </div>
+              </div>
+              <div className="pt-2 border-t border-blue-200 space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Wartość sprzedaży (EUR):</span>
+                  <strong>{formatEUR(totals.totalSellEUR + lockTotals.totalSellEUR)} EUR</strong>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Wartość sprzedaży (PLN):</span>
+                  <strong>{formatPLN(totals.totalSellPLN + lockTotals.totalSellPLN)} PLN</strong>
+                </div>
+                <div className="flex justify-between text-sm pt-1 border-t border-blue-200">
+                  <span className="text-gray-600 font-medium">Marża łączna:</span>
+                  <strong className={totals.overallMarginPct < 0 ? 'text-red-600' : totals.overallMarginPct < 5 ? 'text-orange-600' : 'text-green-700'}>
+                    {totals.overallMarginPct.toFixed(1)}%
+                  </strong>
+                </div>
+                {deliveryCalc && deliveryCalc.costPerTruck > 0 && deliveryPaidBy !== 'fca' && (
+                  <div className="flex justify-between text-sm pt-1 border-t border-blue-200">
+                    <span className={deliveryPaidBy === 'dap_extra' ? 'text-orange-600' : 'text-gray-500'}>
+                      Dostawa ({deliveryCalc.trucks} aut{deliveryCalc.trucks > 1 ? 'a' : ''})
+                      {deliveryPaidBy === 'dap_extra' && <span className="ml-1 font-medium">[refaktura]</span>}:
+                    </span>
+                    <strong className={deliveryPaidBy === 'dap_extra' ? 'text-orange-600' : ''}>
+                      {isEUR
+                        ? `${formatEUR(deliveryCalc.totalCostPLN / exchangeRate)} EUR`
+                        : `${formatPLN(deliveryCalc.totalCostPLN)} PLN`}
+                    </strong>
+                  </div>
+                )}
+                {deliveryPaidBy === 'fca' && (
+                  <div className="flex justify-between text-sm pt-1 border-t border-blue-200">
+                    <span className="text-gray-500">Dostawa:</span>
+                    <strong className="text-green-700">FCA – odbiór własny</strong>
+                  </div>
+                )}
+                {deliveryPaidBy === 'dap_included' && deliveryCalc && deliveryCalc.costPerTruck > 0 && (
+                  <div className="flex justify-between text-sm font-semibold pt-1 border-t border-blue-200 text-blue-900">
+                    <span>Łącznie dla klienta:</span>
+                    <span>{isEUR ? `${formatEUR(totalForClientInCurrency)} EUR` : `${formatPLN(totalForClientInCurrency)} PLN`}</span>
+                  </div>
+                )}
+                {(deliveryFrom || deliveryTo) && deliveryPaidBy !== 'fca' && (
+                  <p className="text-xs text-gray-500 mt-1">🚛 {deliveryFrom}{deliveryTo ? ` → ${deliveryTo}` : ''}</p>
+                )}
+                {deliveryPaidBy === 'fca' && deliveryFrom && (
+                  <p className="text-xs text-gray-500 mt-1">📦 Odbiór z: {deliveryFrom}</p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* ── Waluta i kurs EUR ── */}
           <div className="border border-gray-200 rounded-xl overflow-hidden">
