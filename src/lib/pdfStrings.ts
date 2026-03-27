@@ -29,6 +29,7 @@ export interface PdfStrings {
   thLength:        string;
   thKgPerM:        string;
   thMass:          string;
+  thPricePerT:     string;
 
   // Table body units / labels
   unitPairs:       string;
@@ -126,6 +127,7 @@ const pl: PdfStrings = {
   thLength:     'Dług. [m]',
   thKgPerM:     'kg/m',
   thMass:       'Masa [t]',
+  thPricePerT:  'Cena [EUR/t]',
 
   unitPairs: 'par',
   unitPcs:   'szt.',
@@ -222,6 +224,7 @@ const en: PdfStrings = {
   thLength:     'Length [m]',
   thKgPerM:     'kg/m',
   thMass:       'Mass [t]',
+  thPricePerT:  'Price [EUR/t]',
 
   unitPairs: 'pairs',
   unitPcs:   'pcs.',

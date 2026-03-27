@@ -298,12 +298,14 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
         {/* ── TABELA GRODZIC ── */}
         {hasSheetPiles && <View style={s.table}>
           <View style={s.tableHeaderRow}>
-            <Text style={[s.thCell, { flex: 2.6 }]}>{t.thProfile}</Text>
-            <Text style={[s.thCell, { flex: 2.0 }]}>{t.thSteelGrade}</Text>
-            <Text style={[s.thCell, { flex: 1.0, textAlign: 'center' }]}>{t.thQty}</Text>
-            <Text style={[s.thCell, { flex: 1.0, textAlign: 'right' }]}>{t.thLength}</Text>
-            <Text style={[s.thCell, { flex: 0.8, textAlign: 'right' }]}>{t.thKgPerM}</Text>
-            <Text style={[s.thCell, { flex: 1.2, textAlign: 'right' }]}>{t.thMass}</Text>
+            <Text style={[s.thCell, { flex: 1.8 }]}>{t.thProfile}</Text>
+            <Text style={[s.thCell, { flex: 1.4 }]}>{t.thSteelGrade}</Text>
+            <Text style={[s.thCell, { flex: 0.8, textAlign: 'center' }]}>{t.thQty}</Text>
+            <Text style={[s.thCell, { flex: 0.8, textAlign: 'right' }]}>{t.thLength}</Text>
+            <Text style={[s.thCell, { flex: 0.7, textAlign: 'right' }]}>{t.thKgPerM}</Text>
+            <Text style={[s.thCell, { flex: 0.9, textAlign: 'right' }]}>{t.thMass}</Text>
+            <Text style={[s.thCell, { flex: 1.1, textAlign: 'right' }]}>{t.thPricePerT}</Text>
+            <Text style={[s.thCell, { flex: 1.4, textAlign: 'right' }]}>{t.thValueEUR}</Text>
           </View>
 
           {sortedItems.map((item, idx) => {
@@ -312,26 +314,32 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
               : 0;
             return (
               <View key={item.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
-                <Text style={[s.tdLabel, { flex: 2.6, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                <Text style={[s.tdLabel, { flex: 1.8, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
                   {item.profile_name}
                   {item.is_paired ? ' ×2' : ''}
                 </Text>
-                <Text style={[s.tdLabel, { flex: 2.0, color: C.gray700 }]}>
+                <Text style={[s.tdLabel, { flex: 1.4, color: C.gray700 }]}>
                   {item.steel_grade?.toUpperCase() ?? '—'}
                 </Text>
-                <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'center' }]}>
+                <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'center' }]}>
                   {item.is_paired
                     ? `${item.quantity} ${t.unitPairs}`
                     : `${item.quantity} ${t.unitPcs}`}
                 </Text>
-                <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right' }]}>
+                <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'right' }]}>
                   {item.length_m != null ? `${item.length_m} m` : '—'}
                 </Text>
-                <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'right', color: C.gray700 }]}>
+                <Text style={[s.tdLabel, { flex: 0.7, textAlign: 'right', color: C.gray700 }]}>
                   {formatNumber(kgPerM, 1)}
                 </Text>
-                <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                <Text style={[s.tdLabel, { flex: 0.9, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
                   {formatNumber(item.mass_t, 3)} t
+                </Text>
+                <Text style={[s.tdLabel, { flex: 1.1, textAlign: 'right', color: C.gray700 }]}>
+                  {item.sell_eur_t != null ? `${formatEUR(item.sell_eur_t)} EUR/t` : '—'}
+                </Text>
+                <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                  {formatEUR(item.sell_eur_total ?? 0)} EUR
                 </Text>
               </View>
             );
@@ -339,13 +347,17 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
 
           {/* Wiersz sumy grodzic */}
           <View style={[s.tableBodyRow, { backgroundColor: C.gray100 }]}>
-            <Text style={[s.tdLabel, { flex: 2.6, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{t.totalRow}</Text>
-            <Text style={[s.tdLabel, { flex: 2.0 }]} />
-            <Text style={[s.tdLabel, { flex: 1.0 }]} />
-            <Text style={[s.tdLabel, { flex: 1.0 }]} />
+            <Text style={[s.tdLabel, { flex: 1.8, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{t.totalRow}</Text>
+            <Text style={[s.tdLabel, { flex: 1.4 }]} />
             <Text style={[s.tdLabel, { flex: 0.8 }]} />
-            <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+            <Text style={[s.tdLabel, { flex: 0.8 }]} />
+            <Text style={[s.tdLabel, { flex: 0.7 }]} />
+            <Text style={[s.tdLabel, { flex: 0.9, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
               {formatNumber(totalMassT, 3)} t
+            </Text>
+            <Text style={[s.tdLabel, { flex: 1.1 }]} />
+            <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+              {formatEUR(totalSellEUR)} EUR
             </Text>
           </View>
         </View>}
@@ -353,14 +365,14 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
         {/* ── TABELA ZAMKÓW ── (bez tytułu sekcji – tabela jest samoopisująca) */}
         {hasLocks && (
           <View style={[s.table, { marginTop: hasSheetPiles ? 6 : 0 }]}>
-            {/* Nagłówek: Zamek | Gatunek | Szt. | Dł.[m] | kg/m | mb łącznie | EUR/mb | Wartość EUR */}
+            {/* Nagłówek: Zamek | Gatunek | Ilość | Dł.[m] | kg/m | mb łącznie | EUR/mb | Wartość EUR */}
             <View style={s.tableHeaderRow}>
-              <Text style={[s.thCell, { flex: 2.0 }]}>{t.thLock}</Text>
+              <Text style={[s.thCell, { flex: 1.8 }]}>{t.thLock}</Text>
               <Text style={[s.thCell, { flex: 1.4 }]}>{t.thSteelGrade}</Text>
-              <Text style={[s.thCell, { flex: 0.6, textAlign: 'right' }]}>{t.thLockQtySzt}</Text>
+              <Text style={[s.thCell, { flex: 0.8, textAlign: 'center' }]}>{t.thQty}</Text>
               <Text style={[s.thCell, { flex: 0.8, textAlign: 'right' }]}>{t.thLength}</Text>
               <Text style={[s.thCell, { flex: 0.7, textAlign: 'right' }]}>{t.thKgPerM}</Text>
-              <Text style={[s.thCell, { flex: 0.8, textAlign: 'right' }]}>{t.thMb}</Text>
+              <Text style={[s.thCell, { flex: 0.9, textAlign: 'right' }]}>{t.thMb}</Text>
               <Text style={[s.thCell, { flex: 1.1, textAlign: 'right' }]}>{t.thPricePerMb}</Text>
               <Text style={[s.thCell, { flex: 1.4, textAlign: 'right' }]}>{t.thValueEUR}</Text>
             </View>
@@ -374,14 +386,14 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
               const lenM   = lock.length_m   ?? null;
               return (
                 <View key={lock.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
-                  <Text style={[s.tdLabel, { flex: 2.0, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                  <Text style={[s.tdLabel, { flex: 1.8, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
                     {lock.lock_name}
                   </Text>
                   <Text style={[s.tdLabel, { flex: 1.4, color: C.gray700 }]}>
                     {lock.steel_grade?.toUpperCase() ?? '—'}
                   </Text>
-                  <Text style={[s.tdLabel, { flex: 0.6, textAlign: 'right' }]}>
-                    {qtySzt != null ? `${qtySzt}` : '—'}
+                  <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'center' }]}>
+                    {qtySzt != null ? `${qtySzt} ${t.unitPcs}` : '—'}
                   </Text>
                   <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'right' }]}>
                     {lenM != null ? `${lenM} m` : '—'}
@@ -389,7 +401,7 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
                   <Text style={[s.tdLabel, { flex: 0.7, textAlign: 'right', color: C.gray700 }]}>
                     {formatNumber(kgPerM, 1)}
                   </Text>
-                  <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                  <Text style={[s.tdLabel, { flex: 0.9, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
                     {formatNumber(qMb, 1)}
                   </Text>
                   <Text style={[s.tdLabel, { flex: 1.1, textAlign: 'right', color: C.gray700 }]}>
@@ -404,16 +416,16 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
 
             {/* Wiersz sumy */}
             <View style={[s.tableBodyRow, { backgroundColor: C.gray100 }]}>
-              <Text style={[s.tdLabel, { flex: 2.0, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+              <Text style={[s.tdLabel, { flex: 1.8, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
                 {t.lockTotalRow}
               </Text>
               <Text style={[s.tdLabel, { flex: 1.4, color: C.gray500, fontSize: 7 }]}>
                 {t.lockMassRow}: {formatNumber(locksTotalMassT, 3)} t
               </Text>
-              <Text style={[s.tdLabel, { flex: 0.6 }]} />
+              <Text style={[s.tdLabel, { flex: 0.8 }]} />
               <Text style={[s.tdLabel, { flex: 0.8 }]} />
               <Text style={[s.tdLabel, { flex: 0.7 }]} />
-              <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+              <Text style={[s.tdLabel, { flex: 0.9, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
                 {formatNumber(sortedLocks.reduce((s, l) => s + (l.quantity_mb ?? 0), 0), 1)}
               </Text>
               <Text style={[s.tdLabel, { flex: 1.1 }]} />
