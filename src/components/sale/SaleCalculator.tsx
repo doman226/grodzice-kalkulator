@@ -282,7 +282,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
       }
       const piles        = item.isPaired ? item.quantity * 2 : item.quantity;
       const totalLengthM = piles * item.lengthM;
-      const massT        = (totalLengthM * profile.weight_kg_per_m) / 1000;
+      const massT        = Math.round((totalLengthM * profile.weight_kg_per_m) / 1000 * 1000) / 1000;
       const wallAreaM2   = totalLengthM * (profile.width_mm / 1000);
       // Ceny w stanie są w bieżącej walucie (EUR lub PLN) – przeliczamy do EUR do obliczeń
       const priceScale   = currency === 'EUR' ? 1 : 1 / exchangeRate;

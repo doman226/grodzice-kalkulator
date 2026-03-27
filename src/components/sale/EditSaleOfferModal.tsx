@@ -277,7 +277,7 @@ export default function EditSaleOfferModal({
       const profile = saleProfiles.find(p => p.name === item.profileName);
       if (!profile || item.quantity <= 0 || item.lengthM <= 0) return null;
       const totalLengthM  = item.quantity * item.lengthM * (item.isPaired ? 2 : 1);
-      const massT         = totalLengthM * profile.weight_kg_per_m / 1000;
+      const massT         = Math.round(totalLengthM * profile.weight_kg_per_m / 1000 * 1000) / 1000;
       const wallAreaM2    = totalLengthM * (profile.width_mm / 1000);
       const costEurTotal  = item.costEurT * massT;
       const sellEurTotal  = item.sellEurT * massT;
