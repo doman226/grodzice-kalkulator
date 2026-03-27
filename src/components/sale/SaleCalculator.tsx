@@ -306,8 +306,8 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
       const totalPLN     = totalEUR * exchangeRate;
       const totalSellEUR = quantityMb * item.sellPriceEurMb;
       const totalSellPLN = totalSellEUR * exchangeRate;
-      const marginPct    = item.priceEurMb > 0
-        ? ((item.sellPriceEurMb - item.priceEurMb) / item.priceEurMb) * 100
+      const marginPct    = item.sellPriceEurMb > 0
+        ? ((item.sellPriceEurMb - item.priceEurMb) / item.sellPriceEurMb) * 100
         : null;
       const massT        = (quantityMb * def.weight_kg_m) / 1000;
       return { valid: true, totalEUR, totalPLN, totalSellEUR, totalSellPLN, marginPct, massT };
