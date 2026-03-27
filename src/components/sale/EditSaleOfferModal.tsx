@@ -598,12 +598,11 @@ export default function EditSaleOfferModal({
                         </div>
                       </div>
                       <div className="col-span-1 flex justify-end items-end">
-                        {editItems.length > 1 && (
-                          <button onClick={() => removeItem(item.uid)}
-                            className="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200 transition-colors text-xs">
-                            ✕
-                          </button>
-                        )}
+                        <button onClick={() => removeItem(item.uid)}
+                          className="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200 transition-colors text-xs"
+                          title="Usuń pozycję">
+                          ✕
+                        </button>
                       </div>
                     </div>
 
