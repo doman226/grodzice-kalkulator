@@ -187,9 +187,9 @@ const pl: PdfStrings = {
   thLock:           'Zamek',
   thLockQtySzt:     'Szt.',
   thMb:             'mb łącznie',
-  thPricePerMb:     'Cena [EUR/mb]',
+  thPricePerMb:     'Cena EUR/mb',
   thValueEUR:       'Wartość [EUR]',
-  lockTotalRow:     'Łącznie zamki',
+  lockTotalRow:     'Łącznie',
   lockMassRow:      'Masa zamków',
 
   notesLabel: 'Uwagi',
