@@ -123,8 +123,12 @@ export interface SaleOfferLockItem {
   price_eur_mb: number;          // cena EUR/mb (snapshot)
   total_eur: number;             // quantity_mb × price_eur_mb
   total_pln: number;             // total_eur × exchange_rate
+  sell_price_eur_mb?: number | null;
+  sell_eur_total?: number | null;
+  sell_pln_total?: number | null;
   mass_t: number;                // quantity_mb × weight_kg_m / 1000
   sort_order: number;
+  weight_kg_m?: number | null;
 }
 
 // ─── (sale lookup tables) ────────────────────────────────────────────────────
