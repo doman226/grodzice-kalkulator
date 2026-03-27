@@ -802,9 +802,21 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                 <div className="flex flex-wrap gap-8">
                   <div>
                     <p className="text-xs text-gray-500 mb-0.5">Wartość sprzedaży</p>
-                    <p className="text-2xl font-bold text-blue-900">{formatEUR(lockTotals.totalSellEUR)} EUR</p>
-                    <p className="text-sm text-blue-700 mt-0.5">≈ {formatPLN(lockTotals.totalSellPLN)} PLN</p>
-                    <p className="text-xs text-gray-400 mt-0.5">koszt: {formatEUR(lockTotals.totalEUR)} EUR</p>
+                    <p className="text-2xl font-bold text-blue-900">
+                      {currency === 'EUR'
+                        ? `${formatEUR(lockTotals.totalSellEUR)} EUR`
+                        : `${formatPLN(lockTotals.totalSellPLN)} PLN`}
+                    </p>
+                    <p className="text-sm text-blue-700 mt-0.5">
+                      {currency === 'EUR'
+                        ? `≈ ${formatPLN(lockTotals.totalSellPLN)} PLN`
+                        : `≈ ${formatEUR(lockTotals.totalSellEUR)} EUR`}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      koszt: {currency === 'EUR'
+                        ? `${formatEUR(lockTotals.totalEUR)} EUR`
+                        : `${formatPLN(lockTotals.totalPLN)} PLN`}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 mb-0.5">Masa zamków</p>
