@@ -191,6 +191,11 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
   const exchRate    = offer.exchange_rate ?? 4.25;
   const isEUR       = currency === 'EUR';
 
+  // Nagłówki kolumn zależne od waluty oferty
+  const thPriceT  = isEUR ? t.thPricePerT  : (lang === 'pl' ? 'Cena [PLN/t]'   : 'Price [PLN/t]');
+  const thValueC  = isEUR ? t.thValueEUR   : (lang === 'pl' ? 'Wartość [PLN]'  : 'Value [PLN]');
+  const thPriceMb = isEUR ? t.thPricePerMb : (lang === 'pl' ? 'Cena PLN/mb'    : 'Price PLN/lm');
+
   // backward compat: 'intra' (stare) = dap_included
   const dPaidByRaw = offer.delivery_paid_by as string | undefined;
   const dPaidBy = dPaidByRaw === 'intra' ? 'dap_included'
@@ -312,8 +317,8 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
             <Text style={[s.thCell, { flex: 0.8, textAlign: 'right' }]}>{t.thLength}</Text>
             <Text style={[s.thCell, { flex: 0.7, textAlign: 'right' }]}>{t.thKgPerM}</Text>
             <Text style={[s.thCell, { flex: 0.9, textAlign: 'right' }]}>{t.thMass}</Text>
-            <Text style={[s.thCell, { flex: 1.1, textAlign: 'right' }]}>{t.thPricePerT}</Text>
-            <Text style={[s.thCell, { flex: 1.4, textAlign: 'right' }]}>{t.thValueEUR}</Text>
+            <Text style={[s.thCell, { flex: 1.1, textAlign: 'right' }]}>{thPriceT}</Text>
+            <Text style={[s.thCell, { flex: 1.4, textAlign: 'right' }]}>{thValueC}</Text>
           </View>
 
           {sortedItems.map((item, idx) => {
@@ -344,10 +349,14 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
                   {formatNumber(item.mass_t, 3)} t
                 </Text>
                 <Text style={[s.tdLabel, { flex: 1.1, textAlign: 'right', color: C.gray700 }]}>
-                  {item.sell_eur_t != null ? `${formatEUR(item.sell_eur_t)} EUR/t` : '—'}
+                  {item.sell_eur_t != null
+                    ? `${isEUR ? formatEUR(item.sell_eur_t) : formatPLN(item.sell_eur_t)} ${currency}/t`
+                    : '—'}
                 </Text>
                 <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
-                  {formatEUR(item.sell_eur_total ?? 0)} EUR
+                  {isEUR
+                    ? `${formatEUR(item.sell_eur_total ?? 0)} EUR`
+                    : `${formatPLN(item.sell_pln_total ?? 0)} PLN`}
                 </Text>
               </View>
             );
@@ -365,7 +374,7 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
             </Text>
             <Text style={[s.tdLabel, { flex: 1.1 }]} />
             <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
-              {formatEUR(totalSellEUR)} EUR
+              {isEUR ? `${formatEUR(totalSellEUR)} EUR` : `${formatPLN(totalSellPLN)} PLN`}
             </Text>
           </View>
         </View>}
@@ -381,8 +390,8 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
               <Text style={[s.thCell, { flex: 0.8, textAlign: 'right' }]}>{t.thLength}</Text>
               <Text style={[s.thCell, { flex: 0.7, textAlign: 'right' }]}>{t.thKgPerM}</Text>
               <Text style={[s.thCell, { flex: 0.9, textAlign: 'right' }]}>{t.thMb}</Text>
-              <Text style={[s.thCell, { flex: 1.1, textAlign: 'right' }]}>{t.thPricePerMb}</Text>
-              <Text style={[s.thCell, { flex: 1.4, textAlign: 'right' }]}>{t.thValueEUR}</Text>
+              <Text style={[s.thCell, { flex: 1.1, textAlign: 'right' }]}>{thPriceMb}</Text>
+              <Text style={[s.thCell, { flex: 1.4, textAlign: 'right' }]}>{thValueC}</Text>
             </View>
 
             {/* Pozycje */}
@@ -413,10 +422,14 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
                     {formatNumber(qMb, 1)}
                   </Text>
                   <Text style={[s.tdLabel, { flex: 1.1, textAlign: 'right', color: C.gray700 }]}>
-                    {formatEUR(lock.sell_price_eur_mb ?? lock.price_eur_mb)} EUR/mb
+                    {isEUR
+                      ? `${formatEUR(lock.sell_price_eur_mb ?? lock.price_eur_mb)} EUR/mb`
+                      : `${formatPLN((lock.sell_price_eur_mb ?? lock.price_eur_mb) * exchRate)} PLN/mb`}
                   </Text>
                   <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
-                    {formatEUR(lock.sell_eur_total ?? lock.total_eur)} EUR
+                    {isEUR
+                      ? `${formatEUR(lock.sell_eur_total ?? lock.total_eur)} EUR`
+                      : `${formatPLN(lock.sell_pln_total ?? lock.total_pln ?? 0)} PLN`}
                   </Text>
                 </View>
               );
@@ -438,7 +451,7 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
               </Text>
               <Text style={[s.tdLabel, { flex: 1.1 }]} />
               <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
-                {formatEUR(locksTotalEUR)} EUR
+                {isEUR ? `${formatEUR(locksTotalEUR)} EUR` : `${formatPLN(locksTotalPLN)} PLN`}
               </Text>
             </View>
           </View>

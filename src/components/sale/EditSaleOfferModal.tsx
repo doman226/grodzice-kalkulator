@@ -279,8 +279,11 @@ export default function EditSaleOfferModal({
       const totalLengthM  = item.quantity * item.lengthM * (item.isPaired ? 2 : 1);
       const massT         = Math.round(totalLengthM * profile.weight_kg_per_m / 1000 * 1000) / 1000;
       const wallAreaM2    = totalLengthM * (profile.width_mm / 1000);
-      const costEurTotal  = item.costEurT * massT;
-      const sellEurTotal  = item.sellEurT * massT;
+      // costEurT / sellEurT trzymają wartość w walucie oferty (EUR lub PLN)
+      // priceScale konwertuje do EUR – identyczna logika jak SaleCalculator
+      const priceScale    = currency === 'PLN' ? 1 / exchangeRate : 1;
+      const costEurTotal  = item.costEurT * massT * priceScale;
+      const sellEurTotal  = item.sellEurT * massT * priceScale;
       const sellPlnTotal  = sellEurTotal * exchangeRate;
       const marginPct     = sellEurTotal > 0 ? ((sellEurTotal - costEurTotal) / sellEurTotal) * 100 : 0;
       return { totalLengthM, massT, wallAreaM2, costEurTotal, sellEurTotal, sellPlnTotal, marginPct };
@@ -656,7 +659,7 @@ export default function EditSaleOfferModal({
                         <div className="col-span-3 text-right">
                           <p className="text-xs text-gray-400">Wartość sprzedaży</p>
                           <p className="text-sm font-semibold text-gray-800">
-                            {isEUR ? `${formatEUR(r.sellEurTotal)} EUR` : `${formatPLN(r.sellEurTotal)} PLN`}
+                            {isEUR ? `${formatEUR(r.sellEurTotal)} EUR` : `${formatPLN(r.sellPlnTotal)} PLN`}
                           </p>
                           <p className={`text-xs font-semibold ${
                             r.marginPct < 0 ? 'text-red-600' : r.marginPct < 5 ? 'text-orange-600' : 'text-green-700'
@@ -674,8 +677,12 @@ export default function EditSaleOfferModal({
                 <div className="flex justify-between text-sm font-semibold text-blue-900 pt-2 border-t border-gray-200 px-1">
                   <span>Suma grodzic:</span>
                   <span className="flex gap-4">
-                    <span className="text-gray-600 font-normal">Koszt: {formatEUR(totals.totalCostEUR)} EUR</span>
-                    <span>Sprzedaż: {formatEUR(totals.totalSellEUR)} EUR</span>
+                    <span className="text-gray-600 font-normal">
+                      Koszt: {isEUR ? `${formatEUR(totals.totalCostEUR)} EUR` : `${formatPLN(totals.totalCostEUR * exchangeRate)} PLN`}
+                    </span>
+                    <span>
+                      Sprzedaż: {isEUR ? `${formatEUR(totals.totalSellEUR)} EUR` : `${formatPLN(totals.totalSellPLN)} PLN`}
+                    </span>
                     <span className="text-gray-500 font-normal">· {formatNumber(totals.totalMassT, 3)} t</span>
                   </span>
                 </div>
@@ -808,8 +815,12 @@ export default function EditSaleOfferModal({
                     <div className="flex justify-between text-sm font-semibold text-blue-900 pt-2 border-t border-gray-200 px-1">
                       <span>Suma zamków:</span>
                       <span className="flex gap-4">
-                        <span className="text-gray-600 font-normal">Koszt: {formatEUR(lockTotals.totalEUR)} EUR</span>
-                        <span>Sprzedaż: {formatEUR(lockTotals.totalSellEUR)} EUR</span>
+                        <span className="text-gray-600 font-normal">
+                          Koszt: {isEUR ? `${formatEUR(lockTotals.totalEUR)} EUR` : `${formatPLN(lockTotals.totalPLN)} PLN`}
+                        </span>
+                        <span>
+                          Sprzedaż: {isEUR ? `${formatEUR(lockTotals.totalSellEUR)} EUR` : `${formatPLN(lockTotals.totalSellPLN)} PLN`}
+                        </span>
                         <span className="text-gray-500 font-normal">· {formatNumber(editLockItems.reduce((s, item) => s + (item.weightKgM > 0 ? (item.quantitySzt * item.lengthM) * item.weightKgM / 1000 : 0), 0), 3)} t</span>
                       </span>
                     </div>
