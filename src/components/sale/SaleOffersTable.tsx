@@ -395,15 +395,19 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                         ) : null}
 
                         {/* Tabela zamków */}
-                        {offer.lock_items && offer.lock_items.length > 0 && (
+                        {offer.lock_items && offer.lock_items.length > 0 && (() => {
+                          const isLockEUR   = (offer.currency ?? 'EUR') === 'EUR';
+                          const lockXRate   = offer.exchange_rate ?? 4.25;
+                          const lockCurr    = isLockEUR ? 'EUR' : 'PLN';
+                          return (
                           <div className="rounded-lg overflow-hidden border border-blue-200">
                             <table className="w-full text-xs">
                               <thead>
                                 <tr className="bg-blue-700 text-white">
                                   <th className="text-left px-3 py-2 font-semibold">🔗 Zamek</th>
                                   <th className="text-right px-3 py-2 font-semibold">Ilość [mb]</th>
-                                  <th className="text-right px-3 py-2 font-semibold">EUR/mb</th>
-                                  <th className="text-right px-3 py-2 font-semibold">Wartość EUR</th>
+                                  <th className="text-right px-3 py-2 font-semibold">{lockCurr}/mb</th>
+                                  <th className="text-right px-3 py-2 font-semibold">Wartość {lockCurr}</th>
                                   <th className="text-right px-3 py-2 font-semibold">Masa [t]</th>
                                 </tr>
                               </thead>
@@ -414,8 +418,14 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                                   <tr key={lock.id} className={i % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
                                     <td className="px-3 py-2 font-semibold text-gray-800">{lock.lock_name}</td>
                                     <td className="px-3 py-2 text-right text-gray-600">{formatNumber(lock.quantity_mb, 1)}</td>
-                                    <td className="px-3 py-2 text-right text-gray-600">{formatEUR(lock.price_eur_mb)}</td>
-                                    <td className="px-3 py-2 text-right font-bold text-gray-900">{formatEUR(lock.total_eur)} EUR</td>
+                                    <td className="px-3 py-2 text-right text-gray-600">
+                                      {isLockEUR ? formatEUR(lock.price_eur_mb) : formatPLN(lock.price_eur_mb * lockXRate)}
+                                    </td>
+                                    <td className="px-3 py-2 text-right font-bold text-gray-900">
+                                      {isLockEUR
+                                        ? `${formatEUR(lock.total_eur)} EUR`
+                                        : `${formatPLN(lock.total_pln ?? lock.total_eur * lockXRate)} PLN`}
+                                    </td>
                                     <td className="px-3 py-2 text-right text-gray-600">{formatNumber(lock.mass_t, 3)}</td>
                                   </tr>
                                 ))}
@@ -424,7 +434,9 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                                 <tr className="bg-blue-50 border-t border-blue-200">
                                   <td className="px-3 py-2 font-semibold text-blue-900" colSpan={3}>Łącznie zamki</td>
                                   <td className="px-3 py-2 text-right font-bold text-blue-900">
-                                    {formatEUR(offer.lock_items.reduce((s, l) => s + (l.total_eur ?? 0), 0))} EUR
+                                    {isLockEUR
+                                      ? `${formatEUR(offer.lock_items.reduce((s, l) => s + (l.total_eur ?? 0), 0))} EUR`
+                                      : `${formatPLN(offer.lock_items.reduce((s, l) => s + (l.total_pln ?? l.total_eur * lockXRate), 0))} PLN`}
                                   </td>
                                   <td className="px-3 py-2 text-right font-semibold text-blue-900">
                                     {formatNumber(offer.lock_items.reduce((s, l) => s + (l.mass_t ?? 0), 0), 3)} t
@@ -433,7 +445,8 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                               </tfoot>
                             </table>
                           </div>
-                        )}
+                          );
+                        })()}
 
                         {!offer.items?.length && !offer.lock_items?.length && (
                           <p className="text-xs text-gray-400">Brak pozycji.</p>

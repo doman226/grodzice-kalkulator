@@ -755,11 +755,15 @@ export default function EditSaleOfferModal({
                               onChange={e => updateLockItem(item.uid, { lengthM: Math.max(0.1, parseFloat(e.target.value) || 0.1) })}
                               className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                           </div>
-                          {/* Cena EUR/mb (koszt) */}
+                          {/* Cena/mb (koszt) */}
                           <div className="col-span-2">
-                            {idx === 0 && <p className="text-xs text-gray-400 mb-1">Koszt EUR/mb</p>}
-                            <input type="number" min={0} step={0.5} value={item.priceEurMb}
-                              onChange={e => updateLockItem(item.uid, { priceEurMb: parseFloat(e.target.value) || 0 })}
+                            {idx === 0 && <p className="text-xs text-gray-400 mb-1">Koszt {isEUR ? 'EUR' : 'PLN'}/mb</p>}
+                            <input type="number" min={0} step={0.5}
+                              value={isEUR ? item.priceEurMb : Math.round(item.priceEurMb * exchangeRate * 100) / 100}
+                              onChange={e => {
+                                const v = parseFloat(e.target.value) || 0;
+                                updateLockItem(item.uid, { priceEurMb: isEUR ? v : v / exchangeRate });
+                              }}
                               className={`w-full border rounded-lg px-2 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                                 item.priceEurMb !== defPrice && defPrice > 0 ? 'border-amber-400 bg-amber-50' : 'border-blue-300 bg-blue-50'
                               }`} />
@@ -780,14 +784,17 @@ export default function EditSaleOfferModal({
                         </div>
                         {/* Wiersz 2: cena sprzedaży */}
                         <div className="pt-1 border-t border-gray-100 flex items-center gap-4">
-                          {/* Cena sprzedaży [EUR/mb] */}
+                          {/* Cena sprzedaży [waluta/mb] */}
                           <div className="flex flex-col gap-1">
-                            <label className="text-xs text-gray-500">Cena sprzedaży [EUR/mb]</label>
+                            <label className="text-xs text-gray-500">Cena sprzedaży [{isEUR ? 'EUR' : 'PLN'}/mb]</label>
                             <div className="flex items-center gap-2">
                               <input
                                 type="number" min={0} step={0.01}
-                                value={item.sellPriceEurMb}
-                                onChange={e => updateLockItem(item.uid, { sellPriceEurMb: parseFloat(e.target.value) || 0 })}
+                                value={isEUR ? item.sellPriceEurMb : Math.round(item.sellPriceEurMb * exchangeRate * 100) / 100}
+                                onChange={e => {
+                                  const v = parseFloat(e.target.value) || 0;
+                                  updateLockItem(item.uid, { sellPriceEurMb: isEUR ? v : v / exchangeRate });
+                                }}
                                 className="w-24 border rounded px-2 py-1 text-sm border-blue-400"
                               />
                               {(() => {
