@@ -14,6 +14,7 @@ const SALES_REPS: Record<string, string> = {
 const SIGNATURES: Record<string, string> = {
   'Szymon Sobczak':    `${window.location.origin}/signatures/Sobczak.png`,
   'Mateusz Cieślicki': `${window.location.origin}/signatures/${encodeURIComponent('Cieślicki.png')}`,
+  'Marzena Sobczak':   `${window.location.origin}/signatures/M.Sobczak.png`,
 };
 
 // Rejestracja fontów obsługujących polskie znaki (ą ę ó ś ź ż ć ń ł)
