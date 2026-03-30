@@ -484,18 +484,16 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
           <View style={[s.priceRow, { flexDirection: 'column', gap: 3 }]}>
             {hasSheetPiles && (() => {
               const unitLabelT  = isEUR ? 'EUR/t'  : 'PLN/t';
-              const unitLabelM2 = isEUR ? 'EUR/m²' : 'PLN/m²';
               const sheetLabel  = lang === 'en' ? 'Sheet piles' : 'Grodzice';
               const sheetVal    = isEUR ? totalSellEUR : totalSellPLN;
 
-              // Metryki grodzic (cena/t, cena/m²)
+              // Metryki grodzic (cena/t)
               const totalClient = isEUR ? totalForClientEUR : totalForClientPLN;
               // Dla DAP w cenie – pricePerT uwzględnia transport
               const baseForMetrics = hasLocks
                 ? sheetVal  // gdy są zamki – nie wliczamy transportu do EUR/t grodzic
                 : (dPaidBy === 'dap_included' && deliveryCostPLN > 0 ? totalClient : sheetVal);
-              const pricePerT  = totalMassT      > 0 ? baseForMetrics / totalMassT      : null;
-              const pricePerM2 = totalWallAreaM2 > 0 ? sheetVal        / totalWallAreaM2 : null;
+              const pricePerT  = totalMassT > 0 ? baseForMetrics / totalMassT : null;
 
               const priced   = sortedItems.filter(i => i.sell_eur_t != null);
               const allSame  = priced.length > 0 && priced.every(i => i.sell_eur_t === priced[0].sell_eur_t);
@@ -508,7 +506,6 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
                   <Text>
                     {sheetLabel}: {formatEUR(sheetVal)} {currency}
                     {perTLabel ? `  ·  ${perTLabel}` : ''}
-                    {!hasLocks && pricePerM2 != null ? `  ·  ${formatRound(pricePerM2)} ${unitLabelM2}` : ''}
                   </Text>
                   {/* DAP w cenie – dostawa NIE jest pokazywana klientowi; widoczna tylko przy dap_extra */}
                 </>
