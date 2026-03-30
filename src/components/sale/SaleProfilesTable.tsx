@@ -7,7 +7,6 @@ interface Props {
   onProfilesChange: (profiles: SaleProfile[]) => void;
 }
 
-// Kolumny edytowalne inline
 type EditableField = 'weight_kg_per_m' | 'wall_kg_per_m2' | 'width_mm';
 
 interface EditingCell {
@@ -16,7 +15,15 @@ interface EditingCell {
   value: string;
 }
 
-// Profile których wagi wymagają weryfikacji z katalogiem Vitkovice
+interface NewProfileForm {
+  name: string;
+  width_mm: string;
+  weight_kg_per_m: string;
+  wall_kg_per_m2: string;
+}
+
+const EMPTY_FORM: NewProfileForm = { name: '', width_mm: '', weight_kg_per_m: '', wall_kg_per_m2: '' };
+
 const NEEDS_VERIFICATION = new Set<string>([]);
 
 export default function SaleProfilesTable({ profiles, onProfilesChange }: Props) {
@@ -24,6 +31,10 @@ export default function SaleProfilesTable({ profiles, onProfilesChange }: Props)
   const [saving, setSaving]           = useState<string | null>(null);
   const [toast, setToast]             = useState('');
   const [error, setError]             = useState('');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newForm, setNewForm]         = useState<NewProfileForm>(EMPTY_FORM);
+  const [addSaving, setAddSaving]     = useState(false);
+  const [deletingId, setDeletingId]   = useState<string | null>(null);
 
   function startEdit(profile: SaleProfile, field: EditableField) {
     setEditingCell({ id: profile.id, field, value: String(profile[field]) });
@@ -69,6 +80,62 @@ export default function SaleProfilesTable({ profiles, onProfilesChange }: Props)
       .eq('id', profile.id);
     if (err) { setError('Błąd: ' + err.message); return; }
     onProfilesChange(profiles.map(p => p.id === profile.id ? { ...p, active: !profile.active } : p));
+  }
+
+  async function addProfile() {
+    const name = newForm.name.trim();
+    const width = parseFloat(newForm.width_mm);
+    const weight = parseFloat(newForm.weight_kg_per_m);
+    const wall = parseFloat(newForm.wall_kg_per_m2);
+
+    if (!name) { setError('Podaj nazwę profilu.'); return; }
+    if (isNaN(width) || width <= 0) { setError('Podaj poprawną szerokość [mm].'); return; }
+    if (isNaN(weight) || weight <= 0) { setError('Podaj poprawną wagę [kg/m].'); return; }
+    if (isNaN(wall) || wall <= 0) { setError('Podaj poprawną masę ścianki [kg/m²].'); return; }
+    if (profiles.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+      setError('Profil o tej nazwie już istnieje.');
+      return;
+    }
+
+    setError('');
+    setAddSaving(true);
+
+    const { data, error: err } = await supabase
+      .from('sale_profiles')
+      .insert({ name, series: 'VL', width_mm: width, weight_kg_per_m: weight, wall_kg_per_m2: wall, active: true })
+      .select()
+      .single();
+
+    if (err || !data) {
+      setError('Błąd dodawania: ' + (err?.message ?? 'nieznany'));
+    } else {
+      onProfilesChange([...profiles, data as SaleProfile]);
+      setNewForm(EMPTY_FORM);
+      setShowAddForm(false);
+      showToast('Profil dodany ✓');
+    }
+
+    setAddSaving(false);
+  }
+
+  async function deleteProfile(profile: SaleProfile) {
+    if (!window.confirm(`Czy na pewno usunąć profil "${profile.name}"? Tej operacji nie można cofnąć.`)) return;
+
+    setDeletingId(profile.id);
+
+    const { error: err } = await supabase
+      .from('sale_profiles')
+      .delete()
+      .eq('id', profile.id);
+
+    if (err) {
+      setError('Błąd usuwania: ' + err.message);
+    } else {
+      onProfilesChange(profiles.filter(p => p.id !== profile.id));
+      showToast('Profil usunięty');
+    }
+
+    setDeletingId(null);
   }
 
   function showToast(msg: string) {
@@ -129,25 +196,92 @@ export default function SaleProfilesTable({ profiles, onProfilesChange }: Props)
       )}
 
       {/* Nagłówek */}
-      <div>
-        <h2 className="text-lg font-semibold text-gray-800">Profile VL – dane techniczne</h2>
-        <p className="text-xs text-gray-400 mt-0.5">
-          Kliknij wartość aby edytować inline · Enter lub kliknij poza komórką aby zapisać
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-800">Profile VL – dane techniczne</h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Kliknij wartość aby edytować inline · Enter lub kliknij poza komórką aby zapisać
+          </p>
+        </div>
+        <button
+          onClick={() => { setShowAddForm(v => !v); setError(''); setNewForm(EMPTY_FORM); }}
+          className="flex items-center gap-1.5 bg-blue-900 hover:bg-blue-800 text-white text-sm px-4 py-2 rounded-lg transition-colors font-medium"
+        >
+          <span className="text-lg leading-none">+</span> Dodaj profil
+        </button>
       </div>
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-red-700 text-sm">{error}</div>
       )}
 
-      {/* Ostrzeżenie o profilach do weryfikacji */}
-      {profiles.some(p => NEEDS_VERIFICATION.has(p.name)) && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-amber-800 text-sm flex gap-2">
-          <span className="text-amber-500 text-base">⚠</span>
-          <span>
-            Profile <strong>VL601, VL602 i VL607</strong> mają wagi wpisane szacunkowo.
-            Zweryfikuj je z katalogiem Vitkovice i zaktualizuj klikając komórkę.
-          </span>
+      {/* Formularz dodawania */}
+      {showAddForm && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <p className="text-sm font-semibold text-blue-900 mb-3">Nowy profil VL</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Nazwa</label>
+              <input
+                type="text"
+                placeholder="np. VL608"
+                value={newForm.name}
+                onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))}
+                className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Szerokość [mm]</label>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                placeholder="600"
+                value={newForm.width_mm}
+                onChange={e => setNewForm(f => ({ ...f, width_mm: e.target.value }))}
+                className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Waga [kg/m]</label>
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                placeholder="80.0"
+                value={newForm.weight_kg_per_m}
+                onChange={e => setNewForm(f => ({ ...f, weight_kg_per_m: e.target.value }))}
+                className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Masa ścianki [kg/m²]</label>
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                placeholder="133.3"
+                value={newForm.wall_kg_per_m2}
+                onChange={e => setNewForm(f => ({ ...f, wall_kg_per_m2: e.target.value }))}
+                className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={addProfile}
+              disabled={addSaving}
+              className="bg-blue-900 hover:bg-blue-800 text-white text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {addSaving ? 'Zapisywanie...' : 'Zapisz profil'}
+            </button>
+            <button
+              onClick={() => { setShowAddForm(false); setError(''); setNewForm(EMPTY_FORM); }}
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-4 py-2 rounded-lg transition-colors"
+            >
+              Anuluj
+            </button>
+          </div>
         </div>
       )}
 
@@ -161,6 +295,7 @@ export default function SaleProfilesTable({ profiles, onProfilesChange }: Props)
               <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Waga [kg/m]</th>
               <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Masa ścianki [kg/m²]</th>
               <th className="text-center px-4 py-3 text-xs uppercase tracking-wide font-semibold">Status</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -195,10 +330,20 @@ export default function SaleProfilesTable({ profiles, onProfilesChange }: Props)
                     aktywny
                   </button>
                 </td>
+                <td className="px-4 py-2.5 text-center">
+                  <button
+                    onClick={() => deleteProfile(profile)}
+                    disabled={deletingId === profile.id}
+                    className="text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                    title="Usuń profil"
+                  >
+                    {deletingId === profile.id ? '...' : '✕'}
+                  </button>
+                </td>
               </tr>
             ))}
 
-            {/* Nieaktywne (zwinięte na dole) */}
+            {/* Nieaktywne */}
             {inactiveProfiles.map((profile) => (
               <tr key={profile.id} className="bg-gray-100 opacity-60">
                 <td className="px-4 py-2 text-gray-400 line-through text-sm">{profile.name}</td>
@@ -212,6 +357,16 @@ export default function SaleProfilesTable({ profiles, onProfilesChange }: Props)
                     title="Kliknij aby aktywować"
                   >
                     nieaktywny
+                  </button>
+                </td>
+                <td className="px-4 py-2 text-center">
+                  <button
+                    onClick={() => deleteProfile(profile)}
+                    disabled={deletingId === profile.id}
+                    className="text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                    title="Usuń profil"
+                  >
+                    {deletingId === profile.id ? '...' : '✕'}
                   </button>
                 </td>
               </tr>
