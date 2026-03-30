@@ -354,7 +354,12 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
   const fmtVal   = (pln: number) => isEUR ? formatEUR(pln / exRate)   : formatPLN(pln);
   // Dla wskaźników pochodnych (koszt/t, koszt/m²) używamy Math.round,
   // żeby uniknąć Math.ceil(120.0000001) = 121 (błąd float przy round-trip PLN↔EUR)
-  const fmtRatio = (pln: number) => isEUR ? formatRound(pln / exRate) : formatRound(pln);
+  const fmtRatio  = (pln: number) => isEUR ? formatRound(pln / exRate) : formatRound(pln);
+  // 2 miejsca po przecinku – dla ceny/m² gdzie wartości są niecałkowite (np. 53,97 PLN/m²)
+  const fmtRatio2 = (pln: number) => {
+    const val = isEUR ? pln / exRate : pln;
+    return new Intl.NumberFormat('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
+  };
   const currCode   = isEUR ? 'EUR' : 'PLN';
   const currSuffix = `${currCode} ${t.netSuffix}`;
 
@@ -483,7 +488,7 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
                     <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right' }]}>{formatNumber(item.total_length_m > 0 ? item.mass_t * 1000 / item.total_length_m : 0, 1)}</Text>
                     <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{formatNumber(item.mass_t, 3)} t</Text>
                     <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'right', color: C.gray700 }]}>{wallArea > 0 ? `${formatNumber(wallArea, 1)} m²` : '—'}</Text>
-                    <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'right', color: C.gray700 }]}>{costPerM2 > 0 ? `${fmtRatio(costPerM2)} ${currCode}/m²` : '—'}</Text>
+                    <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'right', color: C.gray700 }]}>{costPerM2 > 0 ? `${fmtRatio2(costPerM2)} ${currCode}/m²` : '—'}</Text>
                   </View>
                 );
               });
@@ -536,7 +541,6 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
             <Text style={s.priceSuffix}> {currSuffix}</Text>
           </Text>
           <View style={s.priceRow}>
-            <Text>{t.costPerM2Label} {fmtRatio(offer.wall_area_m2 > 0 ? totalWithTransport / offer.wall_area_m2 : offer.cost_per_m2 ?? 0)} {currCode}/m²</Text>
             <Text>{t.costPerTonLabel} {fmtRatio(offer.mass_t > 0 ? totalWithTransport / offer.mass_t : offer.cost_per_ton ?? 0)} {currCode}/t</Text>
           </View>
         </View>
