@@ -193,6 +193,7 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
 
   // Nagłówki kolumn zależne od waluty oferty
   const thPriceT  = isEUR ? t.thPricePerT  : (lang === 'pl' ? 'Cena [PLN/t]'   : 'Price [PLN/t]');
+  const thPriceM2 = isEUR ? t.thPricePerM2 : (lang === 'pl' ? 'Cena [PLN/m²]'  : 'Price [PLN/m²]');
   const thValueC  = isEUR ? t.thValueEUR   : (lang === 'pl' ? 'Wartość [PLN]'  : 'Value [PLN]');
   const thPriceMb = isEUR ? t.thPricePerMb : (lang === 'pl' ? 'Cena PLN/mb'    : 'Price PLN/lm');
 
@@ -308,52 +309,57 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
         <Text style={s.greeting}>{t.greeting}</Text>
         <Text style={s.intro}>{t.intro}</Text>
 
-        {/* ── TABELA GRODZIC ── */}
+        {/* ── TABELA GRODZIC ── 9 kolumn: Profil|Gatunek|Ilość|Dług.|Masa[t]|Pow.[m²]|Cena/t|Cena/m²|Wartość */}
         {hasSheetPiles && <View style={s.table}>
           <View style={s.tableHeaderRow}>
-            <Text style={[s.thCell, { flex: 1.8 }]}>{t.thProfile}</Text>
-            <Text style={[s.thCell, { flex: 1.4 }]}>{t.thSteelGrade}</Text>
-            <Text style={[s.thCell, { flex: 0.8, textAlign: 'center' }]}>{t.thQty}</Text>
-            <Text style={[s.thCell, { flex: 0.8, textAlign: 'right' }]}>{t.thLength}</Text>
-            <Text style={[s.thCell, { flex: 0.7, textAlign: 'right' }]}>{t.thKgPerM}</Text>
-            <Text style={[s.thCell, { flex: 0.9, textAlign: 'right' }]}>{t.thMass}</Text>
-            <Text style={[s.thCell, { flex: 1.1, textAlign: 'right' }]}>{thPriceT}</Text>
-            <Text style={[s.thCell, { flex: 1.4, textAlign: 'right' }]}>{thValueC}</Text>
+            <Text style={[s.thCell, { flex: 1.5 }]}>{t.thProfile}</Text>
+            <Text style={[s.thCell, { flex: 1.2 }]}>{t.thSteelGrade}</Text>
+            <Text style={[s.thCell, { flex: 0.7, textAlign: 'center' }]}>{t.thQty}</Text>
+            <Text style={[s.thCell, { flex: 0.7, textAlign: 'right' }]}>{t.thLength}</Text>
+            <Text style={[s.thCell, { flex: 0.85, textAlign: 'right' }]}>{t.thMass}</Text>
+            <Text style={[s.thCell, { flex: 0.85, textAlign: 'right' }]}>{t.thWallArea}</Text>
+            <Text style={[s.thCell, { flex: 1.0, textAlign: 'right' }]}>{thPriceT}</Text>
+            <Text style={[s.thCell, { flex: 1.0, textAlign: 'right' }]}>{thPriceM2}</Text>
+            <Text style={[s.thCell, { flex: 1.3, textAlign: 'right' }]}>{thValueC}</Text>
           </View>
 
           {sortedItems.map((item, idx) => {
-            const kgPerM = item.total_length_m > 0
-              ? (item.mass_t * 1000) / item.total_length_m
-              : 0;
+            const wallArea   = item.wall_area_m2 ?? 0;
+            const sellTotal  = isEUR ? (item.sell_eur_total ?? 0) : (item.sell_pln_total ?? 0);
+            const pricePerM2 = wallArea > 0 ? sellTotal / wallArea : 0;
             return (
               <View key={item.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
-                <Text style={[s.tdLabel, { flex: 1.8, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
-                  {item.profile_name}
-                  {item.is_paired ? ' ×2' : ''}
+                <Text style={[s.tdLabel, { flex: 1.5, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                  {item.profile_name}{item.is_paired ? ' ×2' : ''}
                 </Text>
-                <Text style={[s.tdLabel, { flex: 1.4, color: C.gray700 }]}>
+                <Text style={[s.tdLabel, { flex: 1.2, color: C.gray700 }]}>
                   {item.steel_grade?.toUpperCase() ?? '—'}
                 </Text>
-                <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'center' }]}>
+                <Text style={[s.tdLabel, { flex: 0.7, textAlign: 'center' }]}>
                   {item.is_paired
                     ? `${item.quantity} ${t.unitPairs}`
                     : `${item.quantity} ${t.unitPcs}`}
                 </Text>
-                <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'right' }]}>
+                <Text style={[s.tdLabel, { flex: 0.7, textAlign: 'right' }]}>
                   {item.length_m != null ? `${item.length_m} m` : '—'}
                 </Text>
-                <Text style={[s.tdLabel, { flex: 0.7, textAlign: 'right', color: C.gray700 }]}>
-                  {formatNumber(kgPerM, 1)}
-                </Text>
-                <Text style={[s.tdLabel, { flex: 0.9, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                <Text style={[s.tdLabel, { flex: 0.85, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
                   {formatNumber(item.mass_t, 3)} t
                 </Text>
-                <Text style={[s.tdLabel, { flex: 1.1, textAlign: 'right', color: C.gray700 }]}>
+                <Text style={[s.tdLabel, { flex: 0.85, textAlign: 'right', color: C.gray700 }]}>
+                  {wallArea > 0 ? `${formatNumber(wallArea, 1)} m²` : '—'}
+                </Text>
+                <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right', color: C.gray700 }]}>
                   {item.sell_eur_t != null
                     ? `${isEUR ? formatEUR(item.sell_eur_t) : formatPLN(item.sell_eur_t)} ${currency}/t`
                     : '—'}
                 </Text>
-                <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right', color: C.gray700 }]}>
+                  {pricePerM2 > 0
+                    ? `${isEUR ? formatEUR(pricePerM2) : formatPLN(pricePerM2)} ${currency}/m²`
+                    : '—'}
+                </Text>
+                <Text style={[s.tdLabel, { flex: 1.3, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
                   {isEUR
                     ? `${formatEUR(item.sell_eur_total ?? 0)} EUR`
                     : `${formatPLN(item.sell_pln_total ?? 0)} PLN`}
@@ -364,16 +370,19 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
 
           {/* Wiersz sumy grodzic */}
           <View style={[s.tableBodyRow, { backgroundColor: C.gray100 }]}>
-            <Text style={[s.tdLabel, { flex: 1.8, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{t.totalRow}</Text>
-            <Text style={[s.tdLabel, { flex: 1.4 }]} />
-            <Text style={[s.tdLabel, { flex: 0.8 }]} />
-            <Text style={[s.tdLabel, { flex: 0.8 }]} />
+            <Text style={[s.tdLabel, { flex: 1.5, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{t.totalRow}</Text>
+            <Text style={[s.tdLabel, { flex: 1.2 }]} />
             <Text style={[s.tdLabel, { flex: 0.7 }]} />
-            <Text style={[s.tdLabel, { flex: 0.9, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+            <Text style={[s.tdLabel, { flex: 0.7 }]} />
+            <Text style={[s.tdLabel, { flex: 0.85, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
               {formatNumber(totalMassT, 3)} t
             </Text>
-            <Text style={[s.tdLabel, { flex: 1.1 }]} />
-            <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+            <Text style={[s.tdLabel, { flex: 0.85, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+              {totalWallAreaM2 > 0 ? `${formatNumber(totalWallAreaM2, 1)} m²` : ''}
+            </Text>
+            <Text style={[s.tdLabel, { flex: 1.0 }]} />
+            <Text style={[s.tdLabel, { flex: 1.0 }]} />
+            <Text style={[s.tdLabel, { flex: 1.3, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
               {isEUR ? `${formatEUR(totalSellEUR)} EUR` : `${formatPLN(totalSellPLN)} PLN`}
             </Text>
           </View>
@@ -383,50 +392,55 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
         {hasLocks && (
           <View style={[s.table, { marginTop: hasSheetPiles ? 6 : 0 }]}>
             {/* Nagłówek: Zamek | Gatunek | Ilość | Dł.[m] | kg/m | mb łącznie | EUR/mb | Wartość EUR */}
+            {/* 9 kolumn: Zamek|Gatunek|Szt.|Dług.|kg/mb|Masa[t]|mb łącznie|Cena/mb|Wartość */}
             <View style={s.tableHeaderRow}>
-              <Text style={[s.thCell, { flex: 1.8 }]}>{t.thLock}</Text>
-              <Text style={[s.thCell, { flex: 1.4 }]}>{t.thSteelGrade}</Text>
-              <Text style={[s.thCell, { flex: 0.8, textAlign: 'center' }]}>{t.thQty}</Text>
-              <Text style={[s.thCell, { flex: 0.8, textAlign: 'right' }]}>{t.thLength}</Text>
-              <Text style={[s.thCell, { flex: 0.7, textAlign: 'right' }]}>{t.thKgPerM}</Text>
-              <Text style={[s.thCell, { flex: 0.9, textAlign: 'right' }]}>{t.thMb}</Text>
-              <Text style={[s.thCell, { flex: 1.1, textAlign: 'right' }]}>{thPriceMb}</Text>
-              <Text style={[s.thCell, { flex: 1.4, textAlign: 'right' }]}>{thValueC}</Text>
+              <Text style={[s.thCell, { flex: 1.5 }]}>{t.thLock}</Text>
+              <Text style={[s.thCell, { flex: 1.2 }]}>{t.thSteelGrade}</Text>
+              <Text style={[s.thCell, { flex: 0.7, textAlign: 'center' }]}>{t.thLockQtySzt}</Text>
+              <Text style={[s.thCell, { flex: 0.7, textAlign: 'right' }]}>{t.thLength}</Text>
+              <Text style={[s.thCell, { flex: 0.85, textAlign: 'right' }]}>{t.thKgPerM}</Text>
+              <Text style={[s.thCell, { flex: 0.85, textAlign: 'right' }]}>{t.thLockMassT}</Text>
+              <Text style={[s.thCell, { flex: 1.0, textAlign: 'right' }]}>{t.thMb}</Text>
+              <Text style={[s.thCell, { flex: 1.0, textAlign: 'right' }]}>{thPriceMb}</Text>
+              <Text style={[s.thCell, { flex: 1.3, textAlign: 'right' }]}>{thValueC}</Text>
             </View>
 
             {/* Pozycje */}
             {sortedLocks.map((lock, idx) => {
-              const qMb   = lock.quantity_mb ?? 0;
-              const massT = lock.mass_t ?? 0;
+              const qMb    = lock.quantity_mb ?? 0;
+              const massT  = lock.mass_t ?? 0;
               const kgPerM = qMb > 0 ? (massT * 1000) / qMb : 0;
               const qtySzt = lock.quantity_szt ?? null;
               const lenM   = lock.length_m   ?? null;
               return (
                 <View key={lock.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
-                  <Text style={[s.tdLabel, { flex: 1.8, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                  <Text style={[s.tdLabel, { flex: 1.5, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
                     {lock.lock_name}
                   </Text>
-                  <Text style={[s.tdLabel, { flex: 1.4, color: C.gray700 }]}>
+                  <Text style={[s.tdLabel, { flex: 1.2, color: C.gray700 }]}>
                     {lock.steel_grade?.toUpperCase() ?? '—'}
                   </Text>
-                  <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'center' }]}>
+                  <Text style={[s.tdLabel, { flex: 0.7, textAlign: 'center' }]}>
                     {qtySzt != null ? `${qtySzt} ${t.unitPcs}` : '—'}
                   </Text>
-                  <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'right' }]}>
+                  <Text style={[s.tdLabel, { flex: 0.7, textAlign: 'right' }]}>
                     {lenM != null ? `${lenM} m` : '—'}
                   </Text>
-                  <Text style={[s.tdLabel, { flex: 0.7, textAlign: 'right', color: C.gray700 }]}>
+                  <Text style={[s.tdLabel, { flex: 0.85, textAlign: 'right', color: C.gray700 }]}>
                     {formatNumber(kgPerM, 1)}
                   </Text>
-                  <Text style={[s.tdLabel, { flex: 0.9, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                  <Text style={[s.tdLabel, { flex: 0.85, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                    {formatNumber(massT, 3)} t
+                  </Text>
+                  <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
                     {formatNumber(qMb, 1)}
                   </Text>
-                  <Text style={[s.tdLabel, { flex: 1.1, textAlign: 'right', color: C.gray700 }]}>
+                  <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right', color: C.gray700 }]}>
                     {isEUR
                       ? `${formatEUR(lock.sell_price_eur_mb ?? lock.price_eur_mb)} EUR/mb`
                       : `${formatPLN((lock.sell_price_eur_mb ?? lock.price_eur_mb) * exchRate)} PLN/mb`}
                   </Text>
-                  <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                  <Text style={[s.tdLabel, { flex: 1.3, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
                     {isEUR
                       ? `${formatEUR(lock.sell_eur_total ?? lock.total_eur)} EUR`
                       : `${formatPLN(lock.sell_pln_total ?? lock.total_pln ?? 0)} PLN`}
@@ -435,22 +449,23 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
               );
             })}
 
-            {/* Wiersz sumy */}
+            {/* Wiersz sumy zamków */}
             <View style={[s.tableBodyRow, { backgroundColor: C.gray100 }]}>
-              <Text style={[s.tdLabel, { flex: 1.8, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+              <Text style={[s.tdLabel, { flex: 1.5, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
                 {t.lockTotalRow}
               </Text>
-              <Text style={[s.tdLabel, { flex: 1.4, color: C.gray500, fontSize: 7 }]}>
-                {t.lockMassRow}: {formatNumber(locksTotalMassT, 3)} t
-              </Text>
-              <Text style={[s.tdLabel, { flex: 0.8 }]} />
-              <Text style={[s.tdLabel, { flex: 0.8 }]} />
+              <Text style={[s.tdLabel, { flex: 1.2 }]} />
               <Text style={[s.tdLabel, { flex: 0.7 }]} />
-              <Text style={[s.tdLabel, { flex: 0.9, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
-                {formatNumber(sortedLocks.reduce((s, l) => s + (l.quantity_mb ?? 0), 0), 1)}
+              <Text style={[s.tdLabel, { flex: 0.7 }]} />
+              <Text style={[s.tdLabel, { flex: 0.85 }]} />
+              <Text style={[s.tdLabel, { flex: 0.85, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+                {formatNumber(locksTotalMassT, 3)} t
               </Text>
-              <Text style={[s.tdLabel, { flex: 1.1 }]} />
-              <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+              <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+                {formatNumber(sortedLocks.reduce((acc, l) => acc + (l.quantity_mb ?? 0), 0), 1)}
+              </Text>
+              <Text style={[s.tdLabel, { flex: 1.0 }]} />
+              <Text style={[s.tdLabel, { flex: 1.3, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
                 {isEUR ? `${formatEUR(locksTotalEUR)} EUR` : `${formatPLN(locksTotalPLN)} PLN`}
               </Text>
             </View>

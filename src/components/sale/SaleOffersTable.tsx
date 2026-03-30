@@ -352,8 +352,10 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                                   <th className="text-right px-3 py-2 font-semibold">Szt.</th>
                                   <th className="text-right px-3 py-2 font-semibold">Dług. [m]</th>
                                   <th className="text-right px-3 py-2 font-semibold">Masa [t]</th>
+                                  <th className="text-right px-3 py-2 font-semibold">Pow. [m²]</th>
                                   <th className="text-right px-3 py-2 font-semibold">Koszt {(offer.currency ?? 'EUR')}/t</th>
                                   <th className="text-right px-3 py-2 font-semibold">Sprz. {(offer.currency ?? 'EUR')}/t</th>
+                                  <th className="text-right px-3 py-2 font-semibold">Cena/m²</th>
                                   <th className="text-right px-3 py-2 font-semibold">Wartość {offer.currency ?? 'EUR'}</th>
                                   <th className="text-right px-3 py-2 font-semibold">Marża</th>
                                 </tr>
@@ -372,8 +374,19 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                                     <td className="px-3 py-2 text-right text-gray-600">{item.quantity}</td>
                                     <td className="px-3 py-2 text-right text-gray-600">{item.length_m}</td>
                                     <td className="px-3 py-2 text-right text-gray-600">{formatNumber(item.mass_t, 3)}</td>
+                                    <td className="px-3 py-2 text-right text-gray-600">
+                                      {item.wall_area_m2 != null && item.wall_area_m2 > 0 ? `${formatNumber(item.wall_area_m2, 1)} m²` : '—'}
+                                    </td>
                                     <td className="px-3 py-2 text-right text-gray-500">{item.cost_eur_t != null ? formatRound(item.cost_eur_t) : '—'}</td>
                                     <td className="px-3 py-2 text-right font-semibold text-gray-800">{item.sell_eur_t != null ? formatRound(item.sell_eur_t) : '—'}</td>
+                                    <td className="px-3 py-2 text-right text-purple-700 font-medium">
+                                      {(() => {
+                                        const wall = item.wall_area_m2 ?? 0;
+                                        const sellTotal = (offer.currency ?? 'EUR') === 'PLN' ? (item.sell_pln_total ?? 0) : (item.sell_eur_total ?? 0);
+                                        if (wall <= 0 || sellTotal <= 0) return '—';
+                                        return `${(offer.currency ?? 'EUR') === 'PLN' ? formatPLN(sellTotal / wall) : formatEUR(sellTotal / wall)} ${offer.currency ?? 'EUR'}/m²`;
+                                      })()}
+                                    </td>
                                     <td className="px-3 py-2 text-right font-bold text-gray-900">
                                       {(offer.currency ?? 'EUR') === 'PLN'
                                         ? (item.sell_pln_total != null ? `${formatPLN(item.sell_pln_total)} PLN` : '—')

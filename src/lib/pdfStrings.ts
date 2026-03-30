@@ -30,6 +30,9 @@ export interface PdfStrings {
   thKgPerM:        string;
   thMass:          string;
   thPricePerT:     string;
+  thWallArea:      string;   // Pow. ścianki [m²]
+  thPricePerM2:    string;   // Cena [X/m²]
+  thLockMassT:     string;   // Masa [t] – kolumna zamków
 
   // Table body units / labels
   unitPairs:       string;
@@ -128,6 +131,9 @@ const pl: PdfStrings = {
   thKgPerM:     'kg/m',
   thMass:       'Masa [t]',
   thPricePerT:  'Cena [EUR/t]',
+  thWallArea:   'Pow. [m²]',
+  thPricePerM2: 'Cena/m²',
+  thLockMassT:  'Masa [t]',
 
   unitPairs: 'par',
   unitPcs:   'szt.',
@@ -225,6 +231,9 @@ const en: PdfStrings = {
   thKgPerM:     'kg/m',
   thMass:       'Mass [t]',
   thPricePerT:  'Price [EUR/t]',
+  thWallArea:   'Wall area [m²]',
+  thPricePerM2: 'Price/m²',
+  thLockMassT:  'Mass [t]',
 
   unitPairs: 'pairs',
   unitPcs:   'pcs.',
@@ -324,6 +333,8 @@ export interface RentalPdfStrings {
   thLength:     string;
   thKgPerM:     string;
   thMass:       string;
+  thWallArea:   string;   // Pow. ścianki [m²]
+  thCostPerM2:  string;   // Koszt/m²
   totalRow:     string;
   unitPcs:      string;
   rentalPeriodRow: string;
@@ -434,6 +445,8 @@ const rental_pl: RentalPdfStrings = {
   thLength:        'Dług. [m]',
   thKgPerM:        'kg/m',
   thMass:          'Masa [t]',
+  thWallArea:      'Pow. [m²]',
+  thCostPerM2:     'Koszt/m²',
   totalRow:        'Łącznie',
   unitPcs:         'szt.',
   rentalPeriodRow: 'Podstawowy okres dzierżawy',
@@ -534,6 +547,8 @@ const rental_en: RentalPdfStrings = {
   thLength:        'Length [m]',
   thKgPerM:        'kg/m',
   thMass:          'Mass [t]',
+  thWallArea:      'Wall area [m²]',
+  thCostPerM2:     'Cost/m²',
   totalRow:        'Total',
   unitPcs:         'pcs.',
   rentalPeriodRow: 'Basic rental period',

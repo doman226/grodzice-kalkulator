@@ -638,15 +638,26 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                   {r.valid && (
                     <div className="ml-auto text-right text-xs text-gray-500 space-y-0.5">
                       <p>{items[idx].isPaired && <span className="text-blue-600 font-medium">×2 parowane · </span>}
-                        {formatNumber(r.totalLengthM, 1)} m · {formatNumber(r.massT, 3)} t</p>
-                      {item.sellPriceEurT > 0 && (
-                        <p className="font-semibold text-gray-800">
-                          {currency === 'PLN'
-                            ? <>{formatPLN(r.sellEUR * exchangeRate)} PLN <span className="font-normal text-gray-400">· {formatEUR(r.sellEUR)} EUR</span></>
-                            : <>{formatEUR(r.sellEUR)} EUR</>
-                          }
-                        </p>
-                      )}
+                        {formatNumber(r.totalLengthM, 1)} m · {formatNumber(r.massT, 3)} t
+                        {r.wallAreaM2 > 0 && <> · <span className="text-purple-600">{formatNumber(r.wallAreaM2, 1)} m²</span></>}
+                      </p>
+                      {item.sellPriceEurT > 0 && (() => {
+                        const sellInCurrency = currency === 'PLN' ? r.sellEUR * exchangeRate : r.sellEUR;
+                        const pricePerM2     = r.wallAreaM2 > 0 ? sellInCurrency / r.wallAreaM2 : 0;
+                        return (
+                          <p className="font-semibold text-gray-800">
+                            {currency === 'PLN'
+                              ? <>{formatPLN(sellInCurrency)} PLN <span className="font-normal text-gray-400">· {formatEUR(r.sellEUR)} EUR</span></>
+                              : <>{formatEUR(r.sellEUR)} EUR</>
+                            }
+                            {pricePerM2 > 0 && (
+                              <span className="ml-2 text-xs font-normal text-purple-600">
+                                ({currency === 'PLN' ? formatPLN(pricePerM2) : formatEUR(pricePerM2)} {currency}/m²)
+                              </span>
+                            )}
+                          </p>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -858,6 +869,12 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
               <StatCard label="Masa zamków" value={hasValidLocks ? formatNumber(lockTotals.totalMassT, 3) : '—'} unit="t" />
               <StatCard label="Powierzchnia ścianki" value={isValid ? formatNumber(totals.totalWallAreaM2, 2) : '—'} unit="m²" />
               <StatCard label="Cena sprzedaży / t" value={effectivePerTon > 0 ? formatEUR(effectivePerTon) : '—'} unit={`${currency}/t`} />
+              {isValid && totals.totalWallAreaM2 > 0 && (() => {
+                const sellPerM2 = currency === 'PLN'
+                  ? totals.totalSellPLN / totals.totalWallAreaM2
+                  : totals.totalSellEUR / totals.totalWallAreaM2;
+                return <StatCard label="Cena sprzedaży / m²" value={sellPerM2 > 0 ? (currency === 'PLN' ? formatPLN(sellPerM2) : formatEUR(sellPerM2)) : '—'} unit={`${currency}/m²`} />;
+              })()}
             </div>
             {items.length > 1 && (
               <div className="mt-4 pt-4 border-t border-gray-100 space-y-1">

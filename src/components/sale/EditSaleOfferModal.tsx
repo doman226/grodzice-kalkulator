@@ -618,6 +618,16 @@ export default function EditSaleOfferModal({
                           )}
                         </div>
                       </div>
+                      <div className="col-span-2">
+                        {idx === 0 && <p className="text-xs text-gray-400 mb-1">Pow. [m²]</p>}
+                        <div className="rounded-lg bg-white border border-gray-200 px-2 py-1.5 text-sm text-gray-700 min-h-[34px] flex items-center">
+                          {r && r.wallAreaM2 > 0 ? (
+                            <span className="text-purple-700 font-medium">{formatNumber(r.wallAreaM2, 1)} m²</span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </div>
+                      </div>
                       <div className="col-span-1 flex justify-end items-end">
                         <button onClick={() => removeItem(item.uid)}
                           className="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200 transition-colors text-xs"
@@ -661,6 +671,15 @@ export default function EditSaleOfferModal({
                           <p className="text-sm font-semibold text-gray-800">
                             {isEUR ? `${formatEUR(r.sellEurTotal)} EUR` : `${formatPLN(r.sellPlnTotal)} PLN`}
                           </p>
+                          {r.wallAreaM2 > 0 && (() => {
+                            const sellInCurr = isEUR ? r.sellEurTotal : r.sellPlnTotal;
+                            const pm2 = sellInCurr / r.wallAreaM2;
+                            return (
+                              <p className="text-xs text-purple-600 font-medium">
+                                {isEUR ? formatEUR(pm2) : formatPLN(pm2)} {currency}/m²
+                              </p>
+                            );
+                          })()}
                           <p className={`text-xs font-semibold ${
                             r.marginPct < 0 ? 'text-red-600' : r.marginPct < 5 ? 'text-orange-600' : 'text-green-700'
                           }`}>
