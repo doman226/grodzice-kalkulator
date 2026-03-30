@@ -82,7 +82,7 @@ const s = StyleSheet.create({
   intro:     { marginBottom: 10, lineHeight: 1.5, fontSize: 9, color: C.gray700 },
 
   signatureBlock: { marginTop: 28 },
-  signatureKR:    { fontSize: 9, fontStyle: 'italic', marginBottom: 10, color: C.gray700 },
+  signatureKR:    { fontSize: 9, marginBottom: 10, color: C.gray500 },
   signatureImg:   { width: 110, height: 55, objectFit: 'contain', marginBottom: 4 },
   signatureName:  { fontFamily: 'Roboto', fontWeight: 700, fontSize: 9, marginBottom: 2 },
   signaturePhone: { fontSize: 9, color: C.gray700 },
