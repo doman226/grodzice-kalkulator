@@ -664,6 +664,54 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
               </div>
             );
           })}
+
+          {/* Podsumowanie grodzic */}
+          {isValid && totals.totalSellEUR > 0 && (
+            <div className="mt-2 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+              <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-3">Podsumowanie grodzic</p>
+              <div className="flex flex-wrap gap-8">
+                <div>
+                  <p className="text-xs text-gray-500 mb-0.5">Wartość sprzedaży</p>
+                  <p className="text-2xl font-bold text-blue-900">
+                    {currency === 'EUR'
+                      ? `${formatEUR(totals.totalSellEUR)} EUR`
+                      : `${formatPLN(totals.totalSellPLN)} PLN`}
+                  </p>
+                  <p className="text-sm text-blue-700 mt-0.5">
+                    {currency === 'EUR'
+                      ? `≈ ${formatPLN(totals.totalSellPLN)} PLN`
+                      : `≈ ${formatEUR(totals.totalSellEUR)} EUR`}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    koszt: {currency === 'EUR'
+                      ? `${formatEUR(totals.totalCostEUR)} EUR`
+                      : `${formatPLN(totals.totalCostPLN)} PLN`}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-0.5">Masa grodzic</p>
+                  <p className="text-2xl font-bold text-gray-800">{formatNumber(totals.totalMassT, 3)} t</p>
+                  <p className="text-xs text-gray-400 mt-0.5">łącznie dla {itemResults.filter(r => r.valid).length} poz.</p>
+                </div>
+                {totals.totalWallAreaM2 > 0 && (
+                  <div>
+                    <p className="text-xs text-gray-500 mb-0.5">Pow. ścianki</p>
+                    <p className="text-2xl font-bold text-gray-800">{formatNumber(totals.totalWallAreaM2, 1)} m²</p>
+                    {(() => {
+                      const pm2 = currency === 'PLN'
+                        ? totals.totalSellPLN / totals.totalWallAreaM2
+                        : totals.totalSellEUR / totals.totalWallAreaM2;
+                      return pm2 > 0
+                        ? <p className="text-sm text-purple-600 font-medium mt-0.5">
+                            {currency === 'PLN' ? formatPLN(pm2) : formatEUR(pm2)} {currency}/m²
+                          </p>
+                        : null;
+                    })()}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
