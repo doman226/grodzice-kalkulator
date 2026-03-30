@@ -693,22 +693,6 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                   <p className="text-2xl font-bold text-gray-800">{formatNumber(totals.totalMassT, 3)} t</p>
                   <p className="text-xs text-gray-400 mt-0.5">łącznie dla {itemResults.filter(r => r.valid).length} poz.</p>
                 </div>
-                {totals.totalWallAreaM2 > 0 && (
-                  <div>
-                    <p className="text-xs text-gray-500 mb-0.5">Pow. ścianki</p>
-                    <p className="text-2xl font-bold text-gray-800">{formatNumber(totals.totalWallAreaM2, 1)} m²</p>
-                    {(() => {
-                      const pm2 = currency === 'PLN'
-                        ? totals.totalSellPLN / totals.totalWallAreaM2
-                        : totals.totalSellEUR / totals.totalWallAreaM2;
-                      return pm2 > 0
-                        ? <p className="text-sm text-purple-600 font-medium mt-0.5">
-                            {currency === 'PLN' ? formatPLN(pm2) : formatEUR(pm2)} {currency}/m²
-                          </p>
-                        : null;
-                    })()}
-                  </div>
-                )}
               </div>
             </div>
           )}
