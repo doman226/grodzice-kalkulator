@@ -135,10 +135,7 @@ const s = StyleSheet.create({
 
   // Signature block
   signatureBlock: { marginTop: 28 },
-  signatureKR:    { fontSize: 9, marginBottom: 10, color: C.gray500 },
-  signatureImg:   { width: 110, height: 55, objectFit: 'contain', marginBottom: 4 },
-  signatureName:  { fontFamily: 'Roboto', fontWeight: 700, fontSize: 9, marginBottom: 2 },
-  signaturePhone: { fontSize: 9, color: C.gray700 },
+  signatureImg:   { width: 160, height: 80, objectFit: 'contain' },
 
   // Table
   table: {
@@ -692,10 +689,7 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
         {/* ── PODPIS HANDLOWCA ── */}
         {offer.prepared_by && SIGNATURES[offer.prepared_by] && (
           <View style={s.signatureBlock}>
-            <Text style={s.signatureKR}>Kind Regards,</Text>
             <Image style={s.signatureImg} src={SIGNATURES[offer.prepared_by]} />
-            <Text style={s.signatureName}>{offer.prepared_by}</Text>
-            <Text style={s.signaturePhone}>T: {SALES_REPS[offer.prepared_by]}</Text>
           </View>
         )}
       </Page>
