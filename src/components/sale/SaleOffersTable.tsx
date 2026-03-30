@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { supabase } from '../../lib/supabase';
 import type { Client, SaleOffer, SaleProfile, OfferStatus } from '../../types';
@@ -170,9 +170,8 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                 </td>
               </tr>
             ) : filtered.map((offer, idx) => (
-              <>
+              <React.Fragment key={offer.id}>
                 <tr
-                  key={offer.id}
                   className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}
                 >
                   {/* Numer */}
@@ -509,7 +508,7 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                     </td>
                   </tr>
                 )}
-              </>
+              </React.Fragment>
             ))}
           </tbody>
         </table>
