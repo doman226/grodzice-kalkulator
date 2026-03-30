@@ -12,6 +12,11 @@ const SALES_REPS: Record<string, string> = {
   'Piotr Domański':    '729 393 743',
 };
 
+const SIGNATURES: Record<string, string> = {
+  'Szymon Sobczak':    `${window.location.origin}/signatures/Sobczak.png`,
+  'Mateusz Cieślicki': `${window.location.origin}/signatures/${encodeURIComponent('Cieślicki.png')}`,
+};
+
 Font.register({
   family: 'Roboto',
   fonts: [
@@ -75,6 +80,12 @@ const s = StyleSheet.create({
 
   greeting: { marginBottom: 5, fontSize: 9 },
   intro:     { marginBottom: 10, lineHeight: 1.5, fontSize: 9, color: C.gray700 },
+
+  signatureBlock: { marginTop: 28 },
+  signatureKR:    { fontSize: 9, fontStyle: 'italic', marginBottom: 10, color: C.gray700 },
+  signatureImg:   { width: 110, height: 55, objectFit: 'contain', marginBottom: 4 },
+  signatureName:  { fontFamily: 'Roboto', fontWeight: 700, fontSize: 9, marginBottom: 2 },
+  signaturePhone: { fontSize: 9, color: C.gray700 },
 
   table:          { marginBottom: 10, border: `1 solid ${C.gray200}`, borderRadius: 4, overflow: 'hidden' },
   tableHeaderRow: { flexDirection: 'row', backgroundColor: C.navy },
@@ -649,6 +660,16 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
           <View style={s.notesBox}>
             <Text style={s.notesLabel}>{t.notesLabel}</Text>
             <Text style={s.notesText}>{offer.notes}</Text>
+          </View>
+        )}
+
+        {/* ── PODPIS HANDLOWCA ── */}
+        {offer.prepared_by && SIGNATURES[offer.prepared_by] && (
+          <View style={s.signatureBlock}>
+            <Text style={s.signatureKR}>Kind Regards,</Text>
+            <Image style={s.signatureImg} src={SIGNATURES[offer.prepared_by]} />
+            <Text style={s.signatureName}>{offer.prepared_by}</Text>
+            <Text style={s.signaturePhone}>T: {SALES_REPS[offer.prepared_by]}</Text>
           </View>
         )}
 

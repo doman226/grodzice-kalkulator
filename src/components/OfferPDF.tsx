@@ -11,6 +11,11 @@ const SALES_REPS: Record<string, string> = {
   'Piotr Domański': '729 393 743',
 };
 
+const SIGNATURES: Record<string, string> = {
+  'Szymon Sobczak':    `${window.location.origin}/signatures/Sobczak.png`,
+  'Mateusz Cieślicki': `${window.location.origin}/signatures/${encodeURIComponent('Cieślicki.png')}`,
+};
+
 // Rejestracja fontów obsługujących polskie znaki (ą ę ó ś ź ż ć ń ł)
 // Fonty lokalne w /public/fonts/ – brak zależności od sieci
 Font.register({
@@ -127,6 +132,13 @@ const s = StyleSheet.create({
     fontSize: 9,
     color: C.gray700,
   },
+
+  // Signature block
+  signatureBlock: { marginTop: 28 },
+  signatureKR:    { fontSize: 9, fontStyle: 'italic', marginBottom: 10, color: C.gray700 },
+  signatureImg:   { width: 110, height: 55, objectFit: 'contain', marginBottom: 4 },
+  signatureName:  { fontFamily: 'Roboto', fontWeight: 700, fontSize: 9, marginBottom: 2 },
+  signaturePhone: { fontSize: 9, color: C.gray700 },
 
   // Table
   table: {
@@ -674,6 +686,16 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
           <View style={s.notesBox}>
             <Text style={s.notesLabel}>{t.notesLabel}</Text>
             <Text style={s.notesText}>{offer.notes}</Text>
+          </View>
+        )}
+
+        {/* ── PODPIS HANDLOWCA ── */}
+        {offer.prepared_by && SIGNATURES[offer.prepared_by] && (
+          <View style={s.signatureBlock}>
+            <Text style={s.signatureKR}>Kind Regards,</Text>
+            <Image style={s.signatureImg} src={SIGNATURES[offer.prepared_by]} />
+            <Text style={s.signatureName}>{offer.prepared_by}</Text>
+            <Text style={s.signaturePhone}>T: {SALES_REPS[offer.prepared_by]}</Text>
           </View>
         )}
       </Page>
