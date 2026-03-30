@@ -979,7 +979,9 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                   </p>
                   {hasLockRevenue && (
                     <p className="text-xs text-gray-400 mt-1">
-                      grodzice {formatEUR(totals.totalCostEUR)} + zamki {formatEUR(lockTotals.totalEUR)} EUR
+                      {currency === 'PLN'
+                        ? `grodzice ${formatPLN(totals.totalCostPLN)} + zamki ${formatPLN(lockTotals.totalPLN)} PLN`
+                        : `grodzice ${formatEUR(totals.totalCostEUR)} + zamki ${formatEUR(lockTotals.totalEUR)} EUR`}
                     </p>
                   )}
                 </div>
@@ -998,7 +1000,9 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                   }
                   {hasLockRevenue && (
                     <p className="text-xs text-blue-400 mt-1">
-                      grodzice {formatEUR(totals.totalSellEUR)} + zamki {formatEUR(lockTotals.totalSellEUR)} EUR
+                      {currency === 'PLN'
+                        ? `grodzice ${formatPLN(totals.totalSellPLN)} + zamki ${formatPLN(lockTotals.totalSellPLN)} PLN`
+                        : `grodzice ${formatEUR(totals.totalSellEUR)} + zamki ${formatEUR(lockTotals.totalSellEUR)} EUR`}
                     </p>
                   )}
                 </div>
