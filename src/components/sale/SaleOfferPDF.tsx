@@ -490,29 +490,31 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
             {hasSheetPiles && (() => {
               const unitLabelT  = isEUR ? 'EUR/t'  : 'PLN/t';
               const sheetLabel  = lang === 'en' ? 'Sheet piles' : 'Grodzice';
-              const sheetVal    = isEUR ? totalSellEUR : totalSellPLN;
+              const sheetSellOnly = isEUR ? totalSellEUR : totalSellPLN;
+              // DAP w cenie: transport wliczamy do wartości grodzic (identycznie jak moduł wynajmu)
+              // Dzięki temu breakdown sumuje się do total: (grodzice+transport) + zamki = totalForClient
+              const deliveryCostC = isEUR ? deliveryCostEUR : deliveryCostPLN;
+              const sheetVal      = dPaidBy === 'dap_included' && deliveryCostC > 0
+                ? sheetSellOnly + deliveryCostC
+                : sheetSellOnly;
 
-              // Metryki grodzic (cena/t)
-              const totalClient = isEUR ? totalForClientEUR : totalForClientPLN;
-              // Dla DAP w cenie – pricePerT uwzględnia transport
-              const baseForMetrics = hasLocks
-                ? sheetVal  // gdy są zamki – nie wliczamy transportu do EUR/t grodzic
-                : (dPaidBy === 'dap_included' && deliveryCostPLN > 0 ? totalClient : sheetVal);
-              const pricePerT  = totalMassT > 0 ? baseForMetrics / totalMassT : null;
+              // Cena/t zawsze z przeliczonego sheetVal (uwzględnia transport gdy DAP w cenie)
+              const pricePerT = totalMassT > 0 ? sheetVal / totalMassT : null;
 
+              // Skrót allSame stosujemy tylko gdy nie ma transportu do amortyzacji
               const priced   = sortedItems.filter(i => i.sell_eur_t != null);
               const allSame  = priced.length > 0 && priced.every(i => i.sell_eur_t === priced[0].sell_eur_t);
-              const perTLabel = allSame && priced.length > 0
+              const perTLabel = (deliveryCostC === 0 && allSame && priced.length > 0)
                 ? `${formatRound(priced[0].sell_eur_t ?? 0)} ${unitLabelT}`
                 : pricePerT != null ? `${formatRound(pricePerT)} ${unitLabelT}` : null;
 
               return (
                 <>
                   <Text>
-                    {sheetLabel}: {formatEUR(sheetVal)} {currency}
+                    {sheetLabel}: {isEUR ? formatEUR(sheetVal) : formatPLN(sheetVal)} {currency}
                     {perTLabel ? `  ·  ${perTLabel}` : ''}
                   </Text>
-                  {/* DAP w cenie – dostawa NIE jest pokazywana klientowi; widoczna tylko przy dap_extra */}
+                  {/* DAP w cenie – transport zawarty w kwocie grodzic powyżej; nie pokazujemy osobnej linii */}
                 </>
               );
             })()}
