@@ -69,7 +69,7 @@ export interface SaleOffer {
   campaign_weeks?: string;
   campaign_delivery_weeks?: string;
   warehouse_delivery_time?: string;
-  delivery_terms?: 'DAP' | 'FCA';
+  delivery_terms?: 'DAP' | 'DAP_EXTRA' | 'FCA';
   fca_location?: string;
   created_at: string;
   updated_at: string;

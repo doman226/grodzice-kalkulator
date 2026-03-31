@@ -111,9 +111,9 @@ export default function SaveSaleOfferModal({
   const [warehouseDeliveryTime, setWarehouseDeliveryTime] = useState('5–7 dni roboczych');
 
   // ── Warunki dostawy ──
-  // domyślnie FCA gdy opcja fca, DAP w pozostałych przypadkach
-  const [deliveryTerms, setDeliveryTerms] = useState<'DAP' | 'FCA'>(
-    delivery?.paidBy === 'fca' ? 'FCA' : 'DAP'
+  // domyślnie FCA gdy opcja fca, DAP_EXTRA gdy dap_extra, DAP w pozostałych przypadkach
+  const [deliveryTerms, setDeliveryTerms] = useState<'DAP' | 'DAP_EXTRA' | 'FCA'>(
+    delivery?.paidBy === 'fca' ? 'FCA' : delivery?.paidBy === 'dap_extra' ? 'DAP_EXTRA' : 'DAP'
   );
   const [fcaLocation, setFcaLocation] = useState('');
 
@@ -571,8 +571,9 @@ export default function SaveSaleOfferModal({
                 <p className="text-sm font-medium text-gray-700 mb-2">Warunki dostawy (Incoterms)</p>
                 <div className="flex gap-4 mb-3">
                   {([
-                    { val: 'DAP', label: 'DAP – dostawa w cenie' },
-                    { val: 'FCA', label: 'FCA – odbiór własny' },
+                    { val: 'DAP',       label: 'DAP – dostawa w cenie' },
+                    { val: 'DAP_EXTRA', label: 'DAP – refaktura' },
+                    { val: 'FCA',       label: 'FCA – odbiór własny' },
                   ] as const).map(opt => (
                     <label key={opt.val} className="flex items-center gap-1.5 cursor-pointer text-sm">
                       <input type="radio" name="deliveryTerms" value={opt.val}
@@ -584,9 +585,9 @@ export default function SaveSaleOfferModal({
                   ))}
                 </div>
 
-                {deliveryTerms === 'DAP' && (
+                {(deliveryTerms === 'DAP' || deliveryTerms === 'DAP_EXTRA') && (
                   <p className="text-xs text-gray-500">
-                    DAP ({delivery?.to ? delivery.to : 'adres dostawy do uzupełnienia w sekcji dostawy'})
+                    Na PDF: „DAP ({delivery?.to ? delivery.to : 'adres dostawy do uzupełnienia w sekcji dostawy'})"
                   </p>
                 )}
                 {deliveryTerms === 'FCA' && (

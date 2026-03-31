@@ -206,7 +206,7 @@ export default function EditSaleOfferModal({
   const [campaignWeeks,         setCampaignWeeks]         = useState(offer.campaign_weeks         ?? '');
   const [campaignDeliveryWeeks, setCampaignDeliveryWeeks] = useState(offer.campaign_delivery_weeks ?? '');
   const [warehouseDeliveryTime, setWarehouseDeliveryTime] = useState(offer.warehouse_delivery_time ?? '5–7 dni roboczych');
-  const [deliveryTerms,         setDeliveryTerms]         = useState<'DAP' | 'FCA'>(offer.delivery_terms ?? 'DAP');
+  const [deliveryTerms,         setDeliveryTerms]         = useState<'DAP' | 'DAP_EXTRA' | 'FCA'>(offer.delivery_terms ?? 'DAP');
   const [fcaLocation,           setFcaLocation]           = useState(offer.fca_location ?? '');
 
   const [saving, setSaving] = useState(false);
@@ -1170,8 +1170,9 @@ export default function EditSaleOfferModal({
                 <p className="text-sm font-medium text-gray-700 mb-2">Warunki dostawy (Incoterms)</p>
                 <div className="flex gap-4 mb-3">
                   {([
-                    { val: 'DAP', label: 'DAP – dostawa w cenie' },
-                    { val: 'FCA', label: 'FCA – odbiór własny' },
+                    { val: 'DAP',       label: 'DAP – dostawa w cenie' },
+                    { val: 'DAP_EXTRA', label: 'DAP – refaktura' },
+                    { val: 'FCA',       label: 'FCA – odbiór własny' },
                   ] as const).map(opt => (
                     <label key={opt.val} className="flex items-center gap-1.5 cursor-pointer text-sm">
                       <input type="radio" name="editDeliveryTerms" value={opt.val}
@@ -1182,6 +1183,11 @@ export default function EditSaleOfferModal({
                     </label>
                   ))}
                 </div>
+                {(deliveryTerms === 'DAP' || deliveryTerms === 'DAP_EXTRA') && (
+                  <p className="text-xs text-gray-500">
+                    Na PDF: „DAP ({deliveryTo || 'adres dostawy'})"
+                  </p>
+                )}
                 {deliveryTerms === 'FCA' && (
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">
