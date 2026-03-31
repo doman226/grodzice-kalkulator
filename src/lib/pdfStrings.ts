@@ -80,8 +80,9 @@ export interface PdfStrings {
   deliveryFromStock:  (time?: string) => string;
 
   // Delivery terms
-  deliveryFca:   (location: string) => string;
-  deliveryDap:   (address: string) => string;
+  deliveryFca:      (location: string) => string;
+  deliveryDap:      (address: string) => string;
+  deliveryDapExtra: (address: string) => string;
 
   // Payment text
   paymentPrepaid: string;
@@ -178,8 +179,9 @@ const pl: PdfStrings = {
   deliveryFromStock: time =>
     `z magazynu${time ? `, ${time}` : ''}.`,
 
-  deliveryFca: location => `odbiór własny wg. FCA (${location}).`,
-  deliveryDap: address  => `dostawa w cenie wg. DAP (${address}).`,
+  deliveryFca:      location => `odbiór własny wg. FCA (${location}).`,
+  deliveryDap:      address  => `dostawa w cenie wg. DAP (${address}).`,
+  deliveryDapExtra: address  => `dostawa wg. DAP (${address}), transport refakturowany na klienta.`,
 
   paymentPrepaid: 'przedpłata 100%.',
   paymentCredit:  days =>
@@ -278,8 +280,9 @@ const en: PdfStrings = {
   deliveryFromStock: time =>
     `ex stock${time ? `, ${time}` : ''}.`,
 
-  deliveryFca: location => `customer\'s own collection, FCA (${location}).`,
-  deliveryDap: address  => `delivery included, DAP (${address}).`,
+  deliveryFca:      location => `customer\'s own collection, FCA (${location}).`,
+  deliveryDap:      address  => `delivery included, DAP (${address}).`,
+  deliveryDapExtra: address  => `delivery DAP (${address}), freight re-invoiced to customer.`,
 
   paymentPrepaid: '100% prepayment.',
   paymentCredit:  days =>

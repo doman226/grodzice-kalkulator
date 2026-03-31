@@ -244,10 +244,14 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
   }
 
   function deliveryTermsText(): string {
+    const destination = offer.delivery_to ?? (lang === 'en' ? 'delivery address' : 'adres dostawy');
     if (offer.delivery_terms === 'FCA') {
       return t.deliveryFca(offer.fca_location ?? (lang === 'en' ? 'collection warehouse' : 'magazyn odbioru'));
     }
-    return t.deliveryDap(offer.delivery_to ?? (lang === 'en' ? 'delivery address' : 'adres dostawy'));
+    if (offer.delivery_terms === 'DAP_EXTRA') {
+      return t.deliveryDapExtra(destination);
+    }
+    return t.deliveryDap(destination);
   }
 
   function paymentText(): string {

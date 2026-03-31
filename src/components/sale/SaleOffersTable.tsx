@@ -322,9 +322,9 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                             <div>
                               <span className="text-gray-500">Incoterms:</span>{' '}
                               <strong>
-                                {offer.delivery_terms}
+                                {offer.delivery_terms === 'DAP_EXTRA' ? 'DAP – refaktura' : offer.delivery_terms}
                                 {offer.delivery_terms === 'FCA' && offer.fca_location ? ` (${offer.fca_location})` : ''}
-                                {offer.delivery_terms === 'DAP' && offer.delivery_to ? ` (${offer.delivery_to})` : ''}
+                                {(offer.delivery_terms === 'DAP' || offer.delivery_terms === 'DAP_EXTRA') && offer.delivery_to ? ` (${offer.delivery_to})` : ''}
                               </strong>
                             </div>
                           )}
