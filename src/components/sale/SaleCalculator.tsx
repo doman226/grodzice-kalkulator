@@ -1294,7 +1294,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
             currency={currency}
             exchangeRate={exchangeRate}
             nbpDate={nbpRate.date}
-            delivery={deliveryCalc && deliveryCalc.costPerTruck > 0 ? {
+            delivery={deliveryCalc ? {
               trucks:       deliveryCalc.trucks,
               costPerTruck: deliveryCalc.costPerTruck,
               totalCostPLN: deliveryCalc.totalCostPLN,

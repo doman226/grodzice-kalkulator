@@ -320,6 +320,13 @@ export default function EditSaleOfferModal({
     return { totalEUR, totalPLN, totalSellEUR, totalSellPLN };
   }, [editLockItems, exchangeRate]);
 
+  // Marża łączna: grodzice + zamki (przy samych zamkach totals.totalSellEUR = 0)
+  const combinedMarginPct = useMemo(() => {
+    const sellEUR = totals.totalSellEUR + lockTotals.totalSellEUR;
+    const costEUR = totals.totalCostEUR + lockTotals.totalEUR;
+    return sellEUR > 0 ? ((sellEUR - costEUR) / sellEUR) * 100 : 0;
+  }, [totals.totalSellEUR, totals.totalCostEUR, lockTotals.totalSellEUR, lockTotals.totalEUR]);
+
   const isEUR = currency === 'EUR';
 
   // ── Zmiana waluty – konwertuje ceny pozycji (identyczna logika jak SaleCalculator) ──
@@ -399,7 +406,7 @@ export default function EditSaleOfferModal({
         total_cost_eur:            totals.totalCostEUR,
         total_sell_eur:            totals.totalSellEUR + lockTotals.totalSellEUR,
         total_sell_pln:            totals.totalSellPLN + lockTotals.totalSellPLN,
-        margin_pct:                totals.overallMarginPct,
+        margin_pct:                combinedMarginPct,
         delivery_trucks:           hasTransport ? deliveryCalc!.trucks         : null,
         delivery_cost_per_truck:   hasTransport ? deliveryCalc!.costPerTruck   : null,
         delivery_cost_total:       hasTransport ? deliveryCalc!.totalCostPLN   : null,
@@ -884,8 +891,8 @@ export default function EditSaleOfferModal({
                 </div>
                 <div className="flex justify-between text-sm pt-1 border-t border-blue-200">
                   <span className="text-gray-600 font-medium">Marża łączna:</span>
-                  <strong className={totals.overallMarginPct < 0 ? 'text-red-600' : totals.overallMarginPct < 5 ? 'text-orange-600' : 'text-green-700'}>
-                    {totals.overallMarginPct.toFixed(1)}%
+                  <strong className={combinedMarginPct < 0 ? 'text-red-600' : combinedMarginPct < 5 ? 'text-orange-600' : 'text-green-700'}>
+                    {combinedMarginPct.toFixed(1)}%
                   </strong>
                 </div>
                 {deliveryCalc && deliveryCalc.costPerTruck > 0 && deliveryPaidBy !== 'fca' && (
