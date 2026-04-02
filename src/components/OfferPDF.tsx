@@ -639,7 +639,7 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
         )}
 
         {/* ── WARUNKI DZIERŻAWY ── */}
-        <Text style={s.sectionTitle} break={offer.transport_cost_per_truck != null}>{t.sectionRentalTerms}</Text>
+        <Text style={s.sectionTitle}>{t.sectionRentalTerms}</Text>
         <View style={s.conditionsBox}>
           <Text style={s.conditionItem}>{tPaidBy === 'fca' ? t.rentalTerm1Fca : t.rentalTerm1}</Text>
           <Text style={s.conditionItem}>{t.rentalTerm2}</Text>

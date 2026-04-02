@@ -539,7 +539,7 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
         {/* ── TRANSPORT ── */}
         {(dPaidBy === 'dap_extra' || dPaidBy === 'fca' ||
           (dPaidBy === 'dap_included' && offer.delivery_cost_total != null && offer.delivery_cost_total > 0)) && (
-          <>
+          <View wrap={false}>
             <Text style={s.sectionTitle}>{t.sectionTransport}</Text>
             <View style={s.transportBox}>
               {dPaidBy === 'dap_included' && (
@@ -622,7 +622,7 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
                 </>
               )}
             </View>
-          </>
+          </View>
         )}
 
         {/* ══════════════════════════════════════
