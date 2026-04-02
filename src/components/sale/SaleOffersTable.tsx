@@ -34,6 +34,19 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+// Marża liczona on-the-fly z pozycji (grodzice + zamki) – ignoruje margin_pct z bazy,
+// który mógł być zapisany błędnie (np. 0% dla ofert z samymi zamkami przed poprawką)
+function computeMargin(offer: SaleOffer): number | null {
+  const items = offer.items ?? [];
+  const locks = offer.lock_items ?? [];
+  const sellEUR = items.reduce((s, i) => s + (i.sell_eur_total ?? 0), 0)
+                + locks.reduce((s, l) => s + (l.sell_eur_total ?? l.total_eur ?? 0), 0);
+  const costEUR = items.reduce((s, i) => s + (i.cost_eur_total ?? 0), 0)
+                + locks.reduce((s, l) => s + (l.total_eur ?? 0), 0);
+  if (sellEUR <= 0) return null;
+  return ((sellEUR - costEUR) / sellEUR) * 100;
+}
+
 export default function SaleOffersTable({ offers, onOffersChange, clients, saleProfiles, onClientAdded }: Props) {
   const [search, setSearch]         = useState('');
   const [expanded, setExpanded]     = useState<string | null>(null);
@@ -228,16 +241,19 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
 
                   {/* Marża */}
                   <td className="px-4 py-3 text-right">
-                    {offer.margin_pct != null ? (
-                      <span className={`font-semibold ${
-                        offer.margin_pct < 0 ? 'text-red-600'
-                        : offer.margin_pct < 5 ? 'text-orange-600'
-                        : offer.margin_pct < 10 ? 'text-yellow-700'
-                        : 'text-green-700'
-                      }`}>
-                        {offer.margin_pct.toFixed(1)}%
-                      </span>
-                    ) : '—'}
+                    {(() => {
+                      const m = computeMargin(offer) ?? offer.margin_pct;
+                      return m != null ? (
+                        <span className={`font-semibold ${
+                          m < 0 ? 'text-red-600'
+                          : m < 5 ? 'text-orange-600'
+                          : m < 10 ? 'text-yellow-700'
+                          : 'text-green-700'
+                        }`}>
+                          {m.toFixed(1)}%
+                        </span>
+                      ) : '—';
+                    })()}
                   </td>
 
                   {/* Status */}
