@@ -412,6 +412,26 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
               />
             </div>
           </div>
+          {/* Banner informacyjny – sugerowana stawka wg cennika dla wybranych tygodni */}
+          {(() => {
+            const suggestedPLN = rentalWeeks <= prices.base_weeks
+              ? prices.base_price_pln
+              : prices.base_price_pln + (rentalWeeks - prices.base_weeks) * prices.price_per_week_1;
+            const suggested = currency === 'EUR' ? suggestedPLN / exchangeRate : suggestedPLN;
+            const detail = rentalWeeks <= prices.base_weeks
+              ? `stawka bazowa (do ${prices.base_weeks} tyg.)`
+              : `${prices.base_weeks} tyg. bazowych + ${rentalWeeks - prices.base_weeks}×${prices.price_per_week_1} PLN/t`;
+            return (
+              <div className="mt-2 max-w-lg bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 flex items-start gap-2">
+                <span>💡</span>
+                <span>
+                  Sugerowana dla <strong>{rentalWeeks} tyg.</strong>:{' '}
+                  <strong>{formatRound(suggested)} {currency}/t</strong>
+                  <span className="text-amber-600"> ({detail})</span>
+                </span>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Cennik szkód i napraw */}
