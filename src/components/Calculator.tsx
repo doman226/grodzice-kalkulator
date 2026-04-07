@@ -80,6 +80,7 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
   const [customTrucks, setCustomTrucks] = useState<number | ''>('');
   const [transportPaidBy, setTransportPaidBy] = useState<'dap_included' | 'dap_extra' | 'fca'>('dap_included');
   const WAREHOUSE_PRESET = 'Cieśle 42, 56400, PL';
+  const WAREHOUSE_PRESET_CZ = 'Pohraniční 3272/130, 703 00 Ostrava, CZ';
   const [transportFrom, setTransportFrom] = useState(WAREHOUSE_PRESET);
   const [transportTo, setTransportTo] = useState('');
 
@@ -418,9 +419,12 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
               ? prices.base_price_pln
               : prices.base_price_pln + (rentalWeeks - prices.base_weeks) * prices.price_per_week_1;
             const suggested = currency === 'EUR' ? suggestedPLN / exchangeRate : suggestedPLN;
+            const weekRate = currency === 'EUR'
+              ? +(prices.price_per_week_1 / exchangeRate).toFixed(2)
+              : prices.price_per_week_1;
             const detail = rentalWeeks <= prices.base_weeks
               ? `stawka bazowa (do ${prices.base_weeks} tyg.)`
-              : `${prices.base_weeks} tyg. bazowych + ${rentalWeeks - prices.base_weeks}×${prices.price_per_week_1} PLN/t`;
+              : `${prices.base_weeks} tyg. bazowych + ${rentalWeeks - prices.base_weeks}×${weekRate} ${currency}/t`;
             return (
               <div className="mt-2 max-w-lg bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 flex items-start gap-2">
                 <span>💡</span>
@@ -572,13 +576,14 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
                   {transportPaidBy === 'fca' ? 'Odbiór z (magazyn)' : 'Załadunek (magazyn)'}
                 </label>
                 <select
-                  value={transportFrom === WAREHOUSE_PRESET ? WAREHOUSE_PRESET : '__custom__'}
+                  value={transportFrom === WAREHOUSE_PRESET ? WAREHOUSE_PRESET : transportFrom === WAREHOUSE_PRESET_CZ ? WAREHOUSE_PRESET_CZ : '__custom__'}
                   onChange={e => setTransportFrom(e.target.value === '__custom__' ? '' : e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                   <option value={WAREHOUSE_PRESET}>Magazyn Intra B.V. (Cieśle 42, 56400, PL)</option>
+                  <option value={WAREHOUSE_PRESET_CZ}>Magazyn Intra B.V. (Pohraniční 3272/130, 703 00 Ostrava, CZ)</option>
                   <option value="__custom__">Inny adres…</option>
                 </select>
-                {transportFrom !== WAREHOUSE_PRESET && (
+                {transportFrom !== WAREHOUSE_PRESET && transportFrom !== WAREHOUSE_PRESET_CZ && (
                   <input type="text" value={transportFrom} placeholder="Wpisz adres magazynu"
                     onChange={e => setTransportFrom(e.target.value)}
                     className="w-full mt-1.5 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />

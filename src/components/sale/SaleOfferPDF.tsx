@@ -329,9 +329,14 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
           </View>
 
           {sortedItems.map((item, idx) => {
-            const wallArea   = item.wall_area_m2 ?? 0;
-            const sellTotal  = isEUR ? (item.sell_eur_total ?? 0) : (item.sell_pln_total ?? 0);
-            const pricePerM2 = wallArea > 0 ? sellTotal / wallArea : 0;
+            const wallArea    = item.wall_area_m2 ?? 0;
+            const massT       = item.mass_t ?? 0;
+            // Koszt transportu DAP rozkładamy proporcjonalnie do masy pozycji
+            const dapCost        = isEUR ? deliveryCostEUR : deliveryCostPLN;
+            const transportShare = totalMassT > 0 ? dapCost * massT / totalMassT : 0;
+            const sellTotal   = (isEUR ? (item.sell_eur_total ?? 0) : (item.sell_pln_total ?? 0)) + transportShare;
+            const pricePerM2  = wallArea > 0 ? sellTotal / wallArea : 0;
+            const effectivePriceT = massT > 0 ? sellTotal / massT : (item.sell_eur_t ?? 0);
             return (
               <View key={item.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
                 <Text style={[s.tdLabel, { flex: 1.5, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
@@ -355,8 +360,8 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
                   {wallArea > 0 ? `${formatNumber(wallArea, 1)} m²` : '—'}
                 </Text>
                 <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right', color: C.gray700 }]}>
-                  {item.sell_eur_t != null
-                    ? `${isEUR ? formatEUR(item.sell_eur_t) : formatPLN(item.sell_eur_t)} ${currency}/t`
+                  {effectivePriceT > 0
+                    ? `${isEUR ? formatEUR(effectivePriceT) : formatPLN(effectivePriceT)} ${currency}/t`
                     : '—'}
                 </Text>
                 <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right', color: C.gray700 }]}>
@@ -365,9 +370,7 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
                     : '—'}
                 </Text>
                 <Text style={[s.tdLabel, { flex: 1.3, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
-                  {isEUR
-                    ? `${formatEUR(item.sell_eur_total ?? 0)} EUR`
-                    : `${formatPLN(item.sell_pln_total ?? 0)} PLN`}
+                  {isEUR ? `${formatEUR(sellTotal)} EUR` : `${formatPLN(sellTotal)} PLN`}
                 </Text>
               </View>
             );
@@ -388,7 +391,9 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
             <Text style={[s.tdLabel, { flex: 1.0 }]} />
             <Text style={[s.tdLabel, { flex: 1.0 }]} />
             <Text style={[s.tdLabel, { flex: 1.3, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
-              {isEUR ? `${formatEUR(totalSellEUR)} EUR` : `${formatPLN(totalSellPLN)} PLN`}
+              {isEUR
+                ? `${formatEUR(totalSellEUR + deliveryCostEUR)} EUR`
+                : `${formatPLN(totalSellPLN + deliveryCostPLN)} PLN`}
             </Text>
           </View>
         </View>}

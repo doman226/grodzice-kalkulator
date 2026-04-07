@@ -36,6 +36,7 @@ interface Props {
 
 const TRUCK_CAPACITY_T = 24.5;
 const WAREHOUSE_PRESET = 'Cieśle 42, 56400, PL';
+const WAREHOUSE_PRESET_CZ = 'Pohraniční 3272/130, 703 00 Ostrava, CZ';
 
 function itemsFromOffer(offer: Offer, profiles: Profile[]): CalcItem[] {
   if (offer.items && offer.items.length > 0) {
@@ -611,13 +612,14 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Załadunek</label>
                 <select
-                  value={transportFrom === WAREHOUSE_PRESET ? WAREHOUSE_PRESET : '__custom__'}
+                  value={transportFrom === WAREHOUSE_PRESET ? WAREHOUSE_PRESET : transportFrom === WAREHOUSE_PRESET_CZ ? WAREHOUSE_PRESET_CZ : '__custom__'}
                   onChange={e => setTransportFrom(e.target.value === '__custom__' ? '' : e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value={WAREHOUSE_PRESET}>Magazyn Intra B.V.</option>
+                  <option value={WAREHOUSE_PRESET}>Magazyn Intra B.V. (Cieśle, PL)</option>
+                  <option value={WAREHOUSE_PRESET_CZ}>Magazyn Intra B.V. (Ostrava, CZ)</option>
                   <option value="__custom__">Inny adres…</option>
                 </select>
-                {transportFrom !== WAREHOUSE_PRESET && (
+                {transportFrom !== WAREHOUSE_PRESET && transportFrom !== WAREHOUSE_PRESET_CZ && (
                   <input type="text" value={transportFrom} placeholder="Wpisz adres magazynu"
                     onChange={e => setTransportFrom(e.target.value)}
                     className="w-full mt-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
