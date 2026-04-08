@@ -119,7 +119,7 @@ export default function SaveSaleOfferModal({
 
   // ── Nowy klient inline ──
   const [addingClient, setAddingClient]   = useState(false);
-  const [newClient, setNewClient]         = useState({ name: '', country: 'PL', nip: '', vat_number: '' });
+  const [newClient, setNewClient]         = useState({ name: '', country: 'PL', nip: '', vat_number: '', address: '', city: '', postal_code: '', email: '', phone: '' });
   const [savingClient, setSavingClient]   = useState(false);
   const [nipLoading, setNipLoading]       = useState(false);
 
@@ -129,7 +129,13 @@ export default function SaveSaleOfferModal({
     setNipLoading(true);
     try {
       const data = await fetchNipData(nip);
-      setNewClient(prev => ({ ...prev, name: data.name ?? prev.name }));
+      setNewClient(prev => ({
+        ...prev,
+        name:        data.name        ?? prev.name,
+        address:     data.address     ?? prev.address,
+        postal_code: data.postal_code ?? prev.postal_code,
+        city:        data.city        ?? prev.city,
+      }));
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Błąd połączenia z GUS.');
@@ -143,10 +149,15 @@ export default function SaveSaleOfferModal({
     if (newClient.country !== 'PL' && !newClient.vat_number.trim()) return setError('Podaj numer VAT.');
     setSavingClient(true);
     const { data, error: err } = await supabase.from('clients').insert({
-      name:       newClient.name.trim(),
-      country:    newClient.country,
-      nip:        newClient.country === 'PL'  ? newClient.nip.trim()        : null,
-      vat_number: newClient.country !== 'PL'  ? newClient.vat_number.trim() : null,
+      name:        newClient.name.trim(),
+      country:     newClient.country,
+      nip:         newClient.country === 'PL' ? newClient.nip.trim()         : null,
+      vat_number:  newClient.country !== 'PL' ? newClient.vat_number.trim()  : null,
+      address:     newClient.address.trim()     || null,
+      city:        newClient.city.trim()        || null,
+      postal_code: newClient.postal_code.trim() || null,
+      email:       newClient.email.trim()       || null,
+      phone:       newClient.phone.trim()       || null,
     }).select().single();
     setSavingClient(false);
     if (err) return setError('Błąd: ' + err.message);
@@ -154,7 +165,7 @@ export default function SaveSaleOfferModal({
     onClientAdded(c);
     setClientId(c.id);
     setAddingClient(false);
-    setNewClient({ name: '', country: 'PL', nip: '', vat_number: '' });
+    setNewClient({ name: '', country: 'PL', nip: '', vat_number: '', address: '', city: '', postal_code: '', email: '', phone: '' });
     setError('');
   }
 
@@ -452,6 +463,23 @@ export default function SaveSaleOfferModal({
                     onChange={e => setNewClient({ ...newClient, vat_number: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                 )}
+                <input placeholder="Adres (ulica, nr)" value={newClient.address}
+                  onChange={e => setNewClient({ ...newClient, address: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                <div className="flex gap-2">
+                  <input placeholder="Kod pocztowy" value={newClient.postal_code}
+                    onChange={e => setNewClient({ ...newClient, postal_code: e.target.value })}
+                    className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                  <input placeholder="Miasto" value={newClient.city}
+                    onChange={e => setNewClient({ ...newClient, city: e.target.value })}
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <input placeholder="E-mail" type="email" value={newClient.email}
+                  onChange={e => setNewClient({ ...newClient, email: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                <input placeholder="Telefon" type="tel" value={newClient.phone}
+                  onChange={e => setNewClient({ ...newClient, phone: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                 <div className="flex gap-2">
                   <button onClick={handleAddClient} disabled={savingClient}
                     className="flex-1 py-1.5 text-sm bg-blue-900 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50">
