@@ -1,4 +1,4 @@
-import { Document, Page, View, Text, Image, StyleSheet, Font } from '@react-pdf/renderer';
+import { Document, Page, View, Text, Image, StyleSheet, Font, Link } from '@react-pdf/renderer';
 import type { Offer } from '../types';
 import { formatPLN, formatEUR, formatRound, formatNumber } from '../lib/calculations';
 import { RENTAL_PDF_STRINGS } from '../lib/pdfStrings';
@@ -133,6 +133,7 @@ const s = StyleSheet.create({
     fontSize: 9,
     color: C.gray700,
   },
+  introLink: { color: '#1D4ED8', textDecoration: 'underline' },
 
   // Signature block
   signatureBlock: { marginTop: 28 },
@@ -459,7 +460,18 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
 
         {/* ── POWITANIE ── */}
         <Text style={s.greeting}>{t.greeting}</Text>
-        <Text style={s.intro}>{t.intro}</Text>
+        {(() => {
+          const OWH_URL = 'https://www.intrabv.com/wp-content/uploads/2026/01/IntraBV-Algemene-Voorwaarden-PL-2026.pdf';
+          const linkText = lang === 'pl' ? 'Ogólnych Warunków Sprzedaży i Płatności' : 'General Terms and Conditions of Rental and Payment';
+          const [before, after] = t.intro.split(linkText);
+          return (
+            <Text style={s.intro}>
+              {before}
+              <Link src={OWH_URL} style={s.introLink}>{linkText}</Link>
+              {after}
+            </Text>
+          );
+        })()}
 
         {/* ── TABELA POZYCJI ── */}
         {offer.items && offer.items.length > 0 ? (

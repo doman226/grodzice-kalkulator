@@ -1,4 +1,4 @@
-import { Document, Page, View, Text, Image, StyleSheet, Font } from '@react-pdf/renderer';
+import { Document, Page, View, Text, Image, StyleSheet, Font, Link } from '@react-pdf/renderer';
 import type { SaleOffer } from '../../types';
 import { formatEUR, formatPLN, formatRound, formatNumber } from '../../lib/calculations';
 import { PDF_STRINGS, type PdfLang } from '../../lib/pdfStrings';
@@ -79,8 +79,9 @@ const s = StyleSheet.create({
 
   sep: { borderBottom: `1 solid ${C.gray200}`, marginBottom: 10, marginTop: 4 },
 
-  greeting: { marginBottom: 5, fontSize: 9 },
+  greeting:  { marginBottom: 5, fontSize: 9 },
   intro:     { marginBottom: 10, lineHeight: 1.5, fontSize: 9, color: C.gray700 },
+  introLink: { color: C.blueText, textDecoration: 'underline' },
 
   signatureBlock: { marginTop: 28 },
   signatureImg:   { width: 160, height: 80, objectFit: 'contain' },
@@ -312,7 +313,18 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
 
         {/* ── POWITANIE ── */}
         <Text style={s.greeting}>{t.greeting}</Text>
-        <Text style={s.intro}>{t.intro}</Text>
+        {(() => {
+          const OWH_URL = 'https://www.intrabv.com/wp-content/uploads/2026/01/IntraBV-Algemene-Voorwaarden-PL-2026.pdf';
+          const linkText = lang === 'pl' ? 'Ogólnych Warunków Sprzedaży i Płatności' : 'General Terms and Conditions of Sale and Payment';
+          const [before, after] = t.intro.split(linkText);
+          return (
+            <Text style={s.intro}>
+              {before}
+              <Link src={OWH_URL} style={s.introLink}>{linkText}</Link>
+              {after}
+            </Text>
+          );
+        })()}
 
         {/* ── TABELA GRODZIC ── 9 kolumn: Profil|Gatunek|Ilość|Dług.|Masa[t]|Pow.[m²]|Cena/t|Cena/m²|Wartość */}
         {hasSheetPiles && <View style={s.table}>
