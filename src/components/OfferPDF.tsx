@@ -475,17 +475,18 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
 
         {/* ── TABELA POZYCJI ── */}
         {offer.items && offer.items.length > 0 ? (
-          // Wielopozycyjna tabela (nowe oferty) – 8 kolumn z Pow.[m²] i Koszt/m²
+          // Wielopozycyjna tabela (nowe oferty) – 9 kolumn z Pow.[m²], Koszt/m² i Koszt/t
           <View style={s.table}>
             <View style={s.tableHeaderRow}>
-              <Text style={[s.thCell, { flex: 2.5 }]}>{t.thProfile}</Text>
-              <Text style={[s.thCell, { flex: 1.5 }]}>{t.thSteelGrade}</Text>
+              <Text style={[s.thCell, { flex: 2.0 }]}>{t.thProfile}</Text>
+              <Text style={[s.thCell, { flex: 1.3 }]}>{t.thSteelGrade}</Text>
               <Text style={[s.thCell, { flex: 1.2, textAlign: 'center' }]}>{t.thQty}</Text>
               <Text style={[s.thCell, { flex: 1.2, textAlign: 'right' }]}>{t.thLength}</Text>
-              <Text style={[s.thCell, { flex: 1.0, textAlign: 'right' }]}>{t.thKgPerM}</Text>
+              <Text style={[s.thCell, { flex: 0.9, textAlign: 'right' }]}>{t.thKgPerM}</Text>
               <Text style={[s.thCell, { flex: 1.2, textAlign: 'right' }]}>{t.thMass}</Text>
               <Text style={[s.thCell, { flex: 1.2, textAlign: 'right' }]}>{t.thWallArea}</Text>
-              <Text style={[s.thCell, { flex: 1.2, textAlign: 'right' }]}>{t.thCostPerM2}</Text>
+              <Text style={[s.thCell, { flex: 1.1, textAlign: 'right' }]}>{t.thCostPerM2}</Text>
+              <Text style={[s.thCell, { flex: 0.9, textAlign: 'right' }]}>{t.thCostPerT}</Text>
             </View>
             {(() => {
               const costPerTonPLN = offer.mass_t > 0 ? totalWithTransport / offer.mass_t : 0;
@@ -494,39 +495,42 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
                 const costPerM2   = wallArea > 0 ? costPerTonPLN * (item.mass_t / wallArea) : 0;
                 return (
                   <View key={item.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
-                    <Text style={[s.tdLabel, { flex: 2.5, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{item.profile_name} ({item.profile_type})</Text>
-                    <Text style={[s.tdLabel, { flex: 1.5, color: C.gray700 }]}>{item.steel_grade ?? '—'}</Text>
+                    <Text style={[s.tdLabel, { flex: 2.0, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{item.profile_name} ({item.profile_type})</Text>
+                    <Text style={[s.tdLabel, { flex: 1.3, color: C.gray700 }]}>{item.steel_grade ?? '—'}</Text>
                     <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'center' }]}>{item.quantity} {t.unitPcs}</Text>
                     <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'right' }]}>{item.length_m != null ? `${item.length_m} m` : '–'}</Text>
-                    <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right' }]}>{formatNumber(item.total_length_m > 0 ? item.mass_t * 1000 / item.total_length_m : 0, 1)}</Text>
+                    <Text style={[s.tdLabel, { flex: 0.9, textAlign: 'right' }]}>{formatNumber(item.total_length_m > 0 ? item.mass_t * 1000 / item.total_length_m : 0, 1)}</Text>
                     <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{formatNumber(item.mass_t, 3)} t</Text>
                     <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'right', color: C.gray700 }]}>{wallArea > 0 ? `${formatNumber(wallArea, 1)} m²` : '—'}</Text>
-                    <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'right', color: C.gray700 }]}>{costPerM2 > 0 ? `${fmtRatio2(costPerM2)} ${currCode}/m²` : '—'}</Text>
+                    <Text style={[s.tdLabel, { flex: 1.1, textAlign: 'right', color: C.gray700 }]}>{costPerM2 > 0 ? `${fmtRatio2(costPerM2)} ${currCode}/m²` : '—'}</Text>
+                    <Text style={[s.tdLabel, { flex: 0.9, textAlign: 'right', color: C.gray700 }]}>{costPerTonPLN > 0 ? `${fmtRatio2(costPerTonPLN)} ${currCode}/t` : '—'}</Text>
                   </View>
                 );
               });
             })()}
             {/* Podsumowanie */}
             <View style={[s.tableBodyRow, { backgroundColor: C.gray100 }]}>
-              <Text style={[s.tdLabel, { flex: 2.5, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{t.totalRow}</Text>
-              <Text style={[s.tdLabel, { flex: 1.5 }]}></Text>
+              <Text style={[s.tdLabel, { flex: 2.0, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{t.totalRow}</Text>
+              <Text style={[s.tdLabel, { flex: 1.3 }]}></Text>
               <Text style={[s.tdLabel, { flex: 1.2 }]}></Text>
               <Text style={[s.tdLabel, { flex: 1.2 }]}></Text>
-              <Text style={[s.tdLabel, { flex: 1.0 }]}></Text>
+              <Text style={[s.tdLabel, { flex: 0.9 }]}></Text>
               <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{formatNumber(offer.mass_t, 3)} t</Text>
               <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{offer.wall_area_m2 > 0 ? `${formatNumber(offer.wall_area_m2, 1)} m²` : ''}</Text>
-              <Text style={[s.tdLabel, { flex: 1.2 }]}></Text>
+              <Text style={[s.tdLabel, { flex: 1.1 }]}></Text>
+              <Text style={[s.tdLabel, { flex: 0.9 }]}></Text>
             </View>
             {/* Okres */}
             <View style={[s.tableBodyRow, { borderBottom: 0 }]}>
-              <Text style={[s.tdLabel, { flex: 2.5, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{t.rentalPeriodRow}</Text>
+              <Text style={[s.tdLabel, { flex: 2.0, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{t.rentalPeriodRow}</Text>
               <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{rentalPeriodLabel}</Text>
               <Text style={[s.tdLabel, { flex: 1.2 }]}></Text>
               <Text style={[s.tdLabel, { flex: 1.2 }]}></Text>
-              <Text style={[s.tdLabel, { flex: 1.0 }]}></Text>
+              <Text style={[s.tdLabel, { flex: 0.9 }]}></Text>
               <Text style={[s.tdLabel, { flex: 1.2 }]}></Text>
               <Text style={[s.tdLabel, { flex: 1.2 }]}></Text>
-              <Text style={[s.tdLabel, { flex: 1.2 }]}></Text>
+              <Text style={[s.tdLabel, { flex: 1.1 }]}></Text>
+              <Text style={[s.tdLabel, { flex: 0.9 }]}></Text>
             </View>
           </View>
         ) : (
