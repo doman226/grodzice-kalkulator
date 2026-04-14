@@ -33,7 +33,9 @@ export default function SalePriceMatrix() {
   const [changeLog, setChangeLog]       = useState<SalePriceChangeLog[]>([]);
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState('');
-  const [selectedWh, setSelectedWh]     = useState('');
+  const [selectedWh, setSelectedWh]     = useState<string>(
+    () => sessionStorage.getItem('cennik_wh') ?? ''
+  );
   const [editingCell, setEditingCell]   = useState<EditingCell | null>(null);
   const [editingValue, setEditingValue] = useState('');
   const [saving, setSaving]             = useState<string | null>(null);
@@ -75,7 +77,13 @@ export default function SalePriceMatrix() {
       setGrades(grRes.data as SaleSteeelGrade[]);
       setProfiles(prRes.data as SaleProfile[]);
       setPrices(spRes.data as SalePrice[]);
-      if (whRes.data.length > 0) setSelectedWh(whRes.data[0].id);
+      if (whRes.data.length > 0) {
+        const saved   = sessionStorage.getItem('cennik_wh');
+        const validWh = saved && (whRes.data as SaleWarehouse[]).some(w => w.id === saved)
+          ? saved
+          : (whRes.data as SaleWarehouse[])[0].id;
+        setSelectedWh(validWh);
+      }
     }
     if (!logRes.error && logRes.data) {
       setChangeLog(logRes.data as SalePriceChangeLog[]);
@@ -488,7 +496,7 @@ export default function SalePriceMatrix() {
             {warehouses.map(wh => (
               <button
                 key={wh.id}
-                onClick={() => setSelectedWh(wh.id)}
+                onClick={() => { setSelectedWh(wh.id); sessionStorage.setItem('cennik_wh', wh.id); }}
                 className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   selectedWh === wh.id
                     ? 'border-blue-700 text-blue-700'
