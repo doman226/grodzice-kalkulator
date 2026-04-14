@@ -26,6 +26,7 @@ interface NewProfileForm {
 const SERIES_LABELS: Record<string, string> = {
   VL:  'Grodzice VL – gorącowalcowane (Vitkovice)',
   ESZ: 'Grodzice ESZ – gorącowalcowane (Z-profile)',
+  MKL: 'Grodzice MKL – zimnowalcowane (Intra B.V.)',
 };
 
 function seriesLabel(series: string) {
