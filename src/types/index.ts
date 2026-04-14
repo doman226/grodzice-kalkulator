@@ -165,6 +165,16 @@ export interface SalePrice {
   updated_at: string;
 }
 
+export interface SalePriceChangeLog {
+  id: string;
+  changed_at: string;
+  series: string | null;
+  warehouse_id: string | null;
+  delta_eur: number;
+  note: string | null;
+  affected_rows: number | null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface CalculatorInput {

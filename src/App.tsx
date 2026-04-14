@@ -83,7 +83,7 @@ function App() {
     { id: 'offers',     label: 'Oferty SP',  badge: saleOffersCount  || undefined },
     { id: 'clients',    label: 'Klienci',    badge: clients.length   || undefined },
     { id: 'prices',     label: 'Cennik' },
-    { id: 'profiles',   label: 'Profile VL' },
+    { id: 'profiles',   label: 'Profile' },
   ];
 
   return (
