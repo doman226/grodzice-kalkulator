@@ -67,7 +67,7 @@ export default function SalePriceMatrix() {
       supabase.from('sale_warehouses').select('*').eq('active', true).order('id'),
       supabase.from('sale_steel_grades').select('*').order('sort_order'),
       supabase.from('sale_profiles').select('*').eq('active', true).order('name'),
-      supabase.from('sale_prices').select('*'),
+      supabase.from('sale_prices').select('*').limit(10000),
       supabase.from('sale_price_change_log').select('*').order('changed_at', { ascending: false }).limit(30),
     ]);
     if (whRes.error || grRes.error || prRes.error || spRes.error) {

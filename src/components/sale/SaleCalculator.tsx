@@ -138,7 +138,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
       supabase.from('sale_warehouses').select('*').eq('active', true).order('id'),
       supabase.from('sale_steel_grades').select('*').order('sort_order'),
       supabase.from('sale_profiles').select('*').eq('active', true).order('name'),
-      supabase.from('sale_prices').select('*'),
+      supabase.from('sale_prices').select('*').limit(10000),
     ]);
     if (whRes.error || grRes.error || prRes.error || spRes.error) {
       setDbError('Błąd ładowania danych. Odśwież stronę.');
