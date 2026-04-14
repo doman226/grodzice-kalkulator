@@ -122,20 +122,30 @@ export default function SalePriceMatrix() {
     const existing = map[warehouseId]?.[profileName]?.[gradeId];
     const key      = cellKey(warehouseId, profileName, gradeId);
 
-    if (existing && existing.price_eur_t === newPrice) { setEditingCell(null); return; }
+    // DB zwraca numeric jako string — porównuj przez Number() żeby uniknąć "920" !== 920
+    const existingNum = existing?.price_eur_t != null ? Number(existing.price_eur_t) : null;
+    if (existingNum === newPrice && newPrice !== null) { setEditingCell(null); return; }
+    if (!existing && newPrice === null) { setEditingCell(null); return; }
 
     setSaving(key);
 
     if (existing) {
-      const { error: err } = await supabase
+      // UPDATE istniejącego wiersza — .select() jest KONIECZNE żeby wykryć ciche błędy:
+      // bez .select() Supabase zwraca 204 No Content zarówno dla 1 jak i 0 zaktualizowanych wierszy
+      const { data, error: err } = await supabase
         .from('sale_prices')
         .update({ price_eur_t: newPrice, available: newPrice != null, updated_at: new Date().toISOString() })
-        .eq('id', existing.id);
+        .eq('id', existing.id)
+        .select();
       if (err) {
+        console.error('[SalePriceMatrix] UPDATE error:', err);
         showToast('Błąd zapisu: ' + err.message);
+      } else if (!data || data.length === 0) {
+        console.error('[SalePriceMatrix] UPDATE matched 0 rows — id:', existing.id, 'wh:', warehouseId, 'profile:', profileName, 'grade:', gradeId);
+        showToast('Błąd: wiersz nie został zapisany (0 rows). Sprawdź konsolę.');
       } else {
         setPrices(prev => prev.map(p =>
-          p.id === existing.id ? { ...p, price_eur_t: newPrice, available: newPrice != null } : p
+          p.id === existing.id ? data[0] as SalePrice : p
         ));
         showToast('Zapisano ✓');
       }
@@ -149,6 +159,7 @@ export default function SalePriceMatrix() {
         .select()
         .single();
       if (err) {
+        console.error('[SalePriceMatrix] UPSERT error:', err);
         showToast('Błąd zapisu: ' + err.message);
       } else {
         const saved = data as SalePrice;
