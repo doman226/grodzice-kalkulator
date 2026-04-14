@@ -92,11 +92,14 @@ export default function SalePriceMatrix() {
   }
 
   // ─── mapa cen ────────────────────────────────────────────────────────────────
+  // Klucz wewnętrzny: p.steel_grade = FK → sale_steel_grades.id (np. 's270gp')
+  // IDENTYCZNY z g.id używanym w PriceRow (.rowPrices[g.id]) i commitEdit (gradeId = g.id)
   const priceMap = useCallback(() => {
     const map: Record<string, Record<string, Record<string, SalePrice>>> = {};
     for (const p of prices) {
       if (!map[p.warehouse_id]) map[p.warehouse_id] = {};
       if (!map[p.warehouse_id][p.profile_name]) map[p.warehouse_id][p.profile_name] = {};
+      // p.steel_grade === g.id (oba są kluczem FK, np. 's270gp')
       map[p.warehouse_id][p.profile_name][p.steel_grade] = p;
     }
     return map;
@@ -153,7 +156,7 @@ export default function SalePriceMatrix() {
       const { data, error: err } = await supabase
         .from('sale_prices')
         .upsert(
-          { warehouse_id: warehouseId, profile_name: profileName, steel_grade: gradeId, price_eur_t: newPrice, available: true },
+          { warehouse_id: warehouseId, profile_name: profileName, steel_grade: gradeId, price_eur_t: newPrice, available: true, updated_at: new Date().toISOString() },
           { onConflict: 'warehouse_id,profile_name,steel_grade' }
         )
         .select()
