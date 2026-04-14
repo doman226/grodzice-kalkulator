@@ -142,14 +142,22 @@ export default function SalePriceMatrix() {
     } else if (newPrice != null) {
       const { data, error: err } = await supabase
         .from('sale_prices')
-        .insert({ warehouse_id: warehouseId, profile_name: profileName, steel_grade: gradeId, price_eur_t: newPrice, available: true })
+        .upsert(
+          { warehouse_id: warehouseId, profile_name: profileName, steel_grade: gradeId, price_eur_t: newPrice, available: true },
+          { onConflict: 'warehouse_id,profile_name,steel_grade' }
+        )
         .select()
         .single();
       if (err) {
         showToast('Błąd zapisu: ' + err.message);
       } else {
-        setPrices(prev => [...prev, data as SalePrice]);
-        showToast('Dodano ✓');
+        const saved = data as SalePrice;
+        setPrices(prev => {
+          const exists = prev.find(p => p.id === saved.id);
+          if (exists) return prev.map(p => p.id === saved.id ? saved : p);
+          return [...prev, saved];
+        });
+        showToast('Zapisano ✓');
       }
     }
 
