@@ -147,7 +147,13 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
     }
     const whs  = whRes.data as SaleWarehouse[];
     const grs  = grRes.data as SaleSteeelGrade[];
-    const prs  = prRes.data as SaleProfile[];
+    const prs  = (prRes.data as SaleProfile[]).sort((a, b) => {
+      // VL zawsze na górze, potem serie alfabetycznie, w ramach serii po nazwie
+      if (a.series === b.series) return a.name.localeCompare(b.name);
+      if (a.series === 'VL') return -1;
+      if (b.series === 'VL') return 1;
+      return a.series.localeCompare(b.series);
+    });
     const sps  = spRes.data as SalePrice[];
     setWarehouses(whs);
     setGrades(grs);
@@ -531,7 +537,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
 
                   {/* Profil */}
                   <div className="sm:col-span-3">
-                    {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Profil VL</label>}
+                    {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Profil</label>}
                     <select value={item.profileName} onChange={e => updateItem(item.uid, { profileName: e.target.value })}
                       className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                       {profiles.map(p => <option key={p.id} value={p.name}>{p.name} ({p.weight_kg_per_m} kg/m)</option>)}
