@@ -222,22 +222,36 @@ export default function SalePriceMatrix() {
 
     const delta = Number(bulkDelta);
 
-    // Przygotuj wiersze do upsert
+    // Przygotuj wiersze do upsert — MUSI zawierać wszystkie NOT NULL kolumny (warehouse_id,
+    // profile_name, steel_grade), bo PostgREST .upsert() tłumaczy się na
+    // "INSERT ... ON CONFLICT (id) DO UPDATE SET ...", a PG sprawdza NOT NULL przed
+    // rozwiązaniem konfliktu — bez tych pól dostajemy 400 (null value in column...).
     const updatedRows = prices
       .filter(p => bulkConfirm.affectedIds.includes(p.id))
       .map(p => ({
-        id:          p.id,
-        price_eur_t: Math.max(0, (p.price_eur_t ?? 0) + delta),
-        available:   true,
-        updated_at:  new Date().toISOString(),
+        id:            p.id,
+        warehouse_id:  p.warehouse_id,
+        profile_name:  p.profile_name,
+        steel_grade:   p.steel_grade,
+        price_eur_t:   Math.max(0, (p.price_eur_t ?? 0) + delta),
+        available:     true,
+        updated_at:    new Date().toISOString(),
       }));
 
-    const { error: uErr } = await supabase
+    const { data: upData, error: uErr } = await supabase
       .from('sale_prices')
-      .upsert(updatedRows, { onConflict: 'id' });
+      .upsert(updatedRows, { onConflict: 'id' })
+      .select();
 
     if (uErr) {
+      console.error('[SalePriceMatrix] bulk UPSERT error:', uErr);
       showToast('Błąd aktualizacji: ' + uErr.message);
+      setBulkSaving(false);
+      return;
+    }
+    if (!upData || upData.length !== updatedRows.length) {
+      console.error('[SalePriceMatrix] bulk UPSERT mismatch — expected:', updatedRows.length, 'got:', upData?.length ?? 0);
+      showToast(`Błąd: zaktualizowano ${upData?.length ?? 0} z ${updatedRows.length} wierszy. Sprawdź konsolę.`);
       setBulkSaving(false);
       return;
     }
