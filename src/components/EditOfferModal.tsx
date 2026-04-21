@@ -78,7 +78,11 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
   const [validDays, setValidDays] = useState(offer.valid_days);
   const [paymentDays, setPaymentDays] = useState(offer.payment_days ?? 30);
   const [transportCostPerTruck, setTransportCostPerTruck] = useState<number | ''>(
-    offer.transport_cost_per_truck ?? ''
+    offer.transport_cost_per_truck != null
+      ? (offer.currency === 'EUR' && offer.exchange_rate
+          ? Math.round(offer.transport_cost_per_truck / offer.exchange_rate * 100) / 100
+          : offer.transport_cost_per_truck)
+      : ''
   );
   // Zachowaj ręcznie ustawioną liczbę aut z oryginalnej oferty
   const [customTrucks, setCustomTrucks] = useState<number | ''>(
