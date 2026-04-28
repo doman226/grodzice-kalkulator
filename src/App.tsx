@@ -133,7 +133,11 @@ function App() {
                 <img src="/header-logo.png" alt="Intra B.V." className="h-10 w-auto" />
               </div>
               <p className="text-blue-200 text-sm">
-                {mode === 'rental' ? 'Kalkulator Wynajmu Grodzic Stalowych' : 'Kalkulator Sprzedaży Grodzic Stalowych'}
+                {mode === 'sale'
+                  ? 'Kalkulator Sprzedaży Grodzic Stalowych'
+                  : rentalSubMode === 'road_plate'
+                  ? 'Kalkulator Wynajmu Płyt Drogowych'
+                  : 'Kalkulator Wynajmu Grodzic Stalowych'}
               </p>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
