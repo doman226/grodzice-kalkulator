@@ -1,19 +1,24 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
-import type { Profile, RentalPrices, Client, Offer } from './types';
+import type { Profile, RentalPrices, Client, Offer, RoadPlateProfile, RoadPlateRentalPrices } from './types';
 import Calculator from './components/Calculator';
 import ProfileTable from './components/ProfileTable';
 import PriceSettings from './components/PriceSettings';
 import ClientsTable from './components/ClientsTable';
 import OffersTable from './components/OffersTable';
+import RoadPlateProfilesTable from './components/RoadPlateProfilesTable';
+import RoadPlatePriceSettings from './components/RoadPlatePriceSettings';
+import RoadPlateCalculator from './components/RoadPlateCalculator';
 import SaleSection from './components/sale/SaleSection';
 
 type Mode = 'rental' | 'sale';
+type RentalSubMode = 'sheet_pile' | 'road_plate';
 type Tab = 'calculator' | 'profiles' | 'prices' | 'clients' | 'offers';
 type SaleTab = 'calculator' | 'offers' | 'clients' | 'prices' | 'profiles';
 
 function App() {
   const [mode, setMode] = useState<Mode>('rental');
+  const [rentalSubMode, setRentalSubMode] = useState<RentalSubMode>('sheet_pile');
   const [activeTab, setActiveTab]         = useState<Tab>('calculator');
   const [saleActiveTab, setSaleActiveTab] = useState<SaleTab>('calculator');
   const [saleOffersCount, setSaleOffersCount] = useState(0);
@@ -21,6 +26,10 @@ function App() {
   const [prices, setPrices] = useState<RentalPrices | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
+  // Płyty drogowe — ładowane osobno, ignorujemy błąd jeśli migracja SQL jeszcze nie wykonana
+  const [roadPlateProfiles, setRoadPlateProfiles] = useState<RoadPlateProfile[]>([]);
+  const [roadPlatePrices, setRoadPlatePrices] = useState<RoadPlateRentalPrices | null>(null);
+  const [roadPlateOffers, setRoadPlateOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,7 +47,7 @@ function App() {
         supabase.from('profiles').select('*').eq('active', true).order('name'),
         supabase.from('rental_prices').select('*').single(),
         supabase.from('clients').select('*').eq('active', true).order('name'),
-        supabase.from('offers').select('*, client:clients(*), items:offer_items(*)').order('created_at', { ascending: false }),
+        supabase.from('offers').select('*, client:clients(*), items:offer_items(*)').eq('item_type', 'sheet_pile').order('created_at', { ascending: false }),
       ]);
 
       if (cancelled) return;
@@ -61,20 +70,47 @@ function App() {
       if (!cancelled) setLoading(false);
     }
 
+    // Płyty drogowe — osobne ładowanie, niekrytyczne (migracja SQL może być jeszcze niewykonana)
+    try {
+      const [rpProfilesRes, rpPricesRes, rpOffersRes] = await Promise.all([
+        supabase.from('road_plate_profiles').select('*').eq('active', true).order('thickness_mm', { ascending: false }),
+        supabase.from('road_plate_rental_prices').select('*').single(),
+        supabase.from('offers').select('*, client:clients(*), items:offer_items(*)').eq('item_type', 'road_plate').order('created_at', { ascending: false }),
+      ]);
+      if (cancelled) return;
+      if (!rpProfilesRes.error && rpProfilesRes.data) {
+        setRoadPlateProfiles(rpProfilesRes.data as RoadPlateProfile[]);
+      }
+      if (!rpPricesRes.error && rpPricesRes.data) {
+        setRoadPlatePrices(rpPricesRes.data as RoadPlateRentalPrices);
+      }
+      if (!rpOffersRes.error && rpOffersRes.data) {
+        setRoadPlateOffers(rpOffersRes.data as Offer[]);
+      }
+    } catch {
+      // Tabele road_plate_* jeszcze nie istnieją — migracja oczekuje wykonania
+    }
+
     // Zwróć funkcję czyszczącą (do użycia przez wywołującego jeśli potrzeba)
     return () => { cancelled = true; };
   }
 
   function handleOfferSaved(offer: Offer) {
-    setOffers(prev => [offer, ...prev]);
+    // Routing per item_type: oferty płyt idą do osobnego stanu, grodzice do oryginalnego.
+    if (offer.item_type === 'road_plate') {
+      setRoadPlateOffers(prev => [offer, ...prev]);
+    } else {
+      setOffers(prev => [offer, ...prev]);
+    }
     setActiveTab('offers');
   }
 
+  const offersBadgeCount = rentalSubMode === 'road_plate' ? roadPlateOffers.length : offers.length;
   const tabs: { id: Tab; label: string; badge?: number }[] = [
     { id: 'calculator', label: 'Kalkulator' },
-    { id: 'offers',     label: 'Oferty',          badge: offers.length  || undefined },
+    { id: 'offers',     label: 'Oferty',          badge: offersBadgeCount || undefined },
     { id: 'clients',    label: 'Klienci',        badge: clients.length || undefined },
-    { id: 'profiles',   label: 'Profile grodzic' },
+    { id: 'profiles',   label: rentalSubMode === 'road_plate' ? 'Profile płyt' : 'Profile grodzic' },
     { id: 'prices',     label: 'Ustawienia cen' },
   ];
 
@@ -127,6 +163,34 @@ function App() {
             </div>
           </div>
         </div>
+
+        {/* Sub-toggle GRODZICE / PŁYTY DROGOWE — widoczny tylko w trybie wynajmu */}
+        {mode === 'rental' && (
+          <div className="max-w-7xl mx-auto px-4 pb-3">
+            <div className="flex rounded-lg overflow-hidden border border-blue-700 text-xs font-medium w-fit">
+              <button
+                onClick={() => setRentalSubMode('sheet_pile')}
+                className={`px-4 py-1.5 transition-colors ${
+                  rentalSubMode === 'sheet_pile'
+                    ? 'bg-blue-100 text-blue-900'
+                    : 'bg-blue-800 text-blue-200 hover:bg-blue-700'
+                }`}
+              >
+                Grodzice
+              </button>
+              <button
+                onClick={() => setRentalSubMode('road_plate')}
+                className={`px-4 py-1.5 transition-colors ${
+                  rentalSubMode === 'road_plate'
+                    ? 'bg-blue-100 text-blue-900'
+                    : 'bg-blue-800 text-blue-200 hover:bg-blue-700'
+                }`}
+              >
+                Płyty drogowe
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Navigation */}
         <div className="max-w-7xl mx-auto px-4">
@@ -188,6 +252,55 @@ function App() {
             onTabChange={setSaleActiveTab}
             onOffersCountChange={setSaleOffersCount}
           />
+        ) : rentalSubMode === 'road_plate' ? (
+          <>
+            {activeTab === 'calculator' && (
+              roadPlatePrices && roadPlateProfiles.length > 0 ? (
+                <RoadPlateCalculator
+                  profiles={roadPlateProfiles}
+                  prices={roadPlatePrices}
+                  clients={clients}
+                  onClientAdded={(c) => setClients(prev => [...prev, c])}
+                  onOfferSaved={handleOfferSaved}
+                />
+              ) : (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-8 text-center">
+                  <h2 className="text-lg font-semibold text-red-800 mb-2">Brak danych do kalkulatora</h2>
+                  <p className="text-sm text-red-700">
+                    {roadPlateProfiles.length === 0 ? 'Dodaj przynajmniej jeden profil w zakładce "Profile płyt".' : 'Brak cennika — uruchom migrację SQL.'}
+                  </p>
+                </div>
+              )
+            )}
+            {activeTab === 'offers' && prices && (
+              <OffersTable
+                offers={roadPlateOffers}
+                onOffersChange={setRoadPlateOffers}
+                profiles={profiles}
+                prices={prices}
+                clients={clients}
+                itemType="road_plate"
+                roadPlateProfiles={roadPlateProfiles}
+                roadPlatePrices={roadPlatePrices ?? undefined}
+              />
+            )}
+            {activeTab === 'clients' && (
+              <ClientsTable clients={clients} onClientsChange={setClients} />
+            )}
+            {activeTab === 'profiles' && (
+              <RoadPlateProfilesTable profiles={roadPlateProfiles} onProfilesChange={setRoadPlateProfiles} />
+            )}
+            {activeTab === 'prices' && (
+              roadPlatePrices ? (
+                <RoadPlatePriceSettings prices={roadPlatePrices} onPricesChange={setRoadPlatePrices} />
+              ) : (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-8 text-center">
+                  <h2 className="text-lg font-semibold text-red-800 mb-2">Brak cennika płyt drogowych</h2>
+                  <p className="text-sm text-red-700">Uruchom migrację SQL z <code>docs/migrations/2026-04-27-road-plates.sql</code></p>
+                </div>
+              )
+            )}
+          </>
         ) : (
           <>
             {activeTab === 'calculator' && prices && (

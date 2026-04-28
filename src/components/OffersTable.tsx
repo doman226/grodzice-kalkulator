@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { supabase } from '../lib/supabase';
-import type { Offer, OfferStatus, Profile, RentalPrices, Client } from '../types';
+import type { Offer, OfferStatus, Profile, RentalPrices, Client, RoadPlateProfile, RoadPlateRentalPrices } from '../types';
 import { formatPLN, formatEUR, formatRound, formatNumber } from '../lib/calculations';
 import OfferPDF from './OfferPDF';
+import RoadPlateOfferPDF from './RoadPlateOfferPDF';
 import type { PdfLang } from '../lib/pdfStrings';
 import EditOfferModal from './EditOfferModal';
+import EditRoadPlateOfferModal from './EditRoadPlateOfferModal';
 
 interface Props {
   offers: Offer[];
@@ -13,6 +15,10 @@ interface Props {
   profiles: Profile[];
   prices: RentalPrices;
   clients: Client[];
+  // Tryb road_plate (opcjonalny — domyślnie 'sheet_pile')
+  itemType?: 'sheet_pile' | 'road_plate';
+  roadPlateProfiles?: RoadPlateProfile[];
+  roadPlatePrices?: RoadPlateRentalPrices;
 }
 
 const STATUS_LABELS: Record<OfferStatus, string> = {
@@ -33,7 +39,7 @@ function formatDate(iso: string) {
   return new Intl.DateTimeFormat('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso));
 }
 
-export default function OffersTable({ offers, onOffersChange, profiles, prices, clients }: Props) {
+export default function OffersTable({ offers, onOffersChange, profiles, prices, clients, itemType = 'sheet_pile', roadPlateProfiles, roadPlatePrices }: Props) {
   const [search, setSearch]             = useState('');
   const [filterStatus, setFilterStatus] = useState<OfferStatus | 'wszystkie'>('wszystkie');
   const [expanded, setExpanded]         = useState<string | null>(null);
@@ -52,7 +58,11 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
     const loadingKey = `${offer.id}-${lang}`;
     setPdfLoading(loadingKey);
     try {
-      const blob = await pdf(<OfferPDF offer={offer} lang={lang} />).toBlob();
+      // Switch po item_type — road_plate ma dedykowany komponent PDF z innymi tekstami i tabelą
+      const pdfElement = offer.item_type === 'road_plate'
+        ? <RoadPlateOfferPDF offer={offer} lang={lang} />
+        : <OfferPDF offer={offer} lang={lang} />;
+      const blob = await pdf(pdfElement).toBlob();
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
       a.href     = url;
@@ -113,7 +123,9 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
       {/* Nagłówek + filtry */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
         <div>
-          <h2 className="text-lg font-semibold text-gray-800">Oferty wynajmu</h2>
+          <h2 className="text-lg font-semibold text-gray-800">
+            {itemType === 'road_plate' ? 'Oferty wynajmu — płyty drogowe' : 'Oferty wynajmu'}
+          </h2>
           <p className="text-xs text-gray-400 mt-0.5">{offers.length} ofert w bazie</p>
         </div>
         <div className="sm:ml-auto flex gap-2 flex-wrap">
@@ -174,6 +186,11 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
                   {/* Numer */}
                   <td className="px-4 py-3 font-mono font-semibold text-blue-900">
                     {offer.offer_number}
+                    {offer.item_type === 'road_plate' && (
+                      <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-orange-100 text-orange-700 rounded uppercase tracking-wide font-sans">
+                        Płyty
+                      </span>
+                    )}
                   </td>
 
                   {/* Klient */}
@@ -438,7 +455,30 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
         {filtered.length} z {offers.length} ofert · kliknij „pozycje" aby zobaczyć szczegóły
       </p>
 
-      {editingOffer && (
+      {editingOffer && editingOffer.item_type === 'road_plate' ? (
+        roadPlateProfiles && roadPlatePrices ? (
+          <EditRoadPlateOfferModal
+            offer={editingOffer}
+            profiles={roadPlateProfiles}
+            prices={roadPlatePrices}
+            clients={clients}
+            onSaved={(updated) => {
+              onOffersChange(offers.map(o => o.id === updated.id ? updated : o));
+              setEditingOffer(null);
+              showToast('Oferta zaktualizowana ✓');
+            }}
+            onClose={() => setEditingOffer(null)}
+          />
+        ) : (
+          <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md text-center">
+              <p className="text-red-700 font-medium mb-3">Brak danych do edycji oferty płyty drogowej</p>
+              <p className="text-sm text-gray-600 mb-4">Komponent OffersTable nie otrzymał profili lub cennika road_plate.</p>
+              <button onClick={() => setEditingOffer(null)} className="px-4 py-2 bg-gray-100 rounded-lg text-sm">Zamknij</button>
+            </div>
+          </div>
+        )
+      ) : editingOffer ? (
         <EditOfferModal
           offer={editingOffer}
           profiles={profiles}
@@ -451,7 +491,7 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
           }}
           onClose={() => setEditingOffer(null)}
         />
-      )}
+      ) : null}
     </div>
   );
 }

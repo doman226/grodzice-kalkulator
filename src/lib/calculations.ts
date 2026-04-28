@@ -71,3 +71,29 @@ export function formatNumber(value: number, decimals = 3): string {
     maximumFractionDigits: decimals,
   }).format(value);
 }
+
+// ─── Płyty drogowe ────────────────────────────────────────────────────────────
+
+/**
+ * Metryki dla płyty drogowej.
+ *   - totalLengthM = quantity × sheet_length_m            [m]   (do raportów logistycznych)
+ *   - areaM2       = quantity × sheet_length_m × sheet_width_m  [m²]
+ *   - massT        = areaM2 × weight_kg_per_m2 / 1000     [t]
+ *
+ * Uwaga: dla grodzic masa liczy się z weight_kg_per_m × długość.
+ * Dla płyt liczymy z powierzchni × kg/m² — inna geometria, inna formuła.
+ */
+export function calculateRoadPlateMetrics(
+  quantity: number,
+  sheetLengthM: number,
+  sheetWidthM: number,
+  weightKgPerM2: number,
+): { totalLengthM: number; areaM2: number; massT: number } {
+  if (quantity <= 0 || sheetLengthM <= 0 || sheetWidthM <= 0 || weightKgPerM2 <= 0) {
+    return { totalLengthM: 0, areaM2: 0, massT: 0 };
+  }
+  const totalLengthM = quantity * sheetLengthM;
+  const areaM2 = quantity * sheetLengthM * sheetWidthM;
+  const massT = (areaM2 * weightKgPerM2) / 1000;
+  return { totalLengthM, areaM2, massT };
+}

@@ -1,0 +1,484 @@
+import { useState } from 'react';
+import { supabase, fetchNipData } from '../lib/supabase';
+import type { Client, Offer } from '../types';
+import { formatPLN, formatEUR, formatNumber } from '../lib/calculations';
+import ClientSearchInput from './ClientSearchInput';
+
+interface TransportData {
+  trucks: number;
+  costPerTruck: number;
+  totalCost: number;
+  paidBy: 'dap_included' | 'dap_extra' | 'fca';
+  from: string;
+  to: string;
+}
+
+export interface RoadPlateOfferItemInput {
+  profileId: string;
+  profileName: string;
+  steelGrade: string;
+  quantity: number;
+  thicknessMm: number;
+  sheetLengthM: number;
+  sheetWidthM: number;
+  weightKgPerM2: number;
+  totalLengthM: number;
+  massT: number;
+  areaM2: number;
+}
+
+interface Totals {
+  massT: number;
+  areaM2: number;
+  totalLengthM: number;
+  rentalCostPLN: number;
+  rentalCostEUR: number;
+  costPerM2: number;
+  costPerTon: number;
+}
+
+interface EffectivePrices {
+  base_price_pln: number;
+  price_per_week_1_pln: number;
+  rp_loss_price_pln: number;
+  rp_service_hour_pln: number;
+  rp_sorting_price_pln: number;
+  rp_m12_welding_pln: number;
+  rp_cutting_head_pln: number;
+  rp_lifting_hole_pln: number;
+}
+
+interface Props {
+  clients: Client[];
+  offerItems: RoadPlateOfferItemInput[];
+  rentalWeeks: number;
+  displayUnit: 'weeks' | 'months';
+  totals: Totals;
+  currency: 'EUR' | 'PLN';
+  exchangeRate: number;
+  nbpDate: string;
+  transport: TransportData;
+  prices: EffectivePrices;
+  onSaved: (offer: Offer) => void;
+  onClose: () => void;
+  onClientAdded: (client: Client) => void;
+}
+
+const SALES_REPS = [
+  { name: 'Szymon Sobczak', phone: '579 376 107' },
+  { name: 'Mateusz Cieślicki', phone: '579 141 243' },
+  { name: 'Marzena Sobczak', phone: '579 241 508' },
+  { name: 'Piotr Domański', phone: '729 393 743' },
+];
+
+export default function SaveRoadPlateOfferModal({
+  clients, offerItems, rentalWeeks, displayUnit, totals, currency, exchangeRate, nbpDate, transport, prices, onSaved, onClose, onClientAdded,
+}: Props) {
+  const [clientId, setClientId] = useState('');
+  const [preparedBy, setPreparedBy] = useState(SALES_REPS[0].name);
+  const [notes, setNotes] = useState('');
+  const [validDays, setValidDays] = useState(1);
+  const [paymentDays, setPaymentDays] = useState(30);
+  const [deliveryInfo, setDeliveryInfo] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const [addingClient, setAddingClient] = useState(false);
+  const [newClient, setNewClient] = useState({ name: '', country: 'PL', nip: '', vat_number: '', address: '', city: '', postal_code: '', email: '', phone: '' });
+  const [savingClient, setSavingClient] = useState(false);
+  const [nipLookupLoading, setNipLookupLoading] = useState(false);
+
+  async function lookupNip() {
+    const nip = newClient.nip.replace(/[-\s]/g, '');
+    if (!/^\d{10}$/.test(nip)) { setError('Wpisz poprawny NIP (10 cyfr).'); return; }
+    setNipLookupLoading(true);
+    try {
+      const data = await fetchNipData(nip);
+      setNewClient(prev => ({
+        ...prev,
+        name:        data.name        ?? prev.name,
+        address:     data.address     ?? prev.address,
+        postal_code: data.postal_code ?? prev.postal_code,
+        city:        data.city        ?? prev.city,
+      }));
+      setError('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Błąd połączenia z GUS.');
+    }
+    setNipLookupLoading(false);
+  }
+
+  const rentalCostMain = currency === 'EUR' ? totals.rentalCostEUR : totals.rentalCostPLN;
+  const totalWithTransport = transport.costPerTruck > 0 && transport.paidBy === 'dap_included'
+    ? rentalCostMain + transport.totalCost
+    : rentalCostMain;
+
+  const mainProfileName = offerItems.length === 1 ? offerItems[0].profileName : 'Wiele profili';
+
+  async function handleAddClient() {
+    if (!newClient.name.trim()) return setError('Podaj nazwę firmy.');
+    if (newClient.country === 'PL' && !newClient.nip.trim()) return setError('Podaj NIP.');
+    if (newClient.country !== 'PL' && !newClient.vat_number.trim()) return setError('Podaj numer VAT.');
+    setSavingClient(true);
+    const { data, error: err } = await supabase.from('clients').insert({
+      name:        newClient.name.trim(),
+      country:     newClient.country,
+      nip:         newClient.country === 'PL' ? newClient.nip.trim()         : null,
+      vat_number:  newClient.country !== 'PL' ? newClient.vat_number.trim()  : null,
+      address:     newClient.address.trim()     || null,
+      city:        newClient.city.trim()        || null,
+      postal_code: newClient.postal_code.trim() || null,
+      email:       newClient.email.trim()       || null,
+      phone:       newClient.phone.trim()       || null,
+    }).select().single();
+    setSavingClient(false);
+    if (err) return setError('Błąd zapisu klienta – spróbuj ponownie.');
+    const c = data as Client;
+    onClientAdded(c);
+    setClientId(c.id);
+    setAddingClient(false);
+    setNewClient({ name: '', country: 'PL', nip: '', vat_number: '', address: '', city: '', postal_code: '', email: '', phone: '' });
+    setError('');
+  }
+
+  async function handleSave() {
+    if (!clientId) return setError('Wybierz klienta.');
+    setSaving(true);
+    setError('');
+
+    // Snapshot cen damage zawsze w PLN (canonical) — przy walucie EUR konwertujemy.
+    const toPLN = (v: number) => currency === 'EUR' ? v * exchangeRate : v;
+
+    // 1. Główny rekord oferty z item_type='road_plate'
+    const { data, error: err } = await supabase.from('offers').insert({
+      offer_number: '',
+      item_type: 'road_plate',
+      client_id: clientId,
+      profile_name: mainProfileName,
+      profile_type: 'PLATE',
+      quantity: offerItems.reduce((s, i) => s + i.quantity, 0),
+      length_m: offerItems.length === 1 ? offerItems[0].sheetLengthM : null,
+      rental_weeks: rentalWeeks,
+      total_length_m: totals.totalLengthM,
+      mass_t: totals.massT,
+      wall_area_m2: totals.areaM2,
+      rental_cost_pln: totals.rentalCostPLN,
+      rental_cost_eur: totals.rentalCostEUR,
+      currency,
+      exchange_rate: currency === 'EUR' ? exchangeRate : null,
+      cost_per_m2: totals.costPerM2,
+      cost_per_ton: totals.costPerTon,
+      transport_trucks: transport.trucks,
+      transport_cost_per_truck: transport.costPerTruck > 0
+        ? (currency === 'EUR' ? transport.costPerTruck * exchangeRate : transport.costPerTruck)
+        : null,
+      transport_cost_total: transport.costPerTruck > 0
+        ? (currency === 'EUR' ? transport.totalCost * exchangeRate : transport.totalCost)
+        : null,
+      transport_paid_by: transport.paidBy,
+      transport_from: transport.from || null,
+      transport_to: transport.to || null,
+      steel_grade: offerItems.length === 1 ? offerItems[0].steelGrade : null,
+      delivery_info: deliveryInfo.trim() || null,
+      // Cennik wynajmu — w PLN canonical (przeliczone z EUR jeśli oferta w EUR)
+      base_price_pln: toPLN(prices.base_price_pln),
+      weekly_cost_pln: totals.massT * toPLN(prices.price_per_week_1_pln),
+      price_per_week_1: toPLN(prices.price_per_week_1_pln),
+      // Snapshot damage prices specyficzny dla płyt drogowych (rp_*)
+      rp_loss_price_pln:    toPLN(prices.rp_loss_price_pln),
+      rp_service_hour_pln:  toPLN(prices.rp_service_hour_pln),
+      rp_sorting_price_pln: toPLN(prices.rp_sorting_price_pln),
+      rp_m12_welding_pln:   toPLN(prices.rp_m12_welding_pln),
+      rp_cutting_head_pln:  toPLN(prices.rp_cutting_head_pln),
+      rp_lifting_hole_pln:  toPLN(prices.rp_lifting_hole_pln),
+      notes: notes.trim() || null,
+      valid_days: validDays,
+      payment_days: paymentDays,
+      prepared_by: preparedBy,
+      display_unit: displayUnit,
+      status: 'szkic',
+    }).select('*, client:clients(*)').single();
+
+    if (err) { setSaving(false); return setError('Błąd zapisu oferty – spróbuj ponownie. ' + err.message); }
+
+    const savedOffer = data as Offer;
+
+    // 2. Pozycje oferty z polami specyficznymi dla płyt drogowych
+    const { data: insertedItems, error: itemsErr } = await supabase.from('offer_items').insert(
+      offerItems.map((item, idx) => ({
+        offer_id: savedOffer.id,
+        item_type: 'road_plate',
+        profile_name: item.profileName,
+        profile_type: 'PLATE',
+        steel_grade: item.steelGrade,
+        quantity: item.quantity,
+        length_m: item.sheetLengthM,             // semantyka: długość pojedynczej płyty
+        total_length_m: item.totalLengthM,       // quantity × sheetLengthM
+        mass_t: item.massT,
+        wall_area_m2: item.areaM2,               // dla płyt: powierzchnia tafli (= q × dł × szer)
+        thickness_mm: item.thicknessMm,
+        sheet_length_m: item.sheetLengthM,
+        sheet_width_m: item.sheetWidthM,
+        weight_kg_per_m2: item.weightKgPerM2,
+        sort_order: idx,
+      })),
+    ).select();
+
+    if (itemsErr) {
+      const { error: rollbackErr } = await supabase.rpc('soft_delete_offer', { p_offer_id: savedOffer.id });
+      setSaving(false);
+      if (rollbackErr) {
+        return setError(`Błąd zapisu pozycji i rollback się nie powiódł – skontaktuj się z administratorem. (${itemsErr.message})`);
+      }
+      return setError('Błąd zapisu pozycji – oferta anulowana. Spróbuj ponownie: ' + itemsErr.message);
+    }
+    setSaving(false);
+
+    savedOffer.items = (insertedItems ?? []) as typeof savedOffer.items;
+    onSaved(savedOffer);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-800">Zapisz jako ofertę — płyty drogowe</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Numer zostanie nadany automatycznie (OF/{new Date().getFullYear()}/XXX)</p>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Podsumowanie pozycji */}
+          <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+            <p className="text-xs text-blue-700 font-medium uppercase tracking-wide mb-2">Pozycje oferty ({offerItems.length})</p>
+            <div className="space-y-1 mb-3">
+              {offerItems.map((item, idx) => (
+                <div key={idx} className="flex justify-between text-sm">
+                  <span className="text-gray-600">{item.profileName} – {item.quantity} szt. ({item.sheetWidthM}×{item.sheetLengthM} m)</span>
+                  <span className="font-medium text-gray-800">{formatNumber(item.massT, 3)} t</span>
+                </div>
+              ))}
+            </div>
+            <div className="pt-2 border-t border-blue-200 grid grid-cols-2 gap-2 text-sm">
+              <div><span className="text-gray-500">Masa łączna:</span> <strong>{formatNumber(totals.massT, 3)} t</strong></div>
+              <div><span className="text-gray-500">Okres:</span> <strong>{(() => {
+                if (displayUnit === 'months') {
+                  const m = rentalWeeks / 4;
+                  if (m === 1) return '1 miesiąc';
+                  if (m % 10 >= 2 && m % 10 <= 4 && (m % 100 < 10 || m % 100 >= 20)) return `${m} miesiące`;
+                  return `${m} miesięcy`;
+                }
+                return `${rentalWeeks} tygodni`;
+              })()}</strong></div>
+            </div>
+            <div className="pt-2 border-t border-blue-200 mt-2 space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Wynajem:</span>
+                <strong>
+                  {currency === 'EUR'
+                    ? `${formatEUR(totals.rentalCostEUR)} EUR`
+                    : `${formatPLN(totals.rentalCostPLN)} PLN`}
+                </strong>
+              </div>
+              {currency === 'EUR' && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Kurs EUR/PLN:</span>
+                  <span className="text-gray-500">{exchangeRate.toFixed(4)}{nbpDate ? ` (NBP ${nbpDate})` : ' (ręczny)'}</span>
+                </div>
+              )}
+              {transport.costPerTruck > 0 && transport.paidBy !== 'fca' && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">
+                    Transport ({transport.trucks} aut{transport.trucks > 1 ? 'a' : ''})
+                    {transport.paidBy === 'dap_extra' && <span className="text-orange-600 ml-1">[refaktura]</span>}:
+                  </span>
+                  <strong className={transport.paidBy === 'dap_extra' ? 'text-orange-600' : ''}>
+                    {currency === 'EUR'
+                      ? `${formatEUR(transport.totalCost)} EUR`
+                      : `${formatPLN(transport.totalCost)} PLN`}
+                  </strong>
+                </div>
+              )}
+              {transport.paidBy === 'fca' && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Transport:</span>
+                  <strong className="text-green-700">FCA – klient</strong>
+                </div>
+              )}
+              <div className="flex justify-between pt-1 border-t border-blue-200 text-sm">
+                <span className="text-gray-600 font-medium">Łączna kwota oferty:</span>
+                <strong className="text-blue-900 text-base">
+                  {currency === 'EUR'
+                    ? `${formatEUR(totalWithTransport)} EUR`
+                    : `${formatPLN(totalWithTransport)} PLN`}
+                </strong>
+              </div>
+            </div>
+            {transport.to && (
+              <p className="text-xs text-gray-500 mt-2">🚛 {transport.from} → {transport.to}</p>
+            )}
+          </div>
+
+          {/* Wybór klienta */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Klient <span className="text-red-500">*</span></label>
+            {!addingClient ? (
+              <div className="flex gap-2">
+                <ClientSearchInput clients={clients} value={clientId} onChange={setClientId} required />
+                <button onClick={() => setAddingClient(true)} className="px-3 py-2 text-sm text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 whitespace-nowrap">+ Nowy</button>
+              </div>
+            ) : (
+              <div className="border border-blue-200 rounded-lg p-3 bg-blue-50 space-y-2">
+                <p className="text-xs font-medium text-blue-700">Szybkie dodanie klienta</p>
+                <select value={newClient.country} onChange={e => setNewClient({ ...newClient, country: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                  <option value="PL">🇵🇱 Polska (PL)</option>
+                  <optgroup label="─────────────────">
+                  <option value="AL">🇦🇱 Albania (AL)</option>
+                  <option value="AD">🇦🇩 Andorra (AD)</option>
+                  <option value="AT">🇦🇹 Austria (AT)</option>
+                  <option value="BY">🇧🇾 Białoruś (BY)</option>
+                  <option value="BE">🇧🇪 Belgia (BE)</option>
+                  <option value="BA">🇧🇦 Bośnia i Herceg. (BA)</option>
+                  <option value="BG">🇧🇬 Bułgaria (BG)</option>
+                  <option value="ME">🇲🇪 Czarnogóra (ME)</option>
+                  <option value="CZ">🇨🇿 Czechy (CZ)</option>
+                  <option value="DK">🇩🇰 Dania (DK)</option>
+                  <option value="EE">🇪🇪 Estonia (EE)</option>
+                  <option value="FI">🇫🇮 Finlandia (FI)</option>
+                  <option value="FR">🇫🇷 Francja (FR)</option>
+                  <option value="GR">🇬🇷 Grecja (GR)</option>
+                  <option value="ES">🇪🇸 Hiszpania (ES)</option>
+                  <option value="NL">🇳🇱 Holandia (NL)</option>
+                  <option value="IE">🇮🇪 Irlandia (IE)</option>
+                  <option value="IS">🇮🇸 Islandia (IS)</option>
+                  <option value="XK">🇽🇰 Kosowo (XK)</option>
+                  <option value="LI">🇱🇮 Liechtenstein (LI)</option>
+                  <option value="LT">🇱🇹 Litwa (LT)</option>
+                  <option value="LU">🇱🇺 Luksemburg (LU)</option>
+                  <option value="LV">🇱🇻 Łotwa (LV)</option>
+                  <option value="MK">🇲🇰 Macedonia Płn. (MK)</option>
+                  <option value="MT">🇲🇹 Malta (MT)</option>
+                  <option value="MD">🇲🇩 Mołdawia (MD)</option>
+                  <option value="MC">🇲🇨 Monako (MC)</option>
+                  <option value="DE">🇩🇪 Niemcy (DE)</option>
+                  <option value="NO">🇳🇴 Norwegia (NO)</option>
+                  <option value="PT">🇵🇹 Portugalia (PT)</option>
+                  <option value="RU">🇷🇺 Rosja (RU)</option>
+                  <option value="RO">🇷🇴 Rumunia (RO)</option>
+                  <option value="SM">🇸🇲 San Marino (SM)</option>
+                  <option value="RS">🇷🇸 Serbia (RS)</option>
+                  <option value="SK">🇸🇰 Słowacja (SK)</option>
+                  <option value="SI">🇸🇮 Słowenia (SI)</option>
+                  <option value="CH">🇨🇭 Szwajcaria (CH)</option>
+                  <option value="SE">🇸🇪 Szwecja (SE)</option>
+                  <option value="UA">🇺🇦 Ukraina (UA)</option>
+                  <option value="HU">🇭🇺 Węgry (HU)</option>
+                  <option value="GB">🇬🇧 Wielka Brytania (GB)</option>
+                  <option value="IT">🇮🇹 Włochy (IT)</option>
+                  <option value="HR">🇭🇷 Chorwacja (HR)</option>
+                  <option value="CY">🇨🇾 Cypr (CY)</option>
+                  </optgroup>
+                  <option value="OTHER">Inne (spoza Europy)</option>
+                </select>
+                <input placeholder="Nazwa firmy *" value={newClient.name} onChange={e => setNewClient({ ...newClient, name: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                {newClient.country === 'PL' ? (
+                  <div className="flex gap-2">
+                    <input placeholder="NIP *" value={newClient.nip} onChange={e => setNewClient({ ...newClient, nip: e.target.value })} className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                    <button type="button" onClick={lookupNip} disabled={nipLookupLoading} className="px-3 py-2 bg-blue-700 hover:bg-blue-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50">
+                      {nipLookupLoading ? '...' : '🔍 GUS'}
+                    </button>
+                  </div>
+                ) : (
+                  <input placeholder="Numer VAT *" value={newClient.vat_number} onChange={e => setNewClient({ ...newClient, vat_number: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                )}
+                <input placeholder="Adres (ulica, nr)" value={newClient.address}
+                  onChange={e => setNewClient({ ...newClient, address: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                <div className="flex gap-2">
+                  <input placeholder="Kod pocztowy" value={newClient.postal_code}
+                    onChange={e => setNewClient({ ...newClient, postal_code: e.target.value })}
+                    className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                  <input placeholder="Miasto" value={newClient.city}
+                    onChange={e => setNewClient({ ...newClient, city: e.target.value })}
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <input placeholder="E-mail" type="email" value={newClient.email}
+                  onChange={e => setNewClient({ ...newClient, email: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                <input placeholder="Telefon" type="tel" value={newClient.phone}
+                  onChange={e => setNewClient({ ...newClient, phone: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                <div className="flex gap-2">
+                  <button onClick={handleAddClient} disabled={savingClient} className="flex-1 py-1.5 text-sm bg-blue-900 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50">
+                    {savingClient ? 'Dodawanie...' : 'Dodaj i wybierz'}
+                  </button>
+                  <button onClick={() => setAddingClient(false)} className="px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">Anuluj</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Opiekun handlowy */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Opiekun handlowy <span className="text-red-500">*</span></label>
+            <select value={preparedBy} onChange={e => setPreparedBy(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              {SALES_REPS.map(r => (
+                <option key={r.name} value={r.name}>{r.name} – tel. {r.phone}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Termin dostawy */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Termin dostawy</label>
+            <input
+              type="text"
+              value={deliveryInfo}
+              onChange={e => setDeliveryInfo(e.target.value)}
+              placeholder="np. 5-7 dni roboczych"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-gray-400 mt-1">Pojawi się na PDF w sekcji „Termin dostawy"</p>
+          </div>
+
+          {/* Ważność + Termin płatności */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ważność oferty [dni]</label>
+              <input type="number" min={1} value={validDays} onChange={e => setValidDays(Math.max(1, parseInt(e.target.value) || 30))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Termin płatności</label>
+              <select value={paymentDays} onChange={e => setPaymentDays(parseInt(e.target.value))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value={0}>Przedpłata</option>
+                <option value={7}>7 dni</option>
+                <option value={14}>14 dni</option>
+                <option value={21}>21 dni</option>
+                <option value={30}>30 dni</option>
+                <option value={60}>60 dni</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Notatki */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notatki do oferty</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Opcjonalne uwagi..."
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+
+          {error && <p className="text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+        </div>
+
+        <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">Anuluj</button>
+          <button onClick={handleSave} disabled={saving} className="px-6 py-2 text-sm text-white bg-blue-900 rounded-lg hover:bg-blue-800 font-medium disabled:opacity-50">
+            {saving ? 'Zapisywanie...' : 'Zapisz ofertę'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

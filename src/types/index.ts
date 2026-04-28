@@ -26,6 +26,59 @@ export interface RentalPrices {
   repair_price_pln: number;
 }
 
+// ─── Płyty drogowe (wynajem) ──────────────────────────────────────────────────
+
+export type ItemType = 'sheet_pile' | 'road_plate';
+
+export interface RoadPlateProfile {
+  id: string;
+  name: string;
+  thickness_mm: number;
+  sheet_length_m: number;
+  sheet_width_m: number;
+  weight_kg_per_m2: number;
+  steel_grade: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RoadPlateRentalPrices {
+  id: string;
+  base_price_pln: number;
+  base_weeks: number;
+  price_per_week_1_pln: number;
+  threshold_weeks: number;
+  price_per_week_2_pln: number;
+  loss_price_pln: number;
+  service_hour_pln: number;
+  sorting_price_pln: number;
+  m12_welding_pln: number;
+  cutting_head_pln: number;
+  lifting_hole_pln: number;
+  note?: string;
+  updated_at: string;
+}
+
+export interface RoadPlatePriceHistory {
+  id: string;
+  base_price_pln?: number;
+  base_weeks?: number;
+  price_per_week_1_pln?: number;
+  threshold_weeks?: number;
+  price_per_week_2_pln?: number;
+  loss_price_pln?: number;
+  service_hour_pln?: number;
+  sorting_price_pln?: number;
+  m12_welding_pln?: number;
+  cutting_head_pln?: number;
+  lifting_hole_pln?: number;
+  note?: string;
+  changed_at: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface PriceHistory {
   id: string;
   base_price_pln: number;
@@ -196,6 +249,12 @@ export interface OfferItem {
   mass_t: number;
   wall_area_m2: number;
   sort_order: number;
+  // Płyty drogowe (wypełnione tylko gdy item_type='road_plate')
+  item_type?: ItemType;
+  thickness_mm?: number;
+  sheet_length_m?: number;
+  sheet_width_m?: number;
+  weight_kg_per_m2?: number;
 }
 
 export interface CalculatorResult {
@@ -275,5 +334,14 @@ export interface Offer {
   rental_cost_eur?: number;
   created_at: string;
   updated_at: string;
+  // Dyskryminator typu artykułu (sheet_pile = grodzice, road_plate = płyty drogowe)
+  item_type?: ItemType;
+  // Snapshot cennika napraw dla płyt drogowych (canonical w PLN, jak dla grodzic)
+  rp_loss_price_pln?: number;
+  rp_service_hour_pln?: number;
+  rp_sorting_price_pln?: number;
+  rp_m12_welding_pln?: number;
+  rp_cutting_head_pln?: number;
+  rp_lifting_hole_pln?: number;
   items?: OfferItem[];
 }

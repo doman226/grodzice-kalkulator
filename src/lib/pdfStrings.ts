@@ -638,3 +638,308 @@ export const RENTAL_PDF_STRINGS: Record<PdfLang, RentalPdfStrings> = {
   pl: rental_pl,
   en: rental_en,
 };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ROAD PLATE RENTAL PDF STRINGS
+// Osobny zestaw od grodzic — bez "grodzice", bez normy EN 10248.
+// Tabela: materiał, gatunek, grubość, wymiar, ilość, kg/m², masa, pow., cena, suma
+// ══════════════════════════════════════════════════════════════════════════════
+
+export interface RoadPlateRentalPdfStrings {
+  docTitle:      (offerNo: string) => string;
+  docLanguage:   string;
+  offerTitle:    string;
+
+  // Meta
+  date:          string;
+  offerNumber:   string;
+  salesRep:      string;
+  phone:         string;
+  customerLabel: string;
+  vatLabel:      (country: string) => string;
+
+  // Greeting & intro
+  greeting: string;
+  intro:    string;
+
+  // Table headers (10 kolumn)
+  thMaterial:    string;   // Materiał
+  thSteelGrade:  string;
+  thThickness:   string;   // Grubość [mm]
+  thDimensions:  string;   // Wymiar [m] (szer × dł)
+  thQty:         string;
+  thKgPerM2:     string;   // kg/m²
+  thMass:        string;
+  thArea:        string;   // Pow. [m²]
+  thPrice:       string;   // Cena [<curr>/t]
+  thSubtotal:    string;   // Suma [<curr>]
+  totalRow:      string;
+  unitPcs:       string;
+  rentalPeriodRow: string;
+
+  // Price box
+  rentalCostLabel:   string;
+  netSuffix:         string;
+  costPerM2Label:    string;
+  costPerTonLabel:   string;
+  exchangeRateLabel: string;
+
+  // Weekly rate box
+  weeklyRateTitle:  string;
+  weeklyRateSuffix: string;
+  weeklyRateNote:   string;
+
+  // Transport
+  sectionTransport:    string;
+  labelDelivery:       string;
+  labelRoute:          string;
+  labelTrucks:         string;
+  labelCostPerTruck:   string;
+  labelTotalTransport: string;
+  labelSettlement:     string;
+  labelPickupFrom:     string;
+  valueDapIncluded:    string;
+  valueDapExtra:       string;
+  valueFca:            string;
+  valueRecharge:       string;
+
+  // Rental conditions
+  sectionRentalTerms: string;
+  rentalTerm1:        string;
+  rentalTerm1Fca:     string;
+  rentalTerm2:        string;
+  rentalTerm3:        string;
+  para1:              string;
+  para2:              (val: number | string, unit: string) => string;
+  para3:              string;
+  para4:              string;
+
+  // Damage schedule (6 pól: rp_loss, rp_service_hour, rp_sorting, rp_m12_welding, rp_cutting_head, rp_lifting_hole)
+  sectionDamages: string;
+  damageLoss:        (val: number | string, unit: string) => string;
+  damageServiceHour: (val: number | string, unit: string) => string;
+  damageSorting:     (val: number | string, unit: string) => string;
+  damageM12Welding:  (val: number | string, unit: string) => string;
+  damageCuttingHead: (val: number | string, unit: string) => string;
+  damageLiftingHole: (val: number | string, unit: string) => string;
+
+  // Delivery time
+  sectionDelivery:     string;
+  deliveryPlaceholder: string;
+
+  // Technical (BEZ EN 10248 — tylko tolerancje + wagowanie)
+  sectionTechnical:     string;
+  techGrade:            string;
+  techToleranceWidth:   string;
+  techToleranceLength:  string;
+  techWeighing:         string;
+
+  // Payment
+  sectionPayment:  string;
+  paymentPrepaid:  string;
+  paymentCredit:   (days: number) => string;
+
+  // Validity
+  sectionValidity:    string;
+  validityLine:       (label: string) => string;
+  validityLabel:      (days: number) => string;
+  validityDisclaimer: string;
+
+  // Notes
+  notesLabel: string;
+}
+
+// ─── ROAD PLATE POLISH ────────────────────────────────────────────────────────
+
+const roadPlate_pl: RoadPlateRentalPdfStrings = {
+  docTitle:      offerNo => `Oferta ${offerNo}`,
+  docLanguage:   'pl',
+  offerTitle:    'OFERTA WYNAJMU',
+
+  date:          'Data:',
+  offerNumber:   'Numer oferty:',
+  salesRep:      'Opiekun handlowy:',
+  phone:         'Telefon:',
+  customerLabel: 'Dane klienta:',
+  vatLabel:      country => country === 'PL' ? 'NIP:' : 'VAT:',
+
+  greeting: 'Dzień dobry,',
+  intro:    'W nawiązaniu do przesłanego zapytania oraz naszych Ogólnych Warunków Sprzedaży i Płatności oferujemy usługę wynajmu płyt drogowych:',
+
+  thMaterial:    'Materiał',
+  thSteelGrade:  'Gat. stali',
+  thThickness:   'Grub. [mm]',
+  thDimensions:  'Wymiar [m]',
+  thQty:         'Ilość',
+  thKgPerM2:     'kg/m²',
+  thMass:        'Masa [t]',
+  thArea:        'Pow. [m²]',
+  thPrice:       'Cena',
+  thSubtotal:    'Suma',
+  totalRow:      'Łącznie',
+  unitPcs:       'szt.',
+  rentalPeriodRow: 'Podstawowy okres wynajmu',
+
+  rentalCostLabel:   'Koszt wynajmu',
+  netSuffix:         'netto',
+  costPerM2Label:    'Koszt za m²:',
+  costPerTonLabel:   'Koszt za tonę:',
+  exchangeRateLabel: 'Kurs EUR/PLN:',
+
+  weeklyRateTitle:  'KAŻDY KOLEJNY TYDZIEŃ WYNAJMU',
+  weeklyRateSuffix: '/tona netto',
+  weeklyRateNote:   'po upływie podstawowego okresu wynajmu',
+
+  sectionTransport:    'Transport:',
+  labelDelivery:       'Dostawa:',
+  labelRoute:          'Trasa:',
+  labelTrucks:         'Liczba aut:',
+  labelCostPerTruck:   'Koszt / auto:',
+  labelTotalTransport: 'Łączny koszt transportu:',
+  labelSettlement:     'Rozliczenie:',
+  labelPickupFrom:     'Odbiór z:',
+  valueDapIncluded:    'DAP – w cenie / Intra B.V.',
+  valueDapExtra:       'DAP / Intra B.V.',
+  valueFca:            'FCA – odbiór własny',
+  valueRecharge:       'Refaktura kosztów transportu na klienta',
+
+  sectionRentalTerms: 'Warunki wynajmu:',
+  rentalTerm1: '1) Oferowana cena jest ceną z transportami po stronie Intra: magazyn - budowa. Zwrot do magazynu Intra BV (Cieśle 42 k. Wrocławia) jest obowiązkiem i kosztem Klienta.',
+  rentalTerm1Fca: '1) Transport płyt po stronie Klienta (FCA – odbiór własny). Zwrot do magazynu Intra BV (Cieśle 42 k. Wrocławia) jest obowiązkiem i kosztem Klienta.',
+  rentalTerm2: '2) Na budowie płyty muszą zostać rozładowane i załadowane na koszt Klienta.',
+  rentalTerm3: '3) Podane ceny są cenami netto.',
+
+  para1: 'Pragniemy zaznaczyć, że są to płyty drogowe wypożyczone i w każdym przypadku należy je zwrócić. Zwracamy uwagę, że zwrotowi mogą podlegać wyłącznie materiały dostarczone przez Intra.',
+  para2: (val, unit) => `Płyty muszą zostać zwrócone w stanie kompletnym i czystym. Za straty materialne, także spowodowane cięciami uszkodzonych części, obciążymy Państwa dodatkową kwotą w wysokości ${val},- ${unit}/tona.`,
+  para3: 'Płyty po zwrocie muszą nadawać się do ponownego użycia – bez konieczności obróbki, czyszczenia oraz napraw. Płyty nie mogą posiadać uszkodzeń, zabrudzeń, przylegającej ziemi i innych niedoskonałości ponad normatywne zużycie.',
+  para4: 'W przeciwnym razie obciążymy Państwa następującymi kosztami:',
+
+  sectionDamages: 'Cennik:',
+  damageLoss:        (val, unit) => `- Strata całkowita / brakujący materiał = +${val},- ${unit} / tona;`,
+  damageServiceHour: (val, unit) => `- Roboczogodzina serwisowa (np. prostowanie blach) = +${val},- ${unit} / godz.;`,
+  damageSorting:     (val, unit) => `- Sortowanie i czyszczenie = +${val},- ${unit} / tona;`,
+  damageM12Welding:  (val, unit) => `- Spawanie otworów M12 = +${val},- ${unit} / szt.;`,
+  damageCuttingHead: (val, unit) => `- Głowica tnąca = +${val},- ${unit} / cięcie;`,
+  damageLiftingHole: (val, unit) => `- Nowy otwór do podnoszenia = +${val},- ${unit} / szt.;`,
+
+  sectionDelivery:     'Termin dostawy:',
+  deliveryPlaceholder: '- ............',
+
+  sectionTechnical:    'Warunki techniczne:',
+  techGrade:           '- gatunek stali zgodny z ofertą.',
+  techToleranceWidth:  '- tolerancja szerokości −0/+100 mm (mill edges).',
+  techToleranceLength: '- tolerancja długości −0/+200 mm (mill edges).',
+  techWeighing:        '- fakturowanie wg wagi rzeczywistej.',
+
+  sectionPayment:  'Warunki płatności:',
+  paymentPrepaid:  '- Przedpłata – płatność wymagana przed realizacją zlecenia.',
+  paymentCredit:   days => `- ${days} dni od daty wystawienia faktury, z zastrzeżeniem uzyskania zabezpieczenia wartości zamówienia (Limit kupiecki, gwarancja bankowa, gwarancja płatności publicznego inwestora lub inne zabezpieczenie zaakceptowane przez Intra BV).`,
+
+  sectionValidity:    'Ważność oferty:',
+  validityLine:       label => `- ${label} od daty przesłania oferty.`,
+  validityLabel:      days  => days === 1 ? '24 godziny' : `${days} dni`,
+  validityDisclaimer: 'Oferta nie rezerwuje dostępności z magazynu i wymaga finalnego potwierdzenia.',
+
+  notesLabel: 'Uwagi',
+};
+
+// ─── ROAD PLATE ENGLISH ───────────────────────────────────────────────────────
+
+const roadPlate_en: RoadPlateRentalPdfStrings = {
+  docTitle:      offerNo => `Rental Offer ${offerNo}`,
+  docLanguage:   'en',
+  offerTitle:    'RENTAL OFFER',
+
+  date:          'Date:',
+  offerNumber:   'Offer No.:',
+  salesRep:      'Account Manager:',
+  phone:         'Phone:',
+  customerLabel: 'Customer:',
+  vatLabel:      country => country === 'PL' ? 'Tax No.:' : 'VAT No.:',
+
+  greeting: 'Dear Sir or Madam,',
+  intro:    'With reference to your enquiry and our General Terms and Conditions of Rental and Payment, we are pleased to offer steel road plates for hire on the following terms:',
+
+  thMaterial:    'Material',
+  thSteelGrade:  'Steel grade',
+  thThickness:   'Thick. [mm]',
+  thDimensions:  'Size [m]',
+  thQty:         'Qty',
+  thKgPerM2:     'kg/m²',
+  thMass:        'Mass [t]',
+  thArea:        'Area [m²]',
+  thPrice:       'Price',
+  thSubtotal:    'Total',
+  totalRow:      'Total',
+  unitPcs:       'pcs.',
+  rentalPeriodRow: 'Basic rental period',
+
+  rentalCostLabel:   'Rental cost',
+  netSuffix:         'net',
+  costPerM2Label:    'Cost per m²:',
+  costPerTonLabel:   'Cost per ton:',
+  exchangeRateLabel: 'EUR/PLN rate:',
+
+  weeklyRateTitle:  'EACH ADDITIONAL WEEK OF RENTAL',
+  weeklyRateSuffix: '/ton net',
+  weeklyRateNote:   'after the basic rental period',
+
+  sectionTransport:    'Transport:',
+  labelDelivery:       'Delivery:',
+  labelRoute:          'Route:',
+  labelTrucks:         'No. of trucks:',
+  labelCostPerTruck:   'Cost / truck:',
+  labelTotalTransport: 'Total transport cost:',
+  labelSettlement:     'Settlement:',
+  labelPickupFrom:     'Collection from:',
+  valueDapIncluded:    'DAP – included in price / Intra B.V.',
+  valueDapExtra:       'DAP / Intra B.V.',
+  valueFca:            "FCA – ex works, customer's collection",
+  valueRecharge:       'Transport costs recharged to customer',
+
+  sectionRentalTerms: 'Rental terms:',
+  rentalTerm1: "1) The quoted price includes delivery by Intra from warehouse to site. Return to Intra B.V. warehouse (Cieśle 42, near Wrocław) is the Customer's responsibility and cost.",
+  rentalTerm1Fca: "1) Transport of road plates is arranged by the Customer (FCA – ex works, customer's collection). Return to Intra B.V. warehouse (Cieśle 42, near Wrocław) is the Customer's responsibility and cost.",
+  rentalTerm2: "2) At the construction site, road plates must be unloaded and loaded at the Customer's expense.",
+  rentalTerm3: '3) All prices quoted are net prices.',
+
+  para1: 'Please note that these are rented road plates and must be returned in all cases. Only materials supplied by Intra B.V. are eligible for return.',
+  para2: (val, unit) => `Plates must be returned complete and clean. For material losses, including those caused by cutting of damaged sections, an additional charge of ${val},- ${unit}/ton will apply.`,
+  para3: 'Plates must be returned in a reusable condition – without the need for processing, cleaning or repairs. Plates must not show damage, contamination, adhering soil or other defects beyond normal wear.',
+  para4: 'Otherwise the following charges will apply:',
+
+  sectionDamages: 'Schedule of charges:',
+  damageLoss:        (val, unit) => `- Total loss / missing material = +${val},- ${unit} / ton;`,
+  damageServiceHour: (val, unit) => `- Service hour (e.g. plate straightening) = +${val},- ${unit} / hour;`,
+  damageSorting:     (val, unit) => `- Sorting and cleaning = +${val},- ${unit} / ton;`,
+  damageM12Welding:  (val, unit) => `- Welding of M12 holes = +${val},- ${unit} / pc.;`,
+  damageCuttingHead: (val, unit) => `- Cutting head = +${val},- ${unit} / cut;`,
+  damageLiftingHole: (val, unit) => `- New lifting hole = +${val},- ${unit} / pc.;`,
+
+  sectionDelivery:     'Delivery time:',
+  deliveryPlaceholder: '- ............',
+
+  sectionTechnical:    'Technical terms:',
+  techGrade:           '- steel grade as stated in this offer.',
+  techToleranceWidth:  '- width tolerance −0/+100 mm (mill edges).',
+  techToleranceLength: '- length tolerance −0/+200 mm (mill edges).',
+  techWeighing:        '- invoicing based on actual weight.',
+
+  sectionPayment:  'Payment terms:',
+  paymentPrepaid:  '- Prepayment – payment required prior to execution of the order.',
+  paymentCredit:   days => `- ${days} days from invoice date, subject to obtaining security for the order value (Credit limit, bank guarantee, payment guarantee from a public investor, or other security accepted by Intra B.V.).`,
+
+  sectionValidity:    'Validity of offer:',
+  validityLine:       label => `- ${label} from the date of issue.`,
+  validityLabel:      days  => days === 1 ? '24 hours' : `${days} days`,
+  validityDisclaimer: 'This offer does not reserve stock availability and requires final confirmation.',
+
+  notesLabel: 'Notes',
+};
+
+// ─── Export (Road Plate Rental) ───────────────────────────────────────────────
+
+export const ROAD_PLATE_RENTAL_PDF_STRINGS: Record<PdfLang, RoadPlateRentalPdfStrings> = {
+  pl: roadPlate_pl,
+  en: roadPlate_en,
+};

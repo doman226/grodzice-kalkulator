@@ -19,3 +19,6 @@ dist
 
 # Local Netlify folder
 .netlify
+
+# Claude Code lokalna konfiguracja preview/MCP (nie do repo)
+.claude/
