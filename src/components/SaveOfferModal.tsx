@@ -3,6 +3,7 @@ import { supabase, fetchNipData } from '../lib/supabase';
 import type { Client, Offer, RentalPrices } from '../types';
 import { formatPLN, formatEUR, formatNumber } from '../lib/calculations';
 import ClientSearchInput from './ClientSearchInput';
+import { SALES_REPS, CountryOptions } from '../lib/constants';
 
 interface TransportData {
   trucks: number;
@@ -51,12 +52,7 @@ interface Props {
   onClientAdded: (client: Client) => void;
 }
 
-const SALES_REPS = [
-  { name: 'Szymon Sobczak', phone: '579 376 107' },
-  { name: 'Mateusz Cieślicki', phone: '579 141 243' },
-  { name: 'Marzena Sobczak', phone: '579 241 508' },
-  { name: 'Piotr Domański', phone: '729 393 743' },
-];
+
 
 export default function SaveOfferModal({
   clients, offerItems, rentalWeeks, displayUnit, totals, currency, exchangeRate, nbpDate, transport, prices, onSaved, onClose, onClientAdded,
@@ -316,54 +312,7 @@ export default function SaveOfferModal({
               <div className="border border-blue-200 rounded-lg p-3 bg-blue-50 space-y-2">
                 <p className="text-xs font-medium text-blue-700">Szybkie dodanie klienta</p>
                 <select value={newClient.country} onChange={e => setNewClient({ ...newClient, country: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                  <option value="PL">🇵🇱 Polska (PL)</option>
-                  <optgroup label="─────────────────">
-                  <option value="AL">🇦🇱 Albania (AL)</option>
-                  <option value="AD">🇦🇩 Andorra (AD)</option>
-                  <option value="AT">🇦🇹 Austria (AT)</option>
-                  <option value="BY">🇧🇾 Białoruś (BY)</option>
-                  <option value="BE">🇧🇪 Belgia (BE)</option>
-                  <option value="BA">🇧🇦 Bośnia i Herceg. (BA)</option>
-                  <option value="BG">🇧🇬 Bułgaria (BG)</option>
-                  <option value="ME">🇲🇪 Czarnogóra (ME)</option>
-                  <option value="CZ">🇨🇿 Czechy (CZ)</option>
-                  <option value="DK">🇩🇰 Dania (DK)</option>
-                  <option value="EE">🇪🇪 Estonia (EE)</option>
-                  <option value="FI">🇫🇮 Finlandia (FI)</option>
-                  <option value="FR">🇫🇷 Francja (FR)</option>
-                  <option value="GR">🇬🇷 Grecja (GR)</option>
-                  <option value="ES">🇪🇸 Hiszpania (ES)</option>
-                  <option value="NL">🇳🇱 Holandia (NL)</option>
-                  <option value="IE">🇮🇪 Irlandia (IE)</option>
-                  <option value="IS">🇮🇸 Islandia (IS)</option>
-                  <option value="XK">🇽🇰 Kosowo (XK)</option>
-                  <option value="LI">🇱🇮 Liechtenstein (LI)</option>
-                  <option value="LT">🇱🇹 Litwa (LT)</option>
-                  <option value="LU">🇱🇺 Luksemburg (LU)</option>
-                  <option value="LV">🇱🇻 Łotwa (LV)</option>
-                  <option value="MK">🇲🇰 Macedonia Płn. (MK)</option>
-                  <option value="MT">🇲🇹 Malta (MT)</option>
-                  <option value="MD">🇲🇩 Mołdawia (MD)</option>
-                  <option value="MC">🇲🇨 Monako (MC)</option>
-                  <option value="DE">🇩🇪 Niemcy (DE)</option>
-                  <option value="NO">🇳🇴 Norwegia (NO)</option>
-                  <option value="PT">🇵🇹 Portugalia (PT)</option>
-                  <option value="RU">🇷🇺 Rosja (RU)</option>
-                  <option value="RO">🇷🇴 Rumunia (RO)</option>
-                  <option value="SM">🇸🇲 San Marino (SM)</option>
-                  <option value="RS">🇷🇸 Serbia (RS)</option>
-                  <option value="SK">🇸🇰 Słowacja (SK)</option>
-                  <option value="SI">🇸🇮 Słowenia (SI)</option>
-                  <option value="CH">🇨🇭 Szwajcaria (CH)</option>
-                  <option value="SE">🇸🇪 Szwecja (SE)</option>
-                  <option value="UA">🇺🇦 Ukraina (UA)</option>
-                  <option value="HU">🇭🇺 Węgry (HU)</option>
-                  <option value="GB">🇬🇧 Wielka Brytania (GB)</option>
-                  <option value="IT">🇮🇹 Włochy (IT)</option>
-                  <option value="HR">🇭🇷 Chorwacja (HR)</option>
-                  <option value="CY">🇨🇾 Cypr (CY)</option>
-                  </optgroup>
-                  <option value="OTHER">Inne (spoza Europy)</option>
+                  <CountryOptions />
                 </select>
                 <input placeholder="Nazwa firmy *" value={newClient.name} onChange={e => setNewClient({ ...newClient, name: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                 {newClient.country === 'PL' ? (

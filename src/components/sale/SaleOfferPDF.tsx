@@ -2,15 +2,13 @@ import { Document, Page, View, Text, Image, StyleSheet, Font, Link } from '@reac
 import type { SaleOffer } from '../../types';
 import { formatEUR, formatPLN, formatRound, formatNumber } from '../../lib/calculations';
 import { PDF_STRINGS, type PdfLang } from '../../lib/pdfStrings';
+import { SALES_REPS as SALES_REPS_LIST } from '../../lib/constants';
 
 // ─── Fonty (identyczne z OfferPDF) ───────────────────────────────────────────
 
-const SALES_REPS: Record<string, string> = {
-  'Szymon Sobczak':    '579 376 107',
-  'Mateusz Cieślicki': '579 141 243',
-  'Marzena Sobczak':   '579 241 508',
-  'Piotr Domański':    '729 393 743',
-};
+const SALES_REPS: Record<string, string> = Object.fromEntries(
+  SALES_REPS_LIST.map(r => [r.name, r.phone])
+);
 
 const SIGNATURES: Record<string, string> = {
   'Szymon Sobczak':    `${window.location.origin}/signatures/Sobczak.png`,

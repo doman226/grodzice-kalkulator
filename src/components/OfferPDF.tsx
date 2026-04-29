@@ -3,13 +3,12 @@ import type { Offer } from '../types';
 import { formatPLN, formatEUR, formatRound, formatNumber } from '../lib/calculations';
 import { RENTAL_PDF_STRINGS } from '../lib/pdfStrings';
 import type { PdfLang } from '../lib/pdfStrings';
+import { SALES_REPS as SALES_REPS_LIST } from '../lib/constants';
 
-const SALES_REPS: Record<string, string> = {
-  'Szymon Sobczak': '579 376 107',
-  'Mateusz Cieślicki': '579 141 243',
-  'Marzena Sobczak': '579 241 508',
-  'Piotr Domański': '729 393 743',
-};
+// Lookup map name → phone dla szybkiego dostępu w JSX PDF
+const SALES_REPS: Record<string, string> = Object.fromEntries(
+  SALES_REPS_LIST.map(r => [r.name, r.phone])
+);
 
 const SIGNATURES: Record<string, string> = {
   'Szymon Sobczak':    `${window.location.origin}/signatures/Sobczak.png`,

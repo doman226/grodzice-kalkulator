@@ -3,15 +3,9 @@ import { supabase } from '../lib/supabase';
 import type { Offer, RoadPlateProfile, RoadPlateRentalPrices, Client, OfferItem } from '../types';
 import { calculateRentalCost, calculateRoadPlateMetrics, formatPLN, formatEUR, formatNumber } from '../lib/calculations';
 import ClientSearchInput from './ClientSearchInput';
+import { SALES_REPS } from '../lib/constants';
 
 interface NBPRate { rate: number; date: string; }
-
-const SALES_REPS = [
-  { name: 'Szymon Sobczak', phone: '579 376 107' },
-  { name: 'Mateusz Cieślicki', phone: '579 141 243' },
-  { name: 'Marzena Sobczak', phone: '579 241 508' },
-  { name: 'Piotr Domański', phone: '729 393 743' },
-];
 
 const STEEL_GRADES = ['min. S270GP', 'S270GP', 'min. S355GP', 'S355GP'];
 

@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import type { Client, SaleOffer, SaleOfferItem, SaleProfile, SaleOfferLockItem } from '../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
 import ClientSearchInput from '../ClientSearchInput';
+import { SALES_REPS } from '../../lib/constants';
 
 interface Warehouse { id: string; name: string; }
 interface SalePrice { warehouse_id: string; profile_name: string; steel_grade: string; price_eur_t: number | null; }
@@ -20,13 +21,6 @@ interface EditableLockItem {
 }
 
 // ─── Stałe ───────────────────────────────────────────────────────────────────
-
-const SALES_REPS = [
-  { name: 'Szymon Sobczak',    phone: '579 376 107' },
-  { name: 'Mateusz Cieślicki', phone: '579 141 243' },
-  { name: 'Marzena Sobczak',   phone: '579 241 508' },
-  { name: 'Piotr Domański',    phone: '729 393 743' },
-];
 
 const WAREHOUSE_DELIVERY_OPTIONS = [
   'do 3 dni roboczych',

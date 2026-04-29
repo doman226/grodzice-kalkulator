@@ -3,15 +3,9 @@ import { supabase } from '../lib/supabase';
 import type { Offer, Profile, RentalPrices, Client, OfferItem } from '../types';
 import { calculateRentalCost, formatPLN, formatEUR, formatNumber } from '../lib/calculations';
 import ClientSearchInput from './ClientSearchInput';
+import { SALES_REPS } from '../lib/constants';
 
 interface NBPRate { rate: number; date: string; }
-
-const SALES_REPS = [
-  { name: 'Szymon Sobczak', phone: '579 376 107' },
-  { name: 'Mateusz Cieślicki', phone: '579 141 243' },
-  { name: 'Marzena Sobczak', phone: '579 241 508' },
-  { name: 'Piotr Domański', phone: '729 393 743' },
-];
 
 const STEEL_GRADES = ['min. S270GP', 'S270GP', 'min. S355GP', 'S355GP'];
 
@@ -302,7 +296,7 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
     });
 
     const { data: rpcItems, error: rpcErr } = await supabase
-      .rpc('update_offer_items_atomic', {
+      .rpc('update_offer_items_atomic_v2', {
         p_offer_id: offer.id,
         p_items: newItems,
       });
