@@ -393,6 +393,8 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
 
   // Jednostka waluty w cenniku szkód
   const dmgUnit = isEUR ? 'EUR' : (lang === 'en' ? 'PLN' : 'zł');
+  // Konwersja PLN → waluta oferty dla cen szkód (przechowywane kanonicznie w PLN)
+  const toDmg = (pln: number) => isEUR ? Math.round(pln / exRate) : pln;
 
   const headerUrl = `${window.location.origin}/header-logo.png`;
   const footerUrl = `${window.location.origin}/footer-logo.png`;
@@ -663,19 +665,19 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
         </View>
 
         <Text style={s.paragraph}>{t.para1}</Text>
-        <Text style={s.paragraph}>{t.para2(offer.loss_price_pln ?? 3950, dmgUnit)}</Text>
+        <Text style={s.paragraph}>{t.para2(toDmg(offer.loss_price_pln ?? 3950), dmgUnit)}</Text>
         <Text style={s.paragraph}>{t.para3}</Text>
         <Text style={s.paragraph}>{t.para4}</Text>
 
         {/* ── CENNIK SZKÓD ── */}
         <Text style={s.sectionTitle}>{t.sectionDamages}</Text>
         <View style={s.cennikBox}>
-          <Text style={s.cennikItem}>{t.damage1(offer.loss_price_pln ?? 3950, dmgUnit)}</Text>
-          <Text style={s.cennikItem}>{t.damage2(offer.sorting_price_pln ?? 99, dmgUnit)}</Text>
-          <Text style={s.cennikItem}>{t.damage3(offer.grinding_price_pln ?? 250, dmgUnit)}</Text>
-          <Text style={s.cennikItem}>{t.damage4(offer.welding_price_pln ?? 250, dmgUnit)}</Text>
-          <Text style={s.cennikItem}>{t.damage5(offer.cutting_price_pln ?? 59, dmgUnit)}</Text>
-          <Text style={[s.cennikItem, { marginBottom: 0 }]}>{t.damage6(offer.repair_price_pln ?? 250, dmgUnit)}</Text>
+          <Text style={s.cennikItem}>{t.damage1(toDmg(offer.loss_price_pln ?? 3950), dmgUnit)}</Text>
+          <Text style={s.cennikItem}>{t.damage2(toDmg(offer.sorting_price_pln ?? 99), dmgUnit)}</Text>
+          <Text style={s.cennikItem}>{t.damage3(toDmg(offer.grinding_price_pln ?? 250), dmgUnit)}</Text>
+          <Text style={s.cennikItem}>{t.damage4(toDmg(offer.welding_price_pln ?? 250), dmgUnit)}</Text>
+          <Text style={s.cennikItem}>{t.damage5(toDmg(offer.cutting_price_pln ?? 59), dmgUnit)}</Text>
+          <Text style={[s.cennikItem, { marginBottom: 0 }]}>{t.damage6(toDmg(offer.repair_price_pln ?? 250), dmgUnit)}</Text>
         </View>
 
         {/* ── TERMIN DOSTAWY ── */}
