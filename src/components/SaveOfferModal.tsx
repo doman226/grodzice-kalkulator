@@ -169,14 +169,16 @@ export default function SaveOfferModal({
       price_per_week_1: prices.price_per_week_1,
       price_per_week_2: prices.price_per_week_2,
       threshold_weeks: prices.threshold_weeks,
-      // Ceny szkód — global prices.* zawsze PLN; konwertuj do waluty oferty
-      // aby były spójne z EditOfferModal (wyświetla/zapisuje w walucie oferty).
-      loss_price_pln: currency === 'EUR' ? Math.round(prices.loss_price_pln / exchangeRate) : prices.loss_price_pln,
-      sorting_price_pln: currency === 'EUR' ? Math.round(prices.sorting_price_pln / exchangeRate) : prices.sorting_price_pln,
-      grinding_price_pln: currency === 'EUR' ? Math.round(prices.grinding_price_pln / exchangeRate) : prices.grinding_price_pln,
-      welding_price_pln: currency === 'EUR' ? Math.round(prices.welding_price_pln / exchangeRate) : prices.welding_price_pln,
-      cutting_price_pln: currency === 'EUR' ? Math.round(prices.cutting_price_pln / exchangeRate) : prices.cutting_price_pln,
-      repair_price_pln: currency === 'EUR' ? Math.round(prices.repair_price_pln / exchangeRate) : prices.repair_price_pln,
+      // Ceny szkód — `prices.*_price_pln` przyjmujemy w walucie oferty:
+      // Calculator.handleCurrencyChange konwertuje stan damage przy przelaczeniu
+      // PLN<->EUR i przekazuje juz-przeliczone wartosci w `effectivePricesForOffer`.
+      // Dlatego tu zapisujemy 1:1 bez konwersji (inaczej double-conversion -> /4.25 ponownie).
+      loss_price_pln: prices.loss_price_pln,
+      sorting_price_pln: prices.sorting_price_pln,
+      grinding_price_pln: prices.grinding_price_pln,
+      welding_price_pln: prices.welding_price_pln,
+      cutting_price_pln: prices.cutting_price_pln,
+      repair_price_pln: prices.repair_price_pln,
       notes: notes.trim() || null,
       valid_days: validDays,
       payment_days: paymentDays,
