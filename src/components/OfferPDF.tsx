@@ -392,8 +392,9 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
 
   // Jednostka waluty w cenniku szkód
   const dmgUnit = isEUR ? 'EUR' : (lang === 'en' ? 'PLN' : 'zł');
-  // Konwersja PLN → waluta oferty dla cen szkód (przechowywane kanonicznie w PLN)
-  const toDmg = (pln: number) => isEUR ? Math.round(pln / exRate) : pln;
+  // Ceny szkód przechowywane w walucie oferty (mimo nazwy _pln dla ofert EUR = EUR).
+  // EditOfferModal wyświetla i zapisuje w walucie oferty — brak dodatkowej konwersji.
+  const toDmg = (v: number) => v;
 
   const headerUrl = `${window.location.origin}/header-logo.png`;
   const footerUrl = `${window.location.origin}/footer-logo.png`;
