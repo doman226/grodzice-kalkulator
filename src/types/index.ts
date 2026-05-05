@@ -1,7 +1,7 @@
 export interface Profile {
   id: string;
   name: string;
-  type: 'VL' | 'GU';
+  type: string;
   width_mm: number;
   weight_kg_per_m: number;
   wall_kg_per_m2: number;

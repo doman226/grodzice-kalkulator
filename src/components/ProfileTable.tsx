@@ -15,7 +15,8 @@ interface EditingCell {
 
 interface NewProfileForm {
   name: string;
-  type: 'VL' | 'GU';
+  type: string;        // 'VL' | 'GU' | '__custom__'
+  customType: string;  // wartość gdy type === '__custom__'
   width_mm: string;
   weight_kg_per_m: string;
   wall_kg_per_m2: string;
@@ -24,6 +25,7 @@ interface NewProfileForm {
 const EMPTY_FORM: NewProfileForm = {
   name: '',
   type: 'VL',
+  customType: '',
   width_mm: '600',
   weight_kg_per_m: '',
   wall_kg_per_m2: '',
@@ -34,6 +36,7 @@ export default function ProfileTable({ profiles, onProfilesChange }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [newForm, setNewForm] = useState<NewProfileForm>(EMPTY_FORM);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -100,8 +103,24 @@ export default function ProfileTable({ profiles, onProfilesChange }: Props) {
     }
   }
 
+  function openEdit(profile: Profile) {
+    const isCustom = profile.type !== 'VL' && profile.type !== 'GU';
+    setEditingProfile(profile);
+    setNewForm({
+      name: profile.name,
+      type: isCustom ? '__custom__' : profile.type,
+      customType: isCustom ? profile.type : '',
+      width_mm: String(profile.width_mm),
+      weight_kg_per_m: String(profile.weight_kg_per_m),
+      wall_kg_per_m2: String(profile.wall_kg_per_m2),
+    });
+    setShowModal(true);
+  }
+
   async function handleAdd() {
+    const effType = newForm.type === '__custom__' ? newForm.customType.trim() : newForm.type;
     if (!newForm.name.trim()) return showToast('Podaj nazwę profilu.', 'error');
+    if (!effType) return showToast('Podaj typ profilu.', 'error');
     const w = parseFloat(newForm.width_mm);
     const wt = parseFloat(newForm.weight_kg_per_m);
     const wa = parseFloat(newForm.wall_kg_per_m2);
@@ -112,7 +131,7 @@ export default function ProfileTable({ profiles, onProfilesChange }: Props) {
       .from('profiles')
       .insert({
         name: newForm.name.trim(),
-        type: newForm.type,
+        type: effType,
         width_mm: w,
         weight_kg_per_m: wt,
         wall_kg_per_m2: wa,
@@ -129,6 +148,57 @@ export default function ProfileTable({ profiles, onProfilesChange }: Props) {
       setShowModal(false);
       setNewForm(EMPTY_FORM);
       showToast('Profil dodany.');
+    }
+  }
+
+  async function handleEditSave() {
+    if (!editingProfile) return;
+    const effType = newForm.type === '__custom__' ? newForm.customType.trim() : newForm.type;
+    if (!newForm.name.trim()) return showToast('Podaj nazwę profilu.', 'error');
+    if (!effType) return showToast('Podaj typ profilu.', 'error');
+    const w = parseFloat(newForm.width_mm);
+    const wt = parseFloat(newForm.weight_kg_per_m);
+    const wa = parseFloat(newForm.wall_kg_per_m2);
+    if (isNaN(w) || isNaN(wt) || isNaN(wa)) return showToast('Uzupełnij wszystkie pola liczbowe.', 'error');
+
+    const updated: Profile = {
+      ...editingProfile,
+      name: newForm.name.trim(),
+      type: effType,
+      width_mm: w,
+      weight_kg_per_m: wt,
+      wall_kg_per_m2: wa,
+    };
+
+    // Optimistic update
+    const snapshot = profiles.slice();
+    onProfilesChange(
+      profiles.map(p => p.id === editingProfile.id ? updated : p)
+        .sort((a, b) => a.name.localeCompare(b.name))
+    );
+    setShowModal(false);
+    setEditingProfile(null);
+    setNewForm(EMPTY_FORM);
+
+    setSaving(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        name: updated.name,
+        type: updated.type,
+        width_mm: updated.width_mm,
+        weight_kg_per_m: updated.weight_kg_per_m,
+        wall_kg_per_m2: updated.wall_kg_per_m2,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', editingProfile.id);
+    setSaving(false);
+
+    if (error) {
+      onProfilesChange(snapshot);
+      showToast('Błąd podczas zapisywania: ' + error.message, 'error');
+    } else {
+      showToast('Profil zaktualizowany.');
     }
   }
 
@@ -207,7 +277,9 @@ export default function ProfileTable({ profiles, onProfilesChange }: Props) {
                   <td className="px-4 py-3 font-medium text-gray-800">{profile.name}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
-                      profile.type === 'VL' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                      profile.type === 'VL' ? 'bg-blue-100 text-blue-700'
+                      : profile.type === 'GU' ? 'bg-orange-100 text-orange-700'
+                      : 'bg-gray-100 text-gray-600'
                     }`}>
                       {profile.type}
                     </span>
@@ -233,12 +305,20 @@ export default function ProfileTable({ profiles, onProfilesChange }: Props) {
                         </button>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => setDeleteId(profile.id)}
-                        className="text-red-500 hover:text-red-700 text-xs font-medium px-2 py-1 rounded hover:bg-red-50"
-                      >
-                        Usuń
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => openEdit(profile)}
+                          className="text-blue-600 hover:text-blue-800 text-xs font-medium px-2 py-1 rounded hover:bg-blue-50"
+                        >
+                          Edytuj
+                        </button>
+                        <button
+                          onClick={() => setDeleteId(profile.id)}
+                          className="text-red-500 hover:text-red-700 text-xs font-medium px-2 py-1 rounded hover:bg-red-50"
+                        >
+                          Usuń
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -248,11 +328,13 @@ export default function ProfileTable({ profiles, onProfilesChange }: Props) {
         </div>
       </div>
 
-      {/* Modal dodawania profilu */}
+      {/* Modal dodawania / edycji profilu */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-5">Nowy profil grodzicy</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-5">
+              {editingProfile ? `Edytuj profil: ${editingProfile.name}` : 'Nowy profil grodzicy'}
+            </h3>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -269,12 +351,23 @@ export default function ProfileTable({ profiles, onProfilesChange }: Props) {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Typ</label>
                   <select
                     value={newForm.type}
-                    onChange={(e) => setNewForm({ ...newForm, type: e.target.value as 'VL' | 'GU' })}
+                    onChange={(e) => setNewForm({ ...newForm, type: e.target.value, customType: '' })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   >
                     <option value="VL">VL (Vitkovice)</option>
                     <option value="GU">GU (ArcelorMittal)</option>
+                    <option value="__custom__">Inny (wpisz ręcznie)</option>
                   </select>
+                  {newForm.type === '__custom__' && (
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="np. HZ, Z, IU, PU..."
+                      value={newForm.customType}
+                      onChange={(e) => setNewForm({ ...newForm, customType: e.target.value })}
+                      className="w-full mt-2 border border-blue-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  )}
                 </div>
               </div>
               <div>
@@ -311,17 +404,17 @@ export default function ProfileTable({ profiles, onProfilesChange }: Props) {
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button
-                onClick={() => { setShowModal(false); setNewForm(EMPTY_FORM); }}
+                onClick={() => { setShowModal(false); setEditingProfile(null); setNewForm(EMPTY_FORM); }}
                 className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
               >
                 Anuluj
               </button>
               <button
-                onClick={handleAdd}
+                onClick={editingProfile ? handleEditSave : handleAdd}
                 disabled={saving}
                 className="px-4 py-2 text-sm text-white bg-blue-900 rounded-lg hover:bg-blue-800 disabled:opacity-50"
               >
-                {saving ? 'Zapisywanie...' : 'Dodaj profil'}
+                {saving ? 'Zapisywanie...' : editingProfile ? 'Zapisz zmiany' : 'Dodaj profil'}
               </button>
             </div>
           </div>
