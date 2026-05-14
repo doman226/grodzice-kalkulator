@@ -967,12 +967,12 @@ export interface PipeSalePdfStrings {
   greeting:        string;
   intro:           string;
 
-  // Items table — 9 kolumn
+  // Items table — 9 kolumn (Specyfikacja, Norma, Gatunek, Ilość, L, kg/m, Masa, Cena/t, Wartość)
   thSpec:          string;   // Specyfikacja (Ø×t + typ produktu)
   thNorm:          string;   // Norma
   thSteelGrade:    string;   // Gatunek
-  thSurface:       string;   // Powierzchnia
-  thQtyLength:     string;   // Ilość × dł.
+  thQty:           string;   // Ilość [szt.]
+  thLengthM:       string;   // L = [m]
   thKgPerM:        string;   // kg/m
   thMass:          string;   // Masa [t]
   thPricePerT:     string;   // Cena [waluta/t]
@@ -1060,14 +1060,14 @@ const pipeSale_pl: PipeSalePdfStrings = {
   customerLabel:'Klient:',
   vatLabel:     country => country === 'PL' ? 'NIP:' : 'VAT:',
 
-  greeting: 'Szanowni Państwo,',
-  intro:    'dziękujemy za zapytanie ofertowe. Poniżej przedstawiamy ofertę sprzedaży rur stalowych zgodnie z Ogólnymi Warunkami Sprzedaży i Płatności Intra B.V.',
+  greeting: 'Dzień dobry,',
+  intro:    'W nawiązaniu do przesłanego zapytania oraz naszych Ogólnych Warunków Sprzedaży i Płatności, oferujemy sprzedaż rur stalowych na poniższych warunkach:',
 
   thSpec:       'Specyfikacja',
   thNorm:       'Norma',
   thSteelGrade: 'Gatunek',
-  thSurface:    'Powierzchnia',
-  thQtyLength:  'Ilość × dł.',
+  thQty:        'Ilość [szt.]',
+  thLengthM:    'L = [m]',
   thKgPerM:     'kg/m',
   thMass:       'Masa [t]',
   thPricePerT:  'Cena [waluta/t]',
@@ -1098,8 +1098,8 @@ const pipeSale_pl: PipeSalePdfStrings = {
   sectionDeliveryTime:   'Termin dostawy',
   sectionDeliveryTerms:  'Warunki dostawy (Incoterms 2020)',
   sectionTechnical:      'Warunki techniczne',
-  sectionCommercial:     'Warunki handlowe',
-  sectionValidity:       'Ważność oferty',
+  sectionCommercial:     'Warunki handlowe:',
+  sectionValidity:       'Ważność oferty:',
 
   deliveryFromMill: (weeks, deliveryWeeks) =>
     deliveryWeeks
@@ -1124,12 +1124,13 @@ const pipeSale_pl: PipeSalePdfStrings = {
   techCurrencyEUR:    'Waluta: stawki w EUR. Płatność w EUR lub w PLN po przeliczeniu wg kursu NBP z dnia wystawienia faktury.',
   techCurrencyPLN:    (rate, date) => `Waluta: stawki w PLN. Kurs referencyjny EUR/PLN: ${rate.toFixed(4)} (NBP ${date}).`,
 
-  paymentPrepaid: 'Płatność przed odbiorem (z góry).',
-  paymentCredit:  days => `Termin płatności: ${days} dni od daty wystawienia faktury, przelewem na rachunek bankowy.`,
+  paymentPrepaid: 'przedpłata 100%.',
+  paymentCredit:  days =>
+    `${days} dni od daty wystawienia faktury, z zastrzeżeniem uzyskania zabezpieczenia wartości zamówienia (Limit kupiecki, gwarancja bankowa, gwarancja płatności publicznego inwestora lub inne zabezpieczenie zaakceptowane przez Intra BV).`,
 
-  validityLine1:  label => `Oferta ważna ${label} od daty wystawienia.`,
-  validityLine2:  'Po upływie terminu ceny mogą ulec zmianie. Oferta nie rezerwuje dostępności magazynowej.',
-  validityLabel:  days => days === 1 ? '1 dzień' : days < 5 ? `${days} dni` : `${days} dni`,
+  validityLine1:  label => `- Oferta ważna ${label} od daty wysłania i wymaga finalnego potwierdzenia.`,
+  validityLine2:  '- Oferta nie rezerwuje dostępności magazynowych oraz możliwości produkcyjnych.',
+  validityLabel:  days  => days === 1 ? '24h' : `${days} dni`,
 
   notesLabel: 'Uwagi',
 };
@@ -1150,13 +1151,13 @@ const pipeSale_en: PipeSalePdfStrings = {
   vatLabel:     country => country === 'PL' ? 'NIP:' : 'VAT:',
 
   greeting: 'Dear Sir or Madam,',
-  intro:    'thank you for your enquiry. Below please find our offer for the sale of steel pipes in accordance with the General Terms and Conditions of Sale and Payment of Intra B.V.',
+  intro:    'With reference to your enquiry and our General Terms and Conditions of Sale and Payment, we are pleased to offer steel pipes on the following terms:',
 
   thSpec:       'Specification',
   thNorm:       'Standard',
   thSteelGrade: 'Steel grade',
-  thSurface:    'Surface',
-  thQtyLength:  'Qty × length',
+  thQty:        'Qty [pcs]',
+  thLengthM:    'L = [m]',
   thKgPerM:     'kg/m',
   thMass:       'Mass [t]',
   thPricePerT:  'Price [currency/t]',
@@ -1187,8 +1188,8 @@ const pipeSale_en: PipeSalePdfStrings = {
   sectionDeliveryTime:   'Delivery time',
   sectionDeliveryTerms:  'Delivery terms (Incoterms 2020)',
   sectionTechnical:      'Technical conditions',
-  sectionCommercial:     'Commercial terms',
-  sectionValidity:       'Offer validity',
+  sectionCommercial:     'Commercial terms:',
+  sectionValidity:       'Validity of offer:',
 
   deliveryFromMill: (weeks, deliveryWeeks) =>
     deliveryWeeks
@@ -1213,12 +1214,13 @@ const pipeSale_en: PipeSalePdfStrings = {
   techCurrencyEUR:    'Currency: rates in EUR. Payment in EUR or PLN converted at NBP rate from the invoice date.',
   techCurrencyPLN:    (rate, date) => `Currency: rates in PLN. Reference exchange rate EUR/PLN: ${rate.toFixed(4)} (NBP ${date}).`,
 
-  paymentPrepaid: 'Payment in advance (before collection).',
-  paymentCredit:  days => `Payment term: ${days} days from invoice date, by bank transfer.`,
+  paymentPrepaid: '100% prepayment.',
+  paymentCredit:  days =>
+    `${days} days from invoice date, subject to obtaining security for the order value (Credit limit, bank guarantee, payment guarantee from a public investor, or other security accepted by Intra B.V.).`,
 
-  validityLine1:  label => `Offer valid ${label} from the date of issue.`,
-  validityLine2:  'After the validity period prices may change. The offer does not reserve stock availability.',
-  validityLabel:  days => days === 1 ? '1 day' : `${days} days`,
+  validityLine1:  label => `- This quotation is valid for ${label} from the date of issue and requires final confirmation.`,
+  validityLine2:  '- This quotation does not reserve stock availability or production capacity.',
+  validityLabel:  days  => days === 1 ? '24 hours' : `${days} days`,
 
   notesLabel: 'Notes',
 };

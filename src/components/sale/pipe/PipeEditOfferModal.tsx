@@ -13,6 +13,8 @@ import {
   PIPE_SURFACES,
   isCertifiedCondition,
   pipeKgPerM,
+  NO_CERT_STEEL_GRADE,
+  PIPE_WAREHOUSES,
 } from '../../../lib/pipeConstants';
 import type {
   PipeProductType,
@@ -154,7 +156,12 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose }:
   const [deliveryPaidBy, setDeliveryPaidBy] = useState<'dap_included' | 'dap_extra' | 'fca'>(
     (offer.delivery_paid_by as 'dap_included' | 'dap_extra' | 'fca') ?? 'dap_included'
   );
-  const [deliveryFrom, setDeliveryFrom] = useState(offer.delivery_from ?? 'Magazyn dostawcy');
+  // Magazyn wysyłki — fallback do pierwszego gdy stara oferta ma wartość spoza listy
+  const [deliveryFrom, setDeliveryFrom] = useState<string>(
+    offer.delivery_from && (PIPE_WAREHOUSES as readonly string[]).includes(offer.delivery_from)
+      ? offer.delivery_from
+      : PIPE_WAREHOUSES[0]
+  );
   const [deliveryTo, setDeliveryTo]     = useState(offer.delivery_to ?? '');
 
   // ── Warunki dostawy ──
@@ -204,6 +211,16 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose }:
         const allowed = PIPE_NORM_GRADES[updated.norm];
         if (!allowed.includes(updated.steelGrade)) {
           updated.steelGrade = allowed[0];
+        }
+      }
+      // Zmiana stanu materiału:
+      //   bez atestu → norma "nie dotyczy" (select zablokowany), gatunek → min. S235JRH
+      //   powrót do z atestem → gatunek prawidłowy (reset jeśli był min. S235JRH)
+      if ('condition' in patch) {
+        if (!isCertifiedCondition(updated.condition)) {
+          updated.steelGrade = NO_CERT_STEEL_GRADE;
+        } else if (!PIPE_NORM_GRADES[updated.norm].includes(updated.steelGrade)) {
+          updated.steelGrade = PIPE_NORM_GRADES[updated.norm][0];
         }
       }
       return updated;
@@ -539,18 +556,30 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose }:
                         </select>
                       </Field>
                       <Field label="Norma">
-                        <select value={item.norm}
-                          onChange={e => updateItem(item.uid, { norm: e.target.value as PipeNorm })}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white">
-                          {PIPE_NORMS.map(n => <option key={n} value={n}>{n}</option>)}
-                        </select>
+                        {certified ? (
+                          <select value={item.norm}
+                            onChange={e => updateItem(item.uid, { norm: e.target.value as PipeNorm })}
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white">
+                            {PIPE_NORMS.map(n => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                        ) : (
+                          <div className="w-full px-2 py-1.5 rounded text-sm border bg-gray-100 border-gray-300 text-gray-400 italic">
+                            nie dotyczy
+                          </div>
+                        )}
                       </Field>
                       <Field label="Gatunek stali">
-                        <select value={item.steelGrade}
-                          onChange={e => updateItem(item.uid, { steelGrade: e.target.value })}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white">
-                          {allowedGrades.map(g => <option key={g} value={g}>{g}</option>)}
-                        </select>
+                        {certified ? (
+                          <select value={item.steelGrade}
+                            onChange={e => updateItem(item.uid, { steelGrade: e.target.value })}
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white">
+                            {allowedGrades.map(g => <option key={g} value={g}>{g}</option>)}
+                          </select>
+                        ) : (
+                          <div className="w-full px-2 py-1.5 rounded text-sm border bg-gray-100 border-gray-300 text-gray-500">
+                            {NO_CERT_STEEL_GRADE}
+                          </div>
+                        )}
                       </Field>
                       <Field label="Opis normy produkcyjnej">
                         <div className={`px-2 py-1.5 rounded text-sm border ${
@@ -666,9 +695,11 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose }:
                     onChange={e => setDeliveryCostPerTruck(parseFloat(e.target.value) || '')}
                     className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
                 </Field>
-                <Field label="Skąd">
-                  <input type="text" value={deliveryFrom} onChange={e => setDeliveryFrom(e.target.value)}
-                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                <Field label="Magazyn wysyłki">
+                  <select value={deliveryFrom} onChange={e => setDeliveryFrom(e.target.value)}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white">
+                    {PIPE_WAREHOUSES.map(w => <option key={w} value={w}>{w}</option>)}
+                  </select>
                 </Field>
                 <Field label="Dokąd">
                   <input type="text" value={deliveryTo} onChange={e => setDeliveryTo(e.target.value)}
@@ -678,8 +709,10 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose }:
             )}
             {deliveryPaidBy === 'fca' && (
               <Field label="Magazyn odbioru (FCA)">
-                <input type="text" value={deliveryFrom} onChange={e => setDeliveryFrom(e.target.value)}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                <select value={deliveryFrom} onChange={e => setDeliveryFrom(e.target.value)}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white">
+                  {PIPE_WAREHOUSES.map(w => <option key={w} value={w}>{w}</option>)}
+                </select>
               </Field>
             )}
             {deliveryCalc && deliveryCalc.costPerTruck > 0 && deliveryPaidBy !== 'fca' && (

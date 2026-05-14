@@ -77,6 +77,83 @@ export function isCertifiedCondition(condition: PipeCondition): boolean {
   return !condition.toLowerCase().includes('bez atestu');
 }
 
+// Gatunek stali dla rur bez atestu — nie da się zagwarantować dokładnego
+// gatunku, więc deklarujemy minimum gwarantowane (konwencja branżowa).
+// Gdy stan = "bez atestu": norma → "nie dotyczy", gatunek → ta stała.
+export const NO_CERT_STEEL_GRADE = 'min. S235JRH';
+
+// Magazyny Intra — lista do wyboru w sekcji dostawy ("Skąd"/"Odbiór z").
+// Format "Miasto, Kraj" — przechowywane w delivery_from jako jeden string.
+export const PIPE_WAREHOUSES = [
+  'Lanaken, Belgia',
+  'Maurik, Holandia',
+  'Oleśnica, Polska',
+] as const;
+export type PipeWarehouse = typeof PIPE_WAREHOUSES[number];
+
+export const PIPE_WAREHOUSES_EN: Record<PipeWarehouse, string> = {
+  'Lanaken, Belgia':  'Lanaken, Belgium',
+  'Maurik, Holandia': 'Maurik, Netherlands',
+  'Oleśnica, Polska': 'Oleśnica, Poland',
+};
+
+// ─── Tłumaczenia PL → EN dla PDF (atrybuty zapisane w bazie jako PL) ──────────
+// Wartości pól w pipe_sale_offer_items to polskie snapshoty z momentu zapisu.
+// PDF w wersji EN tłumaczy je przez te mapy. Kody norm (EN10219-1/2 itd.)
+// są międzynarodowe — NIE tłumaczymy ich.
+
+export const PIPE_PRODUCT_TYPES_EN: Record<PipeProductType, string> = {
+  'Rury stalowe ze szwem spiralnym': 'Spiral-welded steel pipes',
+  'Rury stalowe ze szwem wzdłużnym': 'Longitudinally welded steel pipes',
+  'Rury stalowe ze szwem':           'Welded steel pipes',
+  'Rury stalowe bezszwowe':          'Seamless steel pipes',
+};
+
+export const PIPE_CONDITIONS_EN: Record<PipeCondition, string> = {
+  'Nowe, z atestem 3.1/EN10204':                'New, with 3.1/EN10204 certificate',
+  'Nowe, z atestem 3.2/EN10204':                'New, with 3.2/EN10204 certificate',
+  '2 gatunek, bez atestu 3.1/EN10204':          '2nd grade, without 3.1/EN10204 certificate',
+  'surplus/2 gatunek, bez atestu 3.1/EN10204':  'surplus / 2nd grade, without 3.1/EN10204 certificate',
+  'surplus, bez atestu 3.1/EN10204':            'surplus, without 3.1/EN10204 certificate',
+};
+
+export const PIPE_NORM_DESCRIPTIONS_EN: Record<PipeNorm, string> = {
+  'EN10219-1/2': 'Welded steel pipes from structural steel',
+  'EN10217-1':   'Welded steel pipes for pressure purposes',
+  'EN10217-2':   'Welded steel pipes for pressure purposes at elevated temperature',
+  'EN10217-5':   'Welded steel pipes for pressure purposes at elevated temperature',
+  'EN10210-1/2': 'Seamless or welded steel pipes from structural steel',
+  'EN10216-1':   'Seamless steel pipes for pressure purposes',
+  'EN10216-2':   'Seamless steel pipes for pressure purposes at elevated temperature',
+};
+
+export const PIPE_SURFACES_EN: Record<PipeSurface, string> = {
+  'czarna, bez zabezpieczenia':                                            'black, no coating',
+  'trójwarstwowa izolacja polietylenowa 3LPE':                             'three-layer polyethylene coating 3LPE',
+  'trójwarstwowa izolacja polipropylenowa 3LPP':                           'three-layer polypropylene coating 3LPP',
+  'jednowarstwowa izolacja epoksydowa FBE':                                'single-layer epoxy coating FBE',
+  'izolacje bitumiczne: ZO-1, ZO-2, ZO-3, ZM, WM, WW':                     'bituminous coatings: ZO-1, ZO-2, ZO-3, ZM, WM, WW',
+  'zewnętrzna izolacja na rurach 3LPE, 3LHDPE, 3LPP, EP':                  'external coating: 3LPE, 3LHDPE, 3LPP, EP',
+  'zewnętrzne powłoki antykorozyjne SYNERGY klasa izolacji A50, B50, C50': 'external anti-corrosion SYNERGY coatings, insulation class A50, B50, C50',
+  'poliuretanowe izolacje wewnętrzne oraz zewnętrzne na rurach PROTEC':    'internal and external polyurethane PROTEC coatings',
+  'wewnętrzne powłoki malarskie epoksydowe i poliuretanowe':               'internal epoxy and polyurethane paint coatings',
+  'wewnętrzna powłoka cementowa na rurach':                                'internal cement-mortar lining',
+  'malowanie zewnętrznych oraz wewnętrznych powierzchni rur':              'external and internal surface painting',
+  'cynkowanie ogniowe':                                                    'hot-dip galvanizing',
+  'cynkowanie proszkowe':                                                  'powder galvanizing',
+};
+
+// Tłumaczy atrybut rury PL → EN. Gdy lang='pl' zwraca oryginał;
+// gdy 'en' i jest tłumaczenie — zwraca EN; fallback: oryginał (legacy/custom).
+export function translatePipeAttr(
+  value: string,
+  map: Record<string, string>,
+  lang: 'pl' | 'en',
+): string {
+  if (lang === 'pl') return value;
+  return map[value] ?? value;
+}
+
 // Współczynnik wzoru na masę 1 mb rury walcowej.
 // kg/m = (D − t) × t × 0,02466
 // Test kontrolny: Ø168,3 × 6,3 → (168,3 − 6,3) × 6,3 × 0,02466 = 25,168 kg/m

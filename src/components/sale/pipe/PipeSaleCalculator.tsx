@@ -14,6 +14,8 @@ import {
   PIPE_SURFACES,
   isCertifiedCondition,
   pipeKgPerM,
+  NO_CERT_STEEL_GRADE,
+  PIPE_WAREHOUSES,
 } from '../../../lib/pipeConstants';
 import type {
   PipeProductType,
@@ -112,7 +114,7 @@ export default function PipeSaleCalculator({ clients, onClientAdded, onOfferSave
   const [deliveryCostPerTruck, setDeliveryCostPerTruck] = useState<number | ''>('');
   const [customDeliveryTrucks, setCustomDeliveryTrucks] = useState<number | ''>('');
   const [deliveryPaidBy, setDeliveryPaidBy]             = useState<'dap_included' | 'dap_extra' | 'fca'>('dap_included');
-  const [deliveryFrom, setDeliveryFrom]                 = useState('Magazyn dostawcy');
+  const [deliveryFrom, setDeliveryFrom]                 = useState<string>(PIPE_WAREHOUSES[0]);
   const [deliveryTo, setDeliveryTo]                     = useState('');
 
   useEffect(() => { loadNBP(); }, []);
@@ -189,6 +191,16 @@ export default function PipeSaleCalculator({ clients, onClientAdded, onOfferSave
         const allowed = PIPE_NORM_GRADES[updated.norm];
         if (!allowed.includes(updated.steelGrade)) {
           updated.steelGrade = allowed[0];
+        }
+      }
+      // Zmiana stanu materiału:
+      //   bez atestu → norma "nie dotyczy" (select zablokowany), gatunek → min. S235JRH
+      //   powrót do z atestem → gatunek prawidłowy (reset jeśli był min. S235JRH)
+      if ('condition' in patch) {
+        if (!isCertifiedCondition(updated.condition)) {
+          updated.steelGrade = NO_CERT_STEEL_GRADE;
+        } else if (!PIPE_NORM_GRADES[updated.norm].includes(updated.steelGrade)) {
+          updated.steelGrade = PIPE_NORM_GRADES[updated.norm][0];
         }
       }
       return updated;
@@ -482,23 +494,37 @@ export default function PipeSaleCalculator({ clients, onClientAdded, onOfferSave
                   </Field>
 
                   <Field label="Norma">
-                    <select
-                      value={item.norm}
-                      onChange={e => updateItem(item.uid, { norm: e.target.value as PipeNorm })}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {PIPE_NORMS.map(n => <option key={n} value={n}>{n}</option>)}
-                    </select>
+                    {certified ? (
+                      <select
+                        value={item.norm}
+                        onChange={e => updateItem(item.uid, { norm: e.target.value as PipeNorm })}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {PIPE_NORMS.map(n => <option key={n} value={n}>{n}</option>)}
+                      </select>
+                    ) : (
+                      // Bez atestu → norma nie obowiązuje; select zablokowany
+                      <div className="w-full px-2 py-1.5 rounded-lg text-sm border bg-gray-100 border-gray-300 text-gray-400 italic">
+                        nie dotyczy
+                      </div>
+                    )}
                   </Field>
 
                   <Field label="Gatunek stali">
-                    <select
-                      value={item.steelGrade}
-                      onChange={e => updateItem(item.uid, { steelGrade: e.target.value })}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {allowedGrades.map(g => <option key={g} value={g}>{g}</option>)}
-                    </select>
+                    {certified ? (
+                      <select
+                        value={item.steelGrade}
+                        onChange={e => updateItem(item.uid, { steelGrade: e.target.value })}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {allowedGrades.map(g => <option key={g} value={g}>{g}</option>)}
+                      </select>
+                    ) : (
+                      // Bez atestu → gatunek niegwarantowany; deklarujemy minimum
+                      <div className="w-full px-2 py-1.5 rounded-lg text-sm border bg-gray-100 border-gray-300 text-gray-500">
+                        {NO_CERT_STEEL_GRADE}
+                      </div>
+                    )}
                   </Field>
 
                   <Field label="Opis normy produkcyjnej">
@@ -725,13 +751,15 @@ export default function PipeSaleCalculator({ clients, onClientAdded, onOfferSave
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {deliveryPaidBy === 'fca' ? 'Odbiór z (magazyn)' : 'Skąd'}
+              {deliveryPaidBy === 'fca' ? 'Odbiór z magazynu' : 'Magazyn wysyłki'}
             </label>
-            <input
-              type="text" value={deliveryFrom}
+            <select
+              value={deliveryFrom}
               onChange={e => setDeliveryFrom(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {PIPE_WAREHOUSES.map(w => <option key={w} value={w}>{w}</option>)}
+            </select>
           </div>
           {deliveryPaidBy !== 'fca' && (
             <div>

@@ -3,7 +3,16 @@ import type { PipeSaleOffer, PipeSaleOfferItem } from '../../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../../lib/calculations';
 import { PIPE_SALE_PDF_STRINGS, type PdfLang } from '../../../lib/pdfStrings';
 import { SALES_REPS as SALES_REPS_LIST } from '../../../lib/constants';
-import { PIPE_NORM_DESCRIPTIONS, PIPE_NORMS } from '../../../lib/pipeConstants';
+import {
+  PIPE_NORM_DESCRIPTIONS,
+  PIPE_NORM_DESCRIPTIONS_EN,
+  PIPE_NORMS,
+  PIPE_PRODUCT_TYPES_EN,
+  PIPE_CONDITIONS_EN,
+  PIPE_SURFACES_EN,
+  PIPE_WAREHOUSES_EN,
+  translatePipeAttr,
+} from '../../../lib/pipeConstants';
 import type { PipeNorm } from '../../../lib/pipeConstants';
 
 // ─── Fonty (identyczne z SaleOfferPDF) ───────────────────────────────────────
@@ -267,27 +276,35 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
   const conditions = uniqueConditions(sortedItems);
   const noCert     = noItemHasCert(sortedItems);
 
+  // Słownik opisów norm zależny od języka (kody norm — międzynarodowe, nie tłumaczone)
+  const normDescMap = lang === 'en' ? PIPE_NORM_DESCRIPTIONS_EN : PIPE_NORM_DESCRIPTIONS;
+
+  // Magazyn wysyłki — tłumaczony PL→EN (np. "Lanaken, Belgia" → "Lanaken, Belgium")
+  const deliveryFromT = offer.delivery_from
+    ? translatePipeAttr(offer.delivery_from, PIPE_WAREHOUSES_EN, lang)
+    : '';
+
   // Norma — 3 warianty:
   function normLine(): string {
     if (noCert) return t.techNormNoCert;
     if (norms.length === 1) {
       const n = norms[0];
-      const desc = PIPE_NORMS.includes(n as PipeNorm) ? PIPE_NORM_DESCRIPTIONS[n as PipeNorm] : '';
+      const desc = PIPE_NORMS.includes(n as PipeNorm) ? normDescMap[n as PipeNorm] : '';
       return desc ? t.techNormSingle(n, desc) : `${n}.`;
     }
     return t.techNormMultiple(norms.join(', '));
   }
 
-  // Stan — 2 warianty:
-  //   jeden unique stan → pokaż konkretną wartość (np. "Nowe, z atestem 3.1/EN10204")
+  // Stan — 2 warianty (wartości w bazie są PL → tłumaczymy przy lang='en'):
+  //   jeden unique stan → pokaż konkretną wartość
   //   mieszane stany → "wg specyfikacji w tabeli" + ostrzeżenie o atestach
   const conditionLine = conditions.length === 1
-    ? t.techConditionSingle(conditions[0])
+    ? t.techConditionSingle(translatePipeAttr(conditions[0], PIPE_CONDITIONS_EN, lang))
     : t.techConditionMixed;
 
   // Powierzchnia — 2 warianty
   const surfaceLine = surfaces.length === 1
-    ? t.techSurfaceSingle(surfaces[0])
+    ? t.techSurfaceSingle(translatePipeAttr(surfaces[0], PIPE_SURFACES_EN, lang))
     : t.techSurfaceMixed;
 
   // Waluta
@@ -350,7 +367,7 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
         <Text style={s.greeting}>{t.greeting}</Text>
         {(() => {
           const OWH_URL = 'https://www.intrabv.com/wp-content/uploads/2026/01/IntraBV-Algemene-Voorwaarden-PL-2026.pdf';
-          const linkText = lang === 'pl' ? 'Ogólnymi Warunkami Sprzedaży i Płatności' : 'General Terms and Conditions of Sale and Payment';
+          const linkText = lang === 'pl' ? 'Ogólnych Warunków Sprzedaży i Płatności' : 'General Terms and Conditions of Sale and Payment';
           const [before, after] = t.intro.split(linkText);
           if (after == null) return <Text style={s.intro}>{t.intro}</Text>;
           return (
@@ -363,18 +380,20 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
         })()}
 
         {/* ── TABELA POZYCJI — 9 kolumn ── */}
+        {/* Powierzchnia usunieta z tabeli (jest w Warunkach technicznych).
+            Ilosc i dlugosc rozdzielone na osobne kolumny.                */}
         {hasItems && (
           <View style={s.table}>
             <View style={s.tableHeaderRow}>
-              <Text style={[s.thCell, { flex: 2.2 }]}>{t.thSpec}</Text>
-              <Text style={[s.thCell, { flex: 1.0 }]}>{t.thNorm}</Text>
-              <Text style={[s.thCell, { flex: 0.9 }]}>{t.thSteelGrade}</Text>
-              <Text style={[s.thCell, { flex: 1.4 }]}>{t.thSurface}</Text>
-              <Text style={[s.thCell, { flex: 0.9, textAlign: 'center' }]}>{t.thQtyLength}</Text>
-              <Text style={[s.thCell, { flex: 0.6, textAlign: 'right' }]}>{t.thKgPerM}</Text>
-              <Text style={[s.thCell, { flex: 0.7, textAlign: 'right' }]}>{t.thMass}</Text>
-              <Text style={[s.thCell, { flex: 1.0, textAlign: 'right' }]}>{t.thPricePerT}</Text>
-              <Text style={[s.thCell, { flex: 1.3, textAlign: 'right' }]}>{t.thValue}</Text>
+              <Text style={[s.thCell, { flex: 2.4 }]}>{t.thSpec}</Text>
+              <Text style={[s.thCell, { flex: 1.1 }]}>{t.thNorm}</Text>
+              <Text style={[s.thCell, { flex: 1.0 }]}>{t.thSteelGrade}</Text>
+              <Text style={[s.thCell, { flex: 0.7, textAlign: 'center' }]}>{t.thQty}</Text>
+              <Text style={[s.thCell, { flex: 0.8, textAlign: 'right' }]}>{t.thLengthM}</Text>
+              <Text style={[s.thCell, { flex: 0.7, textAlign: 'right' }]}>{t.thKgPerM}</Text>
+              <Text style={[s.thCell, { flex: 0.8, textAlign: 'right' }]}>{t.thMass}</Text>
+              <Text style={[s.thCell, { flex: 1.1, textAlign: 'right' }]}>{t.thPricePerT}</Text>
+              <Text style={[s.thCell, { flex: 1.4, textAlign: 'right' }]}>{t.thValue}</Text>
             </View>
 
             {sortedItems.map((item, idx) => {
@@ -384,40 +403,43 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
               const transportShare = totalMassT > 0 ? dapCost * massT / totalMassT : 0;
               const sellTotal      = (isEUR ? (item.sell_eur_total ?? 0) : (item.sell_pln_total ?? 0)) + transportShare;
               const effectivePriceT = massT > 0 ? sellTotal / massT : (item.sell_price_per_ton ?? 0);
+              // Tłumaczenie atrybutów PL→EN (w bazie zapisane po polsku)
+              const productTypeT = translatePipeAttr(item.product_type, PIPE_PRODUCT_TYPES_EN, lang);
+              const conditionT   = translatePipeAttr(item.condition, PIPE_CONDITIONS_EN, lang);
 
               return (
                 <View key={item.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
                   {/* Specyfikacja: 2 linie (produkt + stan) */}
-                  <View style={[s.tdLabel, { flex: 2.2 }]}>
+                  <View style={[s.tdLabel, { flex: 2.4 }]}>
                     <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.gray800, fontSize: 8 }}>
-                      {item.product_type} Ø{formatNumber(item.diameter_mm, 1)} × {formatNumber(item.wall_thickness_mm, 1)} mm
+                      {productTypeT} Ø{formatNumber(item.diameter_mm, 1)} × {formatNumber(item.wall_thickness_mm, 1)} mm
                     </Text>
-                    <Text style={s.specSubLine}>{item.condition}</Text>
+                    <Text style={s.specSubLine}>{conditionT}</Text>
                   </View>
-                  <Text style={[s.tdLabel, { flex: 1.0, color: C.gray700, fontFamily: 'Roboto', fontWeight: 700 }]}>
+                  <Text style={[s.tdLabel, { flex: 1.1, color: C.gray700, fontFamily: 'Roboto', fontWeight: 700 }]}>
                     {item.norm ?? '—'}
                   </Text>
-                  <Text style={[s.tdLabel, { flex: 0.9, color: C.gray700 }]}>
+                  <Text style={[s.tdLabel, { flex: 1.0, color: C.gray700 }]}>
                     {item.steel_grade}
                   </Text>
-                  <Text style={[s.tdLabel, { flex: 1.4, color: C.gray700 }]}>
-                    {item.surface}
+                  <Text style={[s.tdLabel, { flex: 0.7, textAlign: 'center' }]}>
+                    {item.quantity_szt} {t.unitPcs}
                   </Text>
-                  <Text style={[s.tdLabel, { flex: 0.9, textAlign: 'center' }]}>
-                    {item.quantity_szt} {t.unitPcs} × {formatNumber(item.length_m, 2)} m
+                  <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'right', color: C.gray700 }]}>
+                    {formatNumber(item.length_m, 2)} m
                   </Text>
-                  <Text style={[s.tdLabel, { flex: 0.6, textAlign: 'right', color: C.gray700 }]}>
+                  <Text style={[s.tdLabel, { flex: 0.7, textAlign: 'right', color: C.gray700 }]}>
                     {formatNumber(item.kg_per_m, 3)}
                   </Text>
-                  <Text style={[s.tdLabel, { flex: 0.7, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                  <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
                     {formatNumber(item.mass_t, 3)} t
                   </Text>
-                  <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right', color: C.gray700 }]}>
+                  <Text style={[s.tdLabel, { flex: 1.1, textAlign: 'right', color: C.gray700 }]}>
                     {effectivePriceT > 0
                       ? `${isEUR ? formatEUR(effectivePriceT) : formatPLN(effectivePriceT)} ${currency}/t`
                       : '—'}
                   </Text>
-                  <Text style={[s.tdLabel, { flex: 1.3, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                  <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
                     {isEUR ? `${formatEUR(sellTotal)} EUR` : `${formatPLN(sellTotal)} PLN`}
                   </Text>
                 </View>
@@ -426,17 +448,17 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
 
             {/* Wiersz sumy */}
             <View style={[s.tableBodyRow, { backgroundColor: C.gray100 }]}>
-              <Text style={[s.tdLabel, { flex: 2.2, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{t.totalRow}</Text>
+              <Text style={[s.tdLabel, { flex: 2.4, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{t.totalRow}</Text>
+              <Text style={[s.tdLabel, { flex: 1.1 }]} />
               <Text style={[s.tdLabel, { flex: 1.0 }]} />
-              <Text style={[s.tdLabel, { flex: 0.9 }]} />
-              <Text style={[s.tdLabel, { flex: 1.4 }]} />
-              <Text style={[s.tdLabel, { flex: 0.9 }]} />
-              <Text style={[s.tdLabel, { flex: 0.6 }]} />
-              <Text style={[s.tdLabel, { flex: 0.7, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+              <Text style={[s.tdLabel, { flex: 0.7 }]} />
+              <Text style={[s.tdLabel, { flex: 0.8 }]} />
+              <Text style={[s.tdLabel, { flex: 0.7 }]} />
+              <Text style={[s.tdLabel, { flex: 0.8, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
                 {formatNumber(totalMassT, 3)} t
               </Text>
-              <Text style={[s.tdLabel, { flex: 1.0 }]} />
-              <Text style={[s.tdLabel, { flex: 1.3, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+              <Text style={[s.tdLabel, { flex: 1.1 }]} />
+              <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
                 {isEUR
                   ? `${formatEUR(totalSellEUR + deliveryCostEUR)} EUR`
                   : `${formatPLN(totalSellPLN + deliveryCostPLN)} PLN`}
@@ -501,7 +523,7 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
                       <Text style={s.transportLabel}>{t.labelRoute}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
                       <Text style={s.transportValue}>
-                        {offer.delivery_from}{offer.delivery_to ? ` — ${offer.delivery_to}` : ''}
+                        {deliveryFromT}{offer.delivery_to ? ` — ${offer.delivery_to}` : ''}
                       </Text>
                     </View>
                   )}
@@ -518,7 +540,7 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
                       <Text style={s.transportLabel}>{t.labelRoute}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
                       <Text style={s.transportValue}>
-                        {offer.delivery_from}{offer.delivery_to ? ` — ${offer.delivery_to}` : ''}
+                        {deliveryFromT}{offer.delivery_to ? ` — ${offer.delivery_to}` : ''}
                       </Text>
                     </View>
                   )}
@@ -564,7 +586,7 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
                     <View style={[s.transportRow, { alignItems: 'flex-end' }]}>
                       <Text style={s.transportLabel}>{t.labelPickupFrom}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
-                      <Text style={s.transportValue}>{offer.delivery_from}</Text>
+                      <Text style={s.transportValue}>{deliveryFromT}</Text>
                     </View>
                   )}
                 </>
