@@ -78,7 +78,7 @@ export default function PipeSaveOfferModal({
   const [clientId, setClientId]       = useState('');
   const [preparedBy, setPreparedBy]   = useState(SALES_REPS[0].name);
   const [notes, setNotes]             = useState('');
-  const [validDays, setValidDays]     = useState(7);
+  const [validDays, setValidDays]     = useState(1);   // standard: 1 dzień (PDF pokaże "24h")
   const [paymentDays, setPaymentDays] = useState(30);
   const [saving, setSaving]           = useState(false);
   const [error, setError]             = useState('');

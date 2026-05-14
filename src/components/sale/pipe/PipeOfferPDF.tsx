@@ -623,7 +623,7 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
         {/* ── WAŻNOŚĆ OFERTY ── */}
         <Text style={s.sectionTitle}>{t.sectionValidity}</Text>
         <View style={s.conditionsBox}>
-          <Text style={s.conditionItem}>{t.validityLine1(t.validityLabel(offer.valid_days ?? 14))}</Text>
+          <Text style={s.conditionItem}>{t.validityLine1(t.validityLabel(offer.valid_days ?? 1))}</Text>
           <Text style={[s.conditionItem, { marginBottom: 0 }]}>{t.validityLine2}</Text>
         </View>
 

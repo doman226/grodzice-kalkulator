@@ -1048,7 +1048,7 @@ export interface PipeSalePdfStrings {
 const pipeSale_pl: PipeSalePdfStrings = {
   docTitle:     offerNo => `Oferta sprzedaży rur ${offerNo}`,
   docLanguage:  'pl',
-  offerTitle:   'OFERTA SPRZEDAŻY RUR',
+  offerTitle:   'OFERTA SPRZEDAŻY',
 
   date:         'Data:',
   offerNumber:  'Numer oferty:',
@@ -1116,7 +1116,7 @@ const pipeSale_pl: PipeSalePdfStrings = {
   techTolerance:      'Tolerancje wymiarowe: zgodnie z oferowaną normą produkcyjną.',
   techConditionSingle: condition => `Stan materiału: ${condition}.`,
   techConditionMixed: 'Stan materiału: wg specyfikacji w tabeli (część pozycji bez atestu — patrz kolumna "Specyfikacja").',
-  techGrades:         gradesList => `Gatunki stali oferowane: ${gradesList}.`,
+  techGrades:         gradesList => `Gatunek stali: ${gradesList}.`,
   techSurfaceSingle:  surface => `Powierzchnia: ${surface}.`,
   techSurfaceMixed:   'Powierzchnia: wg specyfikacji w tabeli.',
 
@@ -1136,7 +1136,7 @@ const pipeSale_pl: PipeSalePdfStrings = {
 const pipeSale_en: PipeSalePdfStrings = {
   docTitle:     offerNo => `Pipe sales offer ${offerNo}`,
   docLanguage:  'en',
-  offerTitle:   'PIPE SALES OFFER',
+  offerTitle:   'SALES OFFER',
 
   date:         'Date:',
   offerNumber:  'Offer number:',
@@ -1204,7 +1204,7 @@ const pipeSale_en: PipeSalePdfStrings = {
   techTolerance:      'Dimensional tolerances: in accordance with the offered production standard.',
   techConditionSingle: condition => `Material condition: ${condition}.`,
   techConditionMixed: 'Material condition: according to specification in the table (some items without certificate — see "Specification" column).',
-  techGrades:         gradesList => `Offered steel grades: ${gradesList}.`,
+  techGrades:         gradesList => `Steel grade: ${gradesList}.`,
   techSurfaceSingle:  surface => `Surface: ${surface}.`,
   techSurfaceMixed:   'Surface: according to specification in the table.',
 
