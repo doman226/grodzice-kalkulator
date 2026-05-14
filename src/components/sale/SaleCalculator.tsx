@@ -398,6 +398,14 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
           : Math.round((item.sellPriceEurT / exchangeRate) * 100) / 100
         : 0,
     })));
+    // FIX: koszt transportu/auto też jest "w walucie oferty" — toggle musi go przeliczyć.
+    // Bez tego pole "Koszt / auto" zostawało w starej walucie z nową etykietą [PLN].
+    setDeliveryCostPerTruck(prev => {
+      if (typeof prev !== 'number' || prev <= 0) return prev;
+      return newCurrency === 'PLN'
+        ? Math.round(prev * exchangeRate)
+        : Math.round((prev / exchangeRate) * 100) / 100;
+    });
     setCurrency(newCurrency);
   }
   // Efektywna cena/t – tylko grodzice (bez zamków, transport pro-rata jeśli DAP)

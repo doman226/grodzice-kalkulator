@@ -111,6 +111,10 @@ export default function RoadPlateCalculator({ profiles, prices, clients, onClien
     setM12WeldingPrice(prev => conv(prev));
     setCuttingHeadPrice(prev => conv(prev));
     setLiftingHolePrice(prev => conv(prev));
+    // FIX: transport jest "w walucie oferty" — toggle musi go przeliczyć.
+    if (typeof transportCostPerTruck === 'number' && transportCostPerTruck > 0) {
+      setTransportCostPerTruck(conv(transportCostPerTruck));
+    }
     setCurrency(newCur);
   }
 

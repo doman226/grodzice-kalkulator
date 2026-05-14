@@ -339,6 +339,13 @@ export default function EditSaleOfferModal({
           : Math.round((item.sellEurT / exchangeRate) * 100) / 100
         : 0,
     })));
+    // FIX: koszt transportu/auto też jest "w walucie oferty" — toggle musi go przeliczyć.
+    setDeliveryCostPerTruck(prev => {
+      if (typeof prev !== 'number' || prev <= 0) return prev;
+      return newCurrency === 'PLN'
+        ? Math.round(prev * exchangeRate)
+        : Math.round((prev / exchangeRate) * 100) / 100;
+    });
     setCurrency(newCurrency);
   }
 

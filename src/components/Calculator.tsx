@@ -112,6 +112,11 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
     setWeldingPrice(prev => conv(prev));
     setCuttingPrice(prev => conv(prev));
     setRepairPrice(prev => conv(prev));
+    // FIX: transport jest "w walucie oferty" — toggle musi go przeliczyć.
+    // Bez tego po toggle EUR→PLN pole "Koszt / auto" zostawało w starej walucie z nową etykietą.
+    if (typeof transportCostPerTruck === 'number' && transportCostPerTruck > 0) {
+      setTransportCostPerTruck(conv(transportCostPerTruck));
+    }
     setCurrency(newCur);
   }
 
