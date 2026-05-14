@@ -228,6 +228,81 @@ export interface SalePriceChangeLog {
   affected_rows: number | null;
 }
 
+// ─── Sprzedaż rur stalowych (faza 2) ─────────────────────────────────────────
+
+export interface PipeSaleOffer {
+  id: string;
+  offer_number: string;                                   // SR/YYYY/NNN
+  year: number;
+  sequence: number;
+  client_id?: string;
+  client?: Client;
+  status: OfferStatus;
+  notes?: string;
+  valid_days: number;
+  payment_days: number;
+  prepared_by?: string;
+  currency: 'EUR' | 'PLN';
+  exchange_rate?: number;
+  // Sumy snapshot
+  total_cost_eur?: number;
+  total_sell_eur?: number;
+  total_sell_pln?: number;
+  margin_pct?: number;
+  // Dostawa: koszty
+  delivery_trucks?: number;
+  delivery_cost_per_truck?: number;
+  delivery_cost_total?: number;
+  delivery_paid_by?: 'dap_included' | 'dap_extra' | 'fca';
+  delivery_from?: string;
+  delivery_to?: string;
+  // Warunki oferty
+  delivery_timeline?: 'huta' | 'magazyn';
+  campaign_weeks?: string;
+  campaign_delivery_weeks?: string;
+  warehouse_delivery_time?: string;
+  delivery_terms?: 'DAP' | 'DAP_EXTRA' | 'FCA';
+  fca_location?: string;
+  // Audit / soft-delete
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+  items?: PipeSaleOfferItem[];
+}
+
+export interface PipeSaleOfferItem {
+  id: string;
+  offer_id: string;
+  // Specyfikacja (string snapshots — słowniki w pipeConstants.ts)
+  product_type: string;
+  condition: string;
+  norm?: string | null;
+  norm_description?: string | null;
+  steel_grade: string;
+  surface: string;
+  // Wymiary i ilość
+  diameter_mm: number;
+  wall_thickness_mm: number;
+  quantity_szt: number;
+  length_m: number;
+  // Obliczenia (snapshot z momentu zapisu)
+  kg_per_m: number;
+  total_length_m: number;
+  mass_t: number;
+  // Ceny i sumy (w walucie oferty)
+  cost_price_per_ton?: number | null;
+  sell_price_per_ton: number;
+  cost_total?: number | null;
+  sell_total: number;
+  // Denominacja (zawsze)
+  sell_eur_total: number;
+  sell_pln_total: number;
+  margin_pct?: number | null;
+  // Sortowanie
+  sort_order: number;
+  created_at: string;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface CalculatorInput {

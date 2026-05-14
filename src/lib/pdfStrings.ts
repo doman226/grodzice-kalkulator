@@ -943,3 +943,289 @@ export const ROAD_PLATE_RENTAL_PDF_STRINGS: Record<PdfLang, RoadPlateRentalPdfSt
   pl: roadPlate_pl,
   en: roadPlate_en,
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── PDF: Pipe Sale (sprzedaż rur stalowych) ──────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface PipeSalePdfStrings {
+  // Document
+  docTitle:        (offerNo: string) => string;
+  docLanguage:     string;
+  offerTitle:      string;
+
+  // Meta block
+  date:            string;
+  offerNumber:     string;
+  salesRep:        string;
+  phone:           string;
+  exchangeRate:    string;
+  customerLabel:   string;
+  vatLabel:        (country: string) => string;
+
+  // Greeting & intro
+  greeting:        string;
+  intro:           string;
+
+  // Items table — 9 kolumn
+  thSpec:          string;   // Specyfikacja (Ø×t + typ produktu)
+  thNorm:          string;   // Norma
+  thSteelGrade:    string;   // Gatunek
+  thSurface:       string;   // Powierzchnia
+  thQtyLength:     string;   // Ilość × dł.
+  thKgPerM:        string;   // kg/m
+  thMass:          string;   // Masa [t]
+  thPricePerT:     string;   // Cena [waluta/t]
+  thValue:         string;   // Wartość
+
+  // Table body
+  unitPcs:         string;
+  totalRow:        string;
+
+  // Price box (suma końcowa)
+  priceLabel:                 string;   // "Łączna kwota dla klienta"
+  priceBreakdownPipes:        (val: string) => string;   // "rury 30 200,00 EUR"
+  priceBreakdownTransport:    (val: string) => string;   // "transport 1 200,00 EUR"
+  priceBreakdownRecharge:     string;                    // "+ transport refaktura"
+  netSuffix:                  string;                    // "netto" / "net"
+
+  // Transport section
+  sectionTransport:   string;
+  labelDelivery:      string;
+  labelRoute:         string;
+  labelTrucks:        string;
+  labelCostPerTruck:  string;
+  labelTotalDelivery: string;
+  labelSettlement:    string;
+  labelPickupFrom:    string;
+  valueDapIncluded:   string;
+  valueDapExtra:      string;
+  valueFca:           string;
+  valueRecharge:      string;
+
+  // Sekcje
+  sectionDeliveryTime:   string;
+  sectionDeliveryTerms:  string;
+  sectionTechnical:      string;
+  sectionCommercial:     string;
+  sectionValidity:       string;
+
+  // Termin dostawy
+  deliveryFromMill:   (weeks: string, deliveryWeeks?: string) => string;
+  deliveryFromStock:  (time?: string) => string;
+
+  // Warunki dostawy (Incoterms)
+  deliveryFca:      (location: string) => string;
+  deliveryDap:      (address: string) => string;
+  deliveryDapExtra: (address: string) => string;
+
+  // Warunki techniczne (DYNAMICZNE dla rur)
+  techNormSingle:     (norm: string, description: string) => string;
+  techNormMultiple:   (normsList: string) => string;     // "EN10219-1/2, EN10217-2 (wg specyfikacji w tabeli)"
+  techNormNoCert:     string;                            // gdy wszystkie pozycje bez atestu
+  techTolerance:      string;                            // STATIC: "Tolerancje wymiarowe: zgodnie z oferowaną normą produkcyjną"
+  techConditionSingle: (condition: string) => string;
+  techConditionMixed: string;                            // mieszane stany — wg tabeli
+  techGrades:         (gradesList: string) => string;    // "S235JRH, S275JR"
+  techSurfaceSingle:  (surface: string) => string;
+  techSurfaceMixed:   string;                            // mieszane powierzchnie — wg tabeli
+  techCurrencyEUR:    string;
+  techCurrencyPLN:    (rate: number, date: string) => string;
+
+  // Płatność
+  paymentPrepaid: string;
+  paymentCredit:  (days: number) => string;
+
+  // Ważność
+  validityLine1:  (label: string) => string;
+  validityLine2:  string;
+  validityLabel:  (days: number) => string;
+
+  // Notes
+  notesLabel: string;
+}
+
+// ─── POLISH ───────────────────────────────────────────────────────────────────
+
+const pipeSale_pl: PipeSalePdfStrings = {
+  docTitle:     offerNo => `Oferta sprzedaży rur ${offerNo}`,
+  docLanguage:  'pl',
+  offerTitle:   'OFERTA SPRZEDAŻY RUR',
+
+  date:         'Data:',
+  offerNumber:  'Numer oferty:',
+  salesRep:     'Opiekun handlowy:',
+  phone:        'Telefon:',
+  exchangeRate: 'Kurs:',
+  customerLabel:'Klient:',
+  vatLabel:     country => country === 'PL' ? 'NIP:' : 'VAT:',
+
+  greeting: 'Szanowni Państwo,',
+  intro:    'dziękujemy za zapytanie ofertowe. Poniżej przedstawiamy ofertę sprzedaży rur stalowych zgodnie z Ogólnymi Warunkami Sprzedaży i Płatności Intra B.V.',
+
+  thSpec:       'Specyfikacja',
+  thNorm:       'Norma',
+  thSteelGrade: 'Gatunek',
+  thSurface:    'Powierzchnia',
+  thQtyLength:  'Ilość × dł.',
+  thKgPerM:     'kg/m',
+  thMass:       'Masa [t]',
+  thPricePerT:  'Cena [waluta/t]',
+  thValue:      'Wartość',
+
+  unitPcs:      'szt.',
+  totalRow:     'RAZEM',
+
+  priceLabel:               'Cena sprzedaży',
+  priceBreakdownPipes:      val => `rury ${val}`,
+  priceBreakdownTransport:  val => `transport ${val}`,   // unused — DAP w cenie ukrywa koszt transportu przed klientem
+  priceBreakdownRecharge:   '+ transport refakturowany osobno',
+  netSuffix:                'netto',
+
+  sectionTransport:   'Transport',
+  labelDelivery:      'Dostawa:',
+  labelRoute:         'Trasa:',
+  labelTrucks:        'Liczba aut:',
+  labelCostPerTruck:  'Koszt / auto:',
+  labelTotalDelivery: 'Razem transport:',
+  labelSettlement:    'Rozliczenie:',
+  labelPickupFrom:    'Odbiór z:',
+  valueDapIncluded:   'DAP – transport w cenie',
+  valueDapExtra:      'DAP – transport refakturowany',
+  valueFca:           'FCA – odbiór własny',
+  valueRecharge:      '⚠ Refakturowany na klienta',
+
+  sectionDeliveryTime:   'Termin dostawy',
+  sectionDeliveryTerms:  'Warunki dostawy (Incoterms 2020)',
+  sectionTechnical:      'Warunki techniczne',
+  sectionCommercial:     'Warunki handlowe',
+  sectionValidity:       'Ważność oferty',
+
+  deliveryFromMill: (weeks, deliveryWeeks) =>
+    deliveryWeeks
+      ? `Produkcja w tygodniach ${weeks}, dostawa w tygodniach ${deliveryWeeks} (czas produkcyjny huty).`
+      : `Produkcja w tygodniach ${weeks} (czas produkcyjny huty).`,
+  deliveryFromStock: time =>
+    time ? `Dostawa z magazynu w czasie: ${time}.` : 'Dostawa z magazynu — termin do uzgodnienia.',
+
+  deliveryFca:      location => `Dostawa zgodnie z FCA. Odbiór własny z: ${location}.`,
+  deliveryDap:      address  => `Dostawa zgodnie z DAP do: ${address}.`,
+  deliveryDapExtra: address  => `Dostawa zgodnie z DAP do: ${address}. Koszt transportu refakturowany na klienta.`,
+
+  techNormSingle:     (norm, description) => `Norma produkcyjna: ${norm} — ${description}.`,
+  techNormMultiple:   normsList => `Normy produkcyjne: ${normsList} (wg specyfikacji w tabeli).`,
+  techNormNoCert:     'Norma produkcyjna: nie dotyczy (materiały oferowane bez atestu).',
+  techTolerance:      'Tolerancje wymiarowe: zgodnie z oferowaną normą produkcyjną.',
+  techConditionSingle: condition => `Stan materiału: ${condition}.`,
+  techConditionMixed: 'Stan materiału: wg specyfikacji w tabeli (część pozycji bez atestu — patrz kolumna "Specyfikacja").',
+  techGrades:         gradesList => `Gatunki stali oferowane: ${gradesList}.`,
+  techSurfaceSingle:  surface => `Powierzchnia: ${surface}.`,
+  techSurfaceMixed:   'Powierzchnia: wg specyfikacji w tabeli.',
+  techCurrencyEUR:    'Waluta: stawki w EUR. Płatność w EUR lub w PLN po przeliczeniu wg kursu NBP z dnia wystawienia faktury.',
+  techCurrencyPLN:    (rate, date) => `Waluta: stawki w PLN. Kurs referencyjny EUR/PLN: ${rate.toFixed(4)} (NBP ${date}).`,
+
+  paymentPrepaid: 'Płatność przed odbiorem (z góry).',
+  paymentCredit:  days => `Termin płatności: ${days} dni od daty wystawienia faktury, przelewem na rachunek bankowy.`,
+
+  validityLine1:  label => `Oferta ważna ${label} od daty wystawienia.`,
+  validityLine2:  'Po upływie terminu ceny mogą ulec zmianie. Oferta nie rezerwuje dostępności magazynowej.',
+  validityLabel:  days => days === 1 ? '1 dzień' : days < 5 ? `${days} dni` : `${days} dni`,
+
+  notesLabel: 'Uwagi',
+};
+
+// ─── ENGLISH (robocze tłumaczenia — do zrewidowania) ──────────────────────────
+
+const pipeSale_en: PipeSalePdfStrings = {
+  docTitle:     offerNo => `Pipe sales offer ${offerNo}`,
+  docLanguage:  'en',
+  offerTitle:   'PIPE SALES OFFER',
+
+  date:         'Date:',
+  offerNumber:  'Offer number:',
+  salesRep:     'Sales contact:',
+  phone:        'Phone:',
+  exchangeRate: 'Exchange rate:',
+  customerLabel:'Customer:',
+  vatLabel:     country => country === 'PL' ? 'NIP:' : 'VAT:',
+
+  greeting: 'Dear Sir or Madam,',
+  intro:    'thank you for your enquiry. Below please find our offer for the sale of steel pipes in accordance with the General Terms and Conditions of Sale and Payment of Intra B.V.',
+
+  thSpec:       'Specification',
+  thNorm:       'Standard',
+  thSteelGrade: 'Steel grade',
+  thSurface:    'Surface',
+  thQtyLength:  'Qty × length',
+  thKgPerM:     'kg/m',
+  thMass:       'Mass [t]',
+  thPricePerT:  'Price [currency/t]',
+  thValue:      'Value',
+
+  unitPcs:      'pcs',
+  totalRow:     'TOTAL',
+
+  priceLabel:               'Sale price',
+  priceBreakdownPipes:      val => `pipes ${val}`,
+  priceBreakdownTransport:  val => `transport ${val}`,   // unused — DAP included hides transport cost from customer
+  priceBreakdownRecharge:   '+ transport recharged separately',
+  netSuffix:                'net',
+
+  sectionTransport:   'Transport',
+  labelDelivery:      'Delivery:',
+  labelRoute:         'Route:',
+  labelTrucks:        'Number of trucks:',
+  labelCostPerTruck:  'Cost / truck:',
+  labelTotalDelivery: 'Total transport:',
+  labelSettlement:    'Settlement:',
+  labelPickupFrom:    'Pick-up from:',
+  valueDapIncluded:   'DAP – delivery included in price',
+  valueDapExtra:      'DAP – transport recharged',
+  valueFca:           'FCA – customer collection',
+  valueRecharge:      '⚠ Recharged to customer',
+
+  sectionDeliveryTime:   'Delivery time',
+  sectionDeliveryTerms:  'Delivery terms (Incoterms 2020)',
+  sectionTechnical:      'Technical conditions',
+  sectionCommercial:     'Commercial terms',
+  sectionValidity:       'Offer validity',
+
+  deliveryFromMill: (weeks, deliveryWeeks) =>
+    deliveryWeeks
+      ? `Production in weeks ${weeks}, delivery in weeks ${deliveryWeeks} (mill production time).`
+      : `Production in weeks ${weeks} (mill production time).`,
+  deliveryFromStock: time =>
+    time ? `Delivery from stock within: ${time}.` : 'Delivery from stock — date to be agreed.',
+
+  deliveryFca:      location => `Delivery according to FCA. Collection from: ${location}.`,
+  deliveryDap:      address  => `Delivery according to DAP to: ${address}.`,
+  deliveryDapExtra: address  => `Delivery according to DAP to: ${address}. Transport cost recharged to customer.`,
+
+  techNormSingle:     (norm, description) => `Production standard: ${norm} — ${description}.`,
+  techNormMultiple:   normsList => `Production standards: ${normsList} (according to specification in the table).`,
+  techNormNoCert:     'Production standard: not applicable (materials offered without certificate).',
+  techTolerance:      'Dimensional tolerances: in accordance with the offered production standard.',
+  techConditionSingle: condition => `Material condition: ${condition}.`,
+  techConditionMixed: 'Material condition: according to specification in the table (some items without certificate — see "Specification" column).',
+  techGrades:         gradesList => `Offered steel grades: ${gradesList}.`,
+  techSurfaceSingle:  surface => `Surface: ${surface}.`,
+  techSurfaceMixed:   'Surface: according to specification in the table.',
+  techCurrencyEUR:    'Currency: rates in EUR. Payment in EUR or PLN converted at NBP rate from the invoice date.',
+  techCurrencyPLN:    (rate, date) => `Currency: rates in PLN. Reference exchange rate EUR/PLN: ${rate.toFixed(4)} (NBP ${date}).`,
+
+  paymentPrepaid: 'Payment in advance (before collection).',
+  paymentCredit:  days => `Payment term: ${days} days from invoice date, by bank transfer.`,
+
+  validityLine1:  label => `Offer valid ${label} from the date of issue.`,
+  validityLine2:  'After the validity period prices may change. The offer does not reserve stock availability.',
+  validityLabel:  days => days === 1 ? '1 day' : `${days} days`,
+
+  notesLabel: 'Notes',
+};
+
+// ─── Export (Pipe Sale) ───────────────────────────────────────────────────────
+
+export const PIPE_SALE_PDF_STRINGS: Record<PdfLang, PipeSalePdfStrings> = {
+  pl: pipeSale_pl,
+  en: pipeSale_en,
+};

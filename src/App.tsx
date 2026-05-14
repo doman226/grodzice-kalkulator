@@ -10,18 +10,24 @@ import RoadPlateProfilesTable from './components/RoadPlateProfilesTable';
 import RoadPlatePriceSettings from './components/RoadPlatePriceSettings';
 import RoadPlateCalculator from './components/RoadPlateCalculator';
 import SaleSection from './components/sale/SaleSection';
+import PipeSaleSection from './components/sale/pipe/PipeSaleSection';
+import type { PipeSaleTab } from './components/sale/pipe/PipeSaleSection';
 
 type Mode = 'rental' | 'sale';
 type RentalSubMode = 'sheet_pile' | 'road_plate';
+type SaleSubMode = 'sheet_pile' | 'pipe';
 type Tab = 'calculator' | 'profiles' | 'prices' | 'clients' | 'offers';
 type SaleTab = 'calculator' | 'offers' | 'clients' | 'prices' | 'profiles';
 
 function App() {
   const [mode, setMode] = useState<Mode>('rental');
   const [rentalSubMode, setRentalSubMode] = useState<RentalSubMode>('sheet_pile');
+  const [saleSubMode, setSaleSubMode]     = useState<SaleSubMode>('sheet_pile');
   const [activeTab, setActiveTab]         = useState<Tab>('calculator');
   const [saleActiveTab, setSaleActiveTab] = useState<SaleTab>('calculator');
+  const [pipeSaleActiveTab, setPipeSaleActiveTab] = useState<PipeSaleTab>('calculator');
   const [saleOffersCount, setSaleOffersCount] = useState(0);
+  const [pipeSaleOffersCount, setPipeSaleOffersCount] = useState(0);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [prices, setPrices] = useState<RentalPrices | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
@@ -122,6 +128,28 @@ function App() {
     { id: 'profiles',   label: 'Profile' },
   ];
 
+  // Faza 2: rury mają kalkulator, oferty SR i klientów.
+  const pipeSaleTabs: { id: PipeSaleTab; label: string; badge?: number }[] = [
+    { id: 'calculator', label: 'Kalkulator' },
+    { id: 'offers',     label: 'Oferty SR',  badge: pipeSaleOffersCount || undefined },
+    { id: 'clients',    label: 'Klienci',    badge: clients.length        || undefined },
+  ];
+
+  // Wspólna lista zakładek dla nawigacji — string id, bo trzy różne discriminated unions.
+  const currentTabs: { id: string; label: string; badge?: number }[] =
+    mode === 'rental'
+      ? tabs
+      : saleSubMode === 'pipe'
+        ? pipeSaleTabs
+        : saleTabs;
+
+  const currentActiveTab: string =
+    mode === 'rental'
+      ? activeTab
+      : saleSubMode === 'pipe'
+        ? pipeSaleActiveTab
+        : saleActiveTab;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -134,7 +162,9 @@ function App() {
               </div>
               <p className="text-blue-200 text-sm">
                 {mode === 'sale'
-                  ? 'Kalkulator Sprzedaży Grodzic Stalowych'
+                  ? (saleSubMode === 'pipe'
+                      ? 'Kalkulator Sprzedaży Rur Stalowych'
+                      : 'Kalkulator Sprzedaży Grodzic Stalowych')
                   : rentalSubMode === 'road_plate'
                   ? 'Kalkulator Wynajmu Płyt Drogowych'
                   : 'Kalkulator Wynajmu Grodzic Stalowych'}
@@ -196,20 +226,47 @@ function App() {
           </div>
         )}
 
+        {/* Sub-toggle GRODZICE / RURY STALOWE — widoczny tylko w trybie sprzedaży */}
+        {mode === 'sale' && (
+          <div className="max-w-7xl mx-auto px-4 pb-3">
+            <div className="flex rounded-lg overflow-hidden border border-blue-700 text-xs font-medium w-fit">
+              <button
+                onClick={() => setSaleSubMode('sheet_pile')}
+                className={`px-4 py-1.5 transition-colors ${
+                  saleSubMode === 'sheet_pile'
+                    ? 'bg-blue-100 text-blue-900'
+                    : 'bg-blue-800 text-blue-200 hover:bg-blue-700'
+                }`}
+              >
+                Grodzice
+              </button>
+              <button
+                onClick={() => setSaleSubMode('pipe')}
+                className={`px-4 py-1.5 transition-colors ${
+                  saleSubMode === 'pipe'
+                    ? 'bg-blue-100 text-blue-900'
+                    : 'bg-blue-800 text-blue-200 hover:bg-blue-700'
+                }`}
+              >
+                Rury stalowe
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Navigation */}
         <div className="max-w-7xl mx-auto px-4">
           <nav className="flex gap-1 overflow-x-auto">
-            {(mode === 'rental' ? tabs : saleTabs).map((tab) => {
-              const isActive = mode === 'rental'
-                ? activeTab === tab.id
-                : saleActiveTab === tab.id;
+            {currentTabs.map((tab) => {
+              const isActive = currentActiveTab === tab.id;
               return (
                 <button
                   key={tab.id}
-                  onClick={() => mode === 'rental'
-                    ? setActiveTab(tab.id as Tab)
-                    : setSaleActiveTab(tab.id as SaleTab)
-                  }
+                  onClick={() => {
+                    if (mode === 'rental') setActiveTab(tab.id as Tab);
+                    else if (saleSubMode === 'pipe') setPipeSaleActiveTab(tab.id as PipeSaleTab);
+                    else setSaleActiveTab(tab.id as SaleTab);
+                  }}
                   className={`px-5 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${
                     isActive
                       ? 'border-white text-white bg-blue-800'
@@ -248,14 +305,25 @@ function App() {
             </button>
           </div>
         ) : mode === 'sale' ? (
-          <SaleSection
-            clients={clients}
-            onClientAdded={(c) => setClients(prev => [...prev, c])}
-            onClientsChange={setClients}
-            activeTab={saleActiveTab}
-            onTabChange={setSaleActiveTab}
-            onOffersCountChange={setSaleOffersCount}
-          />
+          saleSubMode === 'pipe' ? (
+            <PipeSaleSection
+              clients={clients}
+              onClientAdded={(c) => setClients(prev => [...prev, c])}
+              onClientsChange={setClients}
+              activeTab={pipeSaleActiveTab}
+              onTabChange={setPipeSaleActiveTab}
+              onOffersCountChange={setPipeSaleOffersCount}
+            />
+          ) : (
+            <SaleSection
+              clients={clients}
+              onClientAdded={(c) => setClients(prev => [...prev, c])}
+              onClientsChange={setClients}
+              activeTab={saleActiveTab}
+              onTabChange={setSaleActiveTab}
+              onOffersCountChange={setSaleOffersCount}
+            />
+          )
         ) : rentalSubMode === 'road_plate' ? (
           <>
             {activeTab === 'calculator' && (
