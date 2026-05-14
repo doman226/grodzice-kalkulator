@@ -307,11 +307,6 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
     ? t.techSurfaceSingle(translatePipeAttr(surfaces[0], PIPE_SURFACES_EN, lang))
     : t.techSurfaceMixed;
 
-  // Waluta
-  const currencyLine = isEUR
-    ? t.techCurrencyEUR
-    : t.techCurrencyPLN(exchRate, dateStr);
-
   return (
     <Document title={t.docTitle(offer.offer_number)} author="Intra B.V." language={t.docLanguage}>
       <Page size="A4" style={s.page}>
@@ -616,8 +611,7 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
           {grades.length > 0 && (
             <Text style={s.conditionItem}>- {t.techGrades(grades.join(', '))}</Text>
           )}
-          <Text style={s.conditionItem}>- {surfaceLine}</Text>
-          <Text style={[s.conditionItem, { marginBottom: 0 }]}>- {currencyLine}</Text>
+          <Text style={[s.conditionItem, { marginBottom: 0 }]}>- {surfaceLine}</Text>
         </View>
 
         {/* ── WARUNKI HANDLOWE ── */}

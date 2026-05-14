@@ -15,6 +15,7 @@ import {
   pipeKgPerM,
   NO_CERT_STEEL_GRADE,
   PIPE_WAREHOUSES,
+  PIPE_WAREHOUSE_CUSTOM,
 } from '../../../lib/pipeConstants';
 import type {
   PipeProductType,
@@ -156,12 +157,9 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose }:
   const [deliveryPaidBy, setDeliveryPaidBy] = useState<'dap_included' | 'dap_extra' | 'fca'>(
     (offer.delivery_paid_by as 'dap_included' | 'dap_extra' | 'fca') ?? 'dap_included'
   );
-  // Magazyn wysyłki — fallback do pierwszego gdy stara oferta ma wartość spoza listy
-  const [deliveryFrom, setDeliveryFrom] = useState<string>(
-    offer.delivery_from && (PIPE_WAREHOUSES as readonly string[]).includes(offer.delivery_from)
-      ? offer.delivery_from
-      : PIPE_WAREHOUSES[0]
-  );
+  // Magazyn wysyłki — wartość spoza listy (np. stara oferta "Magazyn dostawcy")
+  // automatycznie trafia do trybu własnego (pole tekstowe).
+  const [deliveryFrom, setDeliveryFrom] = useState<string>(offer.delivery_from ?? PIPE_WAREHOUSES[0]);
   const [deliveryTo, setDeliveryTo]     = useState(offer.delivery_to ?? '');
 
   // ── Warunki dostawy ──
@@ -178,6 +176,9 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose }:
 
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState('');
+
+  // Tryb własnego magazynu — gdy deliveryFrom nie jest żadnym ze stałych magazynów
+  const isCustomWarehouse = !(PIPE_WAREHOUSES as readonly string[]).includes(deliveryFrom);
 
   // ── Zarządzanie pozycjami ──
   function addItem() {
@@ -696,10 +697,19 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose }:
                     className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
                 </Field>
                 <Field label="Magazyn wysyłki">
-                  <select value={deliveryFrom} onChange={e => setDeliveryFrom(e.target.value)}
+                  <select
+                    value={isCustomWarehouse ? PIPE_WAREHOUSE_CUSTOM : deliveryFrom}
+                    onChange={e => setDeliveryFrom(e.target.value === PIPE_WAREHOUSE_CUSTOM ? '' : e.target.value)}
                     className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white">
                     {PIPE_WAREHOUSES.map(w => <option key={w} value={w}>{w}</option>)}
+                    <option value={PIPE_WAREHOUSE_CUSTOM}>— wpisz własny adres —</option>
                   </select>
+                  {isCustomWarehouse && (
+                    <input type="text" value={deliveryFrom}
+                      placeholder="np. Magazyn klienta, ul. ..., miasto"
+                      onChange={e => setDeliveryFrom(e.target.value)}
+                      className="w-full mt-2 px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                  )}
                 </Field>
                 <Field label="Dokąd">
                   <input type="text" value={deliveryTo} onChange={e => setDeliveryTo(e.target.value)}
@@ -709,10 +719,19 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose }:
             )}
             {deliveryPaidBy === 'fca' && (
               <Field label="Magazyn odbioru (FCA)">
-                <select value={deliveryFrom} onChange={e => setDeliveryFrom(e.target.value)}
+                <select
+                  value={isCustomWarehouse ? PIPE_WAREHOUSE_CUSTOM : deliveryFrom}
+                  onChange={e => setDeliveryFrom(e.target.value === PIPE_WAREHOUSE_CUSTOM ? '' : e.target.value)}
                   className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white">
                   {PIPE_WAREHOUSES.map(w => <option key={w} value={w}>{w}</option>)}
+                  <option value={PIPE_WAREHOUSE_CUSTOM}>— wpisz własny adres —</option>
                 </select>
+                {isCustomWarehouse && (
+                  <input type="text" value={deliveryFrom}
+                    placeholder="np. Magazyn klienta, ul. ..., miasto"
+                    onChange={e => setDeliveryFrom(e.target.value)}
+                    className="w-full mt-2 px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                )}
               </Field>
             )}
             {deliveryCalc && deliveryCalc.costPerTruck > 0 && deliveryPaidBy !== 'fca' && (

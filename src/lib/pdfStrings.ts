@@ -1029,8 +1029,6 @@ export interface PipeSalePdfStrings {
   techGrades:         (gradesList: string) => string;    // "S235JRH, S275JR"
   techSurfaceSingle:  (surface: string) => string;
   techSurfaceMixed:   string;                            // mieszane powierzchnie — wg tabeli
-  techCurrencyEUR:    string;
-  techCurrencyPLN:    (rate: number, date: string) => string;
 
   // Płatność
   paymentPrepaid: string;
@@ -1121,8 +1119,6 @@ const pipeSale_pl: PipeSalePdfStrings = {
   techGrades:         gradesList => `Gatunki stali oferowane: ${gradesList}.`,
   techSurfaceSingle:  surface => `Powierzchnia: ${surface}.`,
   techSurfaceMixed:   'Powierzchnia: wg specyfikacji w tabeli.',
-  techCurrencyEUR:    'Waluta: stawki w EUR. Płatność w EUR lub w PLN po przeliczeniu wg kursu NBP z dnia wystawienia faktury.',
-  techCurrencyPLN:    (rate, date) => `Waluta: stawki w PLN. Kurs referencyjny EUR/PLN: ${rate.toFixed(4)} (NBP ${date}).`,
 
   paymentPrepaid: 'przedpłata 100%.',
   paymentCredit:  days =>
@@ -1211,8 +1207,6 @@ const pipeSale_en: PipeSalePdfStrings = {
   techGrades:         gradesList => `Offered steel grades: ${gradesList}.`,
   techSurfaceSingle:  surface => `Surface: ${surface}.`,
   techSurfaceMixed:   'Surface: according to specification in the table.',
-  techCurrencyEUR:    'Currency: rates in EUR. Payment in EUR or PLN converted at NBP rate from the invoice date.',
-  techCurrencyPLN:    (rate, date) => `Currency: rates in PLN. Reference exchange rate EUR/PLN: ${rate.toFixed(4)} (NBP ${date}).`,
 
   paymentPrepaid: '100% prepayment.',
   paymentCredit:  days =>

@@ -16,6 +16,7 @@ import {
   pipeKgPerM,
   NO_CERT_STEEL_GRADE,
   PIPE_WAREHOUSES,
+  PIPE_WAREHOUSE_CUSTOM,
 } from '../../../lib/pipeConstants';
 import type {
   PipeProductType,
@@ -319,6 +320,9 @@ export default function PipeSaleCalculator({ clients, onClientAdded, onOfferSave
     };
   }, [deliveryCalc, deliveryPaidBy, deliveryFrom, deliveryTo]);
 
+  // Tryb własnego magazynu — gdy deliveryFrom nie jest żadnym ze stałych magazynów
+  const isCustomWarehouse = !(PIPE_WAREHOUSES as readonly string[]).includes(deliveryFrom);
+
   // Sprawdzamy czy są poprawne pozycje z ceną sprzedaży > 0 (warunek zapisu).
   const canSave = snapshots.length > 0 && snapshots.every(s => s.sellPricePerTon > 0);
 
@@ -620,10 +624,14 @@ export default function PipeSaleCalculator({ clients, onClientAdded, onOfferSave
                     {r.marginPct === null ? (
                       <div className="text-base font-semibold text-gray-400">—</div>
                     ) : (
-                      <div className={`inline-block px-2 py-0.5 rounded-md border text-sm font-semibold ${marginColor(r.marginPct)}`}>
-                        {formatNumber(r.marginPct, 1)}%
-                        <span className="ml-1 text-xs font-normal opacity-80">· {marginLabel(r.marginPct)}</span>
-                      </div>
+                      <>
+                        <div className={`inline-block px-2 py-0.5 rounded-md border text-sm font-semibold ${marginColor(r.marginPct)}`}>
+                          {formatNumber(r.marginPct, 1)}%
+                          <span className="ml-1 text-xs font-normal opacity-80">· {marginLabel(r.marginPct)}</span>
+                        </div>
+                        {/* Marża kwotowa = wartość sprzedaży − koszt */}
+                        <div className="text-xs text-gray-600 mt-0.5">{fmtMoney(r.sellTotal - r.costTotal)}</div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -652,6 +660,8 @@ export default function PipeSaleCalculator({ clients, onClientAdded, onOfferSave
             ) : (
               <>
                 <div className="text-lg font-bold">{formatNumber(totals.totalMarginPct, 1)}%</div>
+                {/* Marża kwotowa łączna = suma sprzedaży − suma kosztu */}
+                <div className="text-sm font-semibold">{fmtMoney(totals.totalSell - totals.totalCost)}</div>
                 <div className="text-xs font-normal opacity-80">{marginLabel(totals.totalMarginPct)}</div>
               </>
             )}
@@ -754,12 +764,22 @@ export default function PipeSaleCalculator({ clients, onClientAdded, onOfferSave
               {deliveryPaidBy === 'fca' ? 'Odbiór z magazynu' : 'Magazyn wysyłki'}
             </label>
             <select
-              value={deliveryFrom}
-              onChange={e => setDeliveryFrom(e.target.value)}
+              value={isCustomWarehouse ? PIPE_WAREHOUSE_CUSTOM : deliveryFrom}
+              onChange={e => setDeliveryFrom(e.target.value === PIPE_WAREHOUSE_CUSTOM ? '' : e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {PIPE_WAREHOUSES.map(w => <option key={w} value={w}>{w}</option>)}
+              <option value={PIPE_WAREHOUSE_CUSTOM}>— wpisz własny adres —</option>
             </select>
+            {isCustomWarehouse && (
+              <input
+                type="text"
+                value={deliveryFrom}
+                placeholder="np. Magazyn klienta, ul. ..., miasto"
+                onChange={e => setDeliveryFrom(e.target.value)}
+                className="w-full mt-2 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            )}
           </div>
           {deliveryPaidBy !== 'fca' && (
             <div>

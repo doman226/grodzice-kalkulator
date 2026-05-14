@@ -45,7 +45,7 @@ export const PIPE_NORM_DESCRIPTIONS: Record<PipeNorm, string> = {
 // Gatunki stali dopuszczone w danej normie. Lista bieżącego pola steelGrade
 // w kalkulatorze jest filtrowana po tej mapie po wyborze normy.
 export const PIPE_NORM_GRADES: Record<PipeNorm, readonly string[]> = {
-  'EN10219-1/2': ['S235JRH', 'S275JR', 'S275J0H', 'S355J2H', 'S355J0H', 'S420MH', 'S460N'],
+  'EN10219-1/2': ['S235JRH', 'S275JR', 'S275J0H', 'S355J2H', 'S355J0H', 'S420MH', 'S460N', 'min. S235', 'min. S355'],
   'EN10217-1':   ['P195TR1', 'P195TR2', 'P235TR1', 'P235TR2', 'P265TR1', 'P265TR2'],
   'EN10217-2':   ['P235GH', 'P265GH', 'P355GH', '16Mo3'],
   'EN10217-5':   ['P235GH', 'P265GH', 'P355GH', '16Mo3'],
@@ -88,6 +88,7 @@ export const PIPE_WAREHOUSES = [
   'Lanaken, Belgia',
   'Maurik, Holandia',
   'Oleśnica, Polska',
+  'INTRA B.V.',
 ] as const;
 export type PipeWarehouse = typeof PIPE_WAREHOUSES[number];
 
@@ -95,7 +96,12 @@ export const PIPE_WAREHOUSES_EN: Record<PipeWarehouse, string> = {
   'Lanaken, Belgia':  'Lanaken, Belgium',
   'Maurik, Holandia': 'Maurik, Netherlands',
   'Oleśnica, Polska': 'Oleśnica, Poland',
+  'INTRA B.V.':       'INTRA B.V.',
 };
+
+// Sentinel dla opcji "wpisz własny adres" w dropdownie magazynu wysyłki.
+// Gdy delivery_from nie jest żadnym z PIPE_WAREHOUSES → tryb własny (pole tekstowe).
+export const PIPE_WAREHOUSE_CUSTOM = '__custom__';
 
 // ─── Tłumaczenia PL → EN dla PDF (atrybuty zapisane w bazie jako PL) ──────────
 // Wartości pól w pipe_sale_offer_items to polskie snapshoty z momentu zapisu.
