@@ -17,6 +17,7 @@ import {
   NO_CERT_STEEL_GRADE,
   PIPE_WAREHOUSES,
   PIPE_WAREHOUSE_CUSTOM,
+  PIPE_WAREHOUSE_DELIVERY_OPTIONS,
 } from '../../../lib/pipeConstants';
 import type {
   PipeProductType,
@@ -50,15 +51,6 @@ interface Props {
 }
 
 // ─── Stałe i pomocnicze ─────────────────────────────────────────────────────
-
-const WAREHOUSE_DELIVERY_OPTIONS = [
-  'do 3 dni roboczych',
-  '3–5 dni roboczych',
-  '5–7 dni roboczych',
-  '7–10 dni roboczych',
-  'do 2 tygodni',
-  'do ustalenia',
-];
 
 const TRUCK_CAPACITY_T = 24.5;
 
@@ -753,7 +745,7 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose }:
               <Field label="Czas dostawy z magazynu">
                 <select value={warehouseDeliveryTime} onChange={e => setWarehouseDeliveryTime(e.target.value)}
                   className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white">
-                  {WAREHOUSE_DELIVERY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  {PIPE_WAREHOUSE_DELIVERY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
               </Field>
             ) : (

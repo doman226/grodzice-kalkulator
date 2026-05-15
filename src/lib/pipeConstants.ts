@@ -103,6 +103,27 @@ export const PIPE_WAREHOUSES_EN: Record<PipeWarehouse, string> = {
 // Gdy delivery_from nie jest żadnym z PIPE_WAREHOUSES → tryb własny (pole tekstowe).
 export const PIPE_WAREHOUSE_CUSTOM = '__custom__';
 
+// Opcje czasu dostawy z magazynu — używane w modalu Save/Edit oraz tłumaczone w PDF EN.
+// Wartość zapisana w pipe_sale_offers.warehouse_delivery_time jako polski snapshot.
+export const PIPE_WAREHOUSE_DELIVERY_OPTIONS = [
+  'do 3 dni roboczych',
+  '3–5 dni roboczych',
+  '5–7 dni roboczych',
+  '7–10 dni roboczych',
+  'do 2 tygodni',
+  'do ustalenia',
+] as const;
+export type PipeWarehouseDeliveryOption = typeof PIPE_WAREHOUSE_DELIVERY_OPTIONS[number];
+
+export const PIPE_WAREHOUSE_DELIVERY_OPTIONS_EN: Record<PipeWarehouseDeliveryOption, string> = {
+  'do 3 dni roboczych':  'up to 3 working days',
+  '3–5 dni roboczych':   '3–5 working days',
+  '5–7 dni roboczych':   '5–7 working days',
+  '7–10 dni roboczych':  '7–10 working days',
+  'do 2 tygodni':        'up to 2 weeks',
+  'do ustalenia':        'to be agreed',
+};
+
 // ─── Tłumaczenia PL → EN dla PDF (atrybuty zapisane w bazie jako PL) ──────────
 // Wartości pól w pipe_sale_offer_items to polskie snapshoty z momentu zapisu.
 // PDF w wersji EN tłumaczy je przez te mapy. Kody norm (EN10219-1/2 itd.)

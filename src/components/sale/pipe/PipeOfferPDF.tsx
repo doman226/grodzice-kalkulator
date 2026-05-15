@@ -11,6 +11,7 @@ import {
   PIPE_CONDITIONS_EN,
   PIPE_SURFACES_EN,
   PIPE_WAREHOUSES_EN,
+  PIPE_WAREHOUSE_DELIVERY_OPTIONS_EN,
   translatePipeAttr,
 } from '../../../lib/pipeConstants';
 import type { PipeNorm } from '../../../lib/pipeConstants';
@@ -250,7 +251,11 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
       const dostawa  = offer.campaign_delivery_weeks;
       return t.deliveryFromMill(String(kampania), dostawa ? String(dostawa) : undefined);
     }
-    return t.deliveryFromStock(offer.warehouse_delivery_time ?? undefined);
+    // Tłumaczenie czasu dostawy z magazynu PL→EN (wartość w bazie jako polski snapshot).
+    const whTime = offer.warehouse_delivery_time
+      ? translatePipeAttr(offer.warehouse_delivery_time, PIPE_WAREHOUSE_DELIVERY_OPTIONS_EN, lang)
+      : undefined;
+    return t.deliveryFromStock(whTime);
   }
 
   function deliveryTermsText(): string {
