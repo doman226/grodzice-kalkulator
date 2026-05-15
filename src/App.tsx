@@ -114,7 +114,7 @@ function App() {
   const offersBadgeCount = rentalSubMode === 'road_plate' ? roadPlateOffers.length : offers.length;
   const tabs: { id: Tab; label: string; badge?: number }[] = [
     { id: 'calculator', label: 'Kalkulator' },
-    { id: 'offers',     label: 'Oferty',          badge: offersBadgeCount || undefined },
+    { id: 'offers',     label: rentalSubMode === 'road_plate' ? 'Oferty OP' : 'Oferty',  badge: offersBadgeCount || undefined },
     { id: 'clients',    label: 'Klienci',        badge: clients.length || undefined },
     { id: 'profiles',   label: rentalSubMode === 'road_plate' ? 'Profile płyt' : 'Profile grodzic' },
     { id: 'prices',     label: 'Ustawienia cen' },

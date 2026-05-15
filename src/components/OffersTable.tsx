@@ -124,7 +124,7 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
         <div>
           <h2 className="text-lg font-semibold text-gray-800">
-            {itemType === 'road_plate' ? 'Oferty wynajmu — płyty drogowe' : 'Oferty wynajmu'}
+            {itemType === 'road_plate' ? 'Oferty wynajmu płyt drogowych (OP)' : 'Oferty wynajmu'}
           </h2>
           <p className="text-xs text-gray-400 mt-0.5">{offers.length} ofert w bazie</p>
         </div>
