@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import React, { useState } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { supabase } from '../../../lib/supabase';
 import type { Client, PipeSaleOffer, OfferStatus } from '../../../types';
@@ -32,6 +32,18 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function computeMargin(offer: PipeSaleOffer): { pct: number; amountEUR: number } | null {
+  const its = offer.items ?? [];
+  const sellEUR = its.reduce((s, i) => s + (i.sell_eur_total ?? 0), 0);
+  const costEUR = its.reduce((s, i) => {
+    if (!i.cost_total) return s;
+    if (offer.currency === 'EUR') return s + i.cost_total;
+    return s + (offer.exchange_rate ? i.cost_total / offer.exchange_rate : 0);
+  }, 0);
+  if (sellEUR <= 0) return null;
+  return { pct: ((sellEUR - costEUR) / sellEUR) * 100, amountEUR: sellEUR - costEUR };
+}
+
 export default function PipeOffersTable({ offers, onOffersChange, clients }: Props) {
   const [search, setSearch]             = useState('');
   const [expanded, setExpanded]         = useState<string | null>(null);
@@ -39,7 +51,12 @@ export default function PipeOffersTable({ offers, onOffersChange, clients }: Pro
   const [toast, setToast]               = useState('');
   const [error, setError]               = useState('');
   const [editOffer, setEditOffer]       = useState<PipeSaleOffer | null>(null);
-  const [pdfLoading, setPdfLoading]     = useState<string | null>(null);  // klucz: `${offer.id}-${lang}`
+  const [pdfLoading, setPdfLoading]     = useState<string | null>(null);
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(''), 2500);
+  }
 
   function handleOfferUpdated(updated: PipeSaleOffer) {
     onOffersChange(offers.map(o => o.id === updated.id ? updated : o));
@@ -65,11 +82,6 @@ export default function PipeOffersTable({ offers, onOffersChange, clients }: Pro
     }
   }
 
-  function showToast(msg: string) {
-    setToast(msg);
-    setTimeout(() => setToast(''), 2500);
-  }
-
   async function changeStatus(offer: PipeSaleOffer, newStatus: OfferStatus) {
     setStatusSaving(offer.id);
     const { error: err } = await supabase
@@ -83,7 +95,6 @@ export default function PipeOffersTable({ offers, onOffersChange, clients }: Pro
   }
 
   async function handleDelete(offer: PipeSaleOffer) {
-    // Wymagana akceptacja użytkownika przed soft-delete (zgodnie z fazą 2 — pkt 6)
     if (!confirm(`Przenieść ofertę ${offer.offer_number} do kosza?\n(soft-delete — możliwa do przywrócenia w bazie przez UPDATE deleted_at = NULL)`)) return;
     const { error: err } = await supabase
       .from('pipe_sale_offers')
@@ -95,26 +106,6 @@ export default function PipeOffersTable({ offers, onOffersChange, clients }: Pro
     showToast('Oferta przeniesiona do kosza ✓');
   }
 
-  // Marża on-the-fly: nadrzędna nad zapisanym margin_pct (jak w SaleOffersTable)
-  function computeMargin(offer: PipeSaleOffer): number | null {
-    const its = offer.items ?? [];
-    const sellEUR = its.reduce((s, i) => s + (i.sell_eur_total ?? 0), 0);
-    const costEUR = its.reduce((s, i) => {
-      // cost_total w walucie oferty; ale w EUR raporcie potrzebujemy denominacji
-      if (!i.cost_total) return s;
-      if (offer.currency === 'EUR') return s + i.cost_total;
-      return s + (offer.exchange_rate ? i.cost_total / offer.exchange_rate : 0);
-    }, 0);
-    if (sellEUR <= 0) return null;
-    return ((sellEUR - costEUR) / sellEUR) * 100;
-  }
-
-  function fmtCurrency(val: number | undefined, currency: string): string {
-    if (val == null) return '—';
-    return currency === 'EUR' ? `${formatEUR(val)} EUR` : `${formatPLN(val)} PLN`;
-  }
-
-  // Filtrowanie po numerze i kliencie
   const filtered = offers.filter(o => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
@@ -162,216 +153,357 @@ export default function PipeOffersTable({ offers, onOffersChange, clients }: Pro
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-red-700 text-sm flex justify-between items-center">
-          <span>{error}</span>
-          <button onClick={() => setError('')} className="text-red-500 hover:text-red-700">×</button>
-        </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-red-700 text-sm">{error}</div>
       )}
 
-      {filtered.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center text-gray-400">
-          {offers.length === 0
-            ? 'Brak zapisanych ofert. Wystaw pierwszą z kalkulatora.'
-            : 'Brak ofert pasujących do wyszukiwania.'}
-        </div>
-      ) : (
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
+      {/* Tabela */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-blue-900 text-white">
+              <th className="text-left px-4 py-3 text-xs uppercase tracking-wide font-semibold">Numer</th>
+              <th className="text-left px-4 py-3 text-xs uppercase tracking-wide font-semibold">Klient</th>
+              <th className="text-left px-4 py-3 text-xs uppercase tracking-wide font-semibold">Data</th>
+              <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Masa [t]</th>
+              <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Wartość</th>
+              <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Marża %</th>
+              <th className="text-center px-4 py-3 text-xs uppercase tracking-wide font-semibold">Status</th>
+              <th className="text-center px-4 py-3 text-xs uppercase tracking-wide font-semibold">Szczegóły</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
               <tr>
-                <th className="w-8"></th>
-                <th className="text-left  px-3 py-2 font-medium text-gray-600">Numer</th>
-                <th className="text-left  px-3 py-2 font-medium text-gray-600">Klient</th>
-                <th className="text-left  px-3 py-2 font-medium text-gray-600">Data</th>
-                <th className="text-right px-3 py-2 font-medium text-gray-600">Masa</th>
-                <th className="text-right px-3 py-2 font-medium text-gray-600">Wartość</th>
-                <th className="text-right px-3 py-2 font-medium text-gray-600">Marża</th>
-                <th className="text-left  px-3 py-2 font-medium text-gray-600">Status</th>
-                <th className="w-24"></th>
+                <td colSpan={8} className="text-center py-12 text-gray-400 text-sm">
+                  {search ? 'Brak wyników dla podanego wyszukiwania.' : 'Brak ofert sprzedaży rur. Użyj kalkulatora, aby stworzyć pierwszą.'}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {filtered.map(offer => {
-                const isOpen = expanded === offer.id;
-                const margin = computeMargin(offer);
-                const totalMassT = (offer.items ?? []).reduce((s, i) => s + (i.mass_t ?? 0), 0);
-                return (
-                  <Fragment key={offer.id}>
-                    <tr
-                      className={`border-b border-gray-100 hover:bg-blue-50/30 cursor-pointer ${isOpen ? 'bg-blue-50/40' : ''}`}
-                      onClick={() => setExpanded(isOpen ? null : offer.id)}
-                    >
-                      <td className="px-2 text-gray-400 text-center">{isOpen ? '▼' : '▶'}</td>
-                      <td className="px-3 py-2 font-mono font-semibold text-blue-900">{offer.offer_number}</td>
-                      <td className="px-3 py-2 text-gray-700">{offer.client?.name ?? '—'}</td>
-                      <td className="px-3 py-2 text-gray-500">{formatDate(offer.created_at)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(totalMassT, 3)} t</td>
-                      <td className="px-3 py-2 text-right tabular-nums font-medium">
-                        {fmtCurrency(offer.total_sell_eur ?? undefined, 'EUR')}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {margin === null ? '—' : `${formatNumber(margin, 1)}%`}
-                      </td>
-                      <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+            ) : filtered.map((offer, idx) => {
+              const totalMassT = (offer.items ?? []).reduce((s, i) => s + (i.mass_t ?? 0), 0);
+              const currency = offer.currency || 'EUR';
+
+              return (
+                <React.Fragment key={offer.id}>
+                  <tr className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
+                    {/* Numer */}
+                    <td className="px-4 py-3 font-mono font-semibold text-blue-900">
+                      {offer.offer_number || '—'}
+                    </td>
+
+                    {/* Klient */}
+                    <td className="px-4 py-3">
+                      <span className="font-medium text-gray-800">{offer.client?.name ?? '—'}</span>
+                      {offer.client?.country && offer.client.country !== 'PL' && (
+                        <span className="ml-1 text-xs text-gray-400">[{offer.client.country}]</span>
+                      )}
+                    </td>
+
+                    {/* Data */}
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                      {formatDate(offer.created_at)}
+                    </td>
+
+                    {/* Masa */}
+                    <td className="px-4 py-3 text-right text-gray-600">
+                      {formatNumber(totalMassT, 3)}
+                    </td>
+
+                    {/* Wartość — primary wg waluty oferty */}
+                    <td className="px-4 py-3 text-right">
+                      {currency === 'PLN' ? (
+                        <>
+                          <div className="font-semibold text-gray-800">
+                            {offer.total_sell_pln != null ? `${formatPLN(offer.total_sell_pln)} PLN` : '—'}
+                          </div>
+                          {offer.total_sell_eur != null && (
+                            <div className="text-xs text-gray-400">{formatEUR(offer.total_sell_eur)} EUR</div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <div className="font-semibold text-gray-800">
+                            {offer.total_sell_eur != null ? `${formatEUR(offer.total_sell_eur)} EUR` : '—'}
+                          </div>
+                          {offer.total_sell_pln != null && (
+                            <div className="text-xs text-gray-400">{formatPLN(offer.total_sell_pln)} PLN</div>
+                          )}
+                        </>
+                      )}
+                    </td>
+
+                    {/* Marża */}
+                    <td className="px-4 py-3 text-right">
+                      {(() => {
+                        const result = computeMargin(offer);
+                        const m = result?.pct ?? offer.margin_pct;
+                        if (m == null) return '—';
+                        const colorClass = m < 0 ? 'text-red-600'
+                          : m < 5 ? 'text-orange-600'
+                          : m < 10 ? 'text-yellow-700'
+                          : 'text-green-700';
+                        const amt = result ? (currency === 'EUR' ? result.amountEUR : result.amountEUR * (offer.exchange_rate ?? 1)) : null;
+                        return (
+                          <>
+                            <div className={`font-semibold ${colorClass}`}>{m.toFixed(1)}%</div>
+                            {amt != null && (
+                              <div className={`text-xs ${colorClass}`}>
+                                {currency === 'EUR' ? formatEUR(amt) : formatPLN(amt)} {currency}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-4 py-3 text-center">
+                      {statusSaving === offer.id ? (
+                        <span className="text-xs text-blue-400">...</span>
+                      ) : (
                         <select
                           value={offer.status}
                           onChange={e => changeStatus(offer, e.target.value as OfferStatus)}
-                          disabled={statusSaving === offer.id}
-                          className={`text-xs px-2 py-1 rounded font-medium border-0 cursor-pointer ${STATUS_COLORS[offer.status]} disabled:opacity-50`}
+                          className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${STATUS_COLORS[offer.status]}`}
                         >
-                          {(Object.keys(STATUS_LABELS) as OfferStatus[]).map(s =>
+                          {(Object.keys(STATUS_LABELS) as OfferStatus[]).map(s => (
                             <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-                          )}
+                          ))}
                         </select>
-                      </td>
-                      <td className="px-3 py-2 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                        <button
-                          onClick={() => handleDownloadPDF(offer, 'pl')}
-                          disabled={pdfLoading === `${offer.id}-pl`}
-                          className="text-xs text-emerald-700 hover:text-emerald-900 font-medium mr-2 disabled:opacity-40"
-                          title="Pobierz PDF (polski)"
-                        >
-                          {pdfLoading === `${offer.id}-pl` ? '...' : 'PDF PL'}
-                        </button>
-                        <button
-                          onClick={() => handleDownloadPDF(offer, 'en')}
-                          disabled={pdfLoading === `${offer.id}-en`}
-                          className="text-xs text-emerald-700 hover:text-emerald-900 font-medium mr-2 disabled:opacity-40"
-                          title="Pobierz PDF (angielski)"
-                        >
-                          {pdfLoading === `${offer.id}-en` ? '...' : 'PDF EN'}
-                        </button>
-                        <button
-                          onClick={() => setEditOffer(offer)}
-                          className="text-xs text-blue-700 hover:text-blue-900 font-medium mr-2"
-                          title="Edytuj ofertę"
-                        >
-                          Edytuj
-                        </button>
-                        <button
-                          onClick={() => handleDelete(offer)}
-                          className="text-xs text-red-600 hover:text-red-800 font-medium"
-                          title="Przenieś do kosza (soft-delete)"
-                        >
-                          Usuń
-                        </button>
+                      )}
+                    </td>
+
+                    {/* Szczegóły */}
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => setExpanded(expanded === offer.id ? null : offer.id)}
+                        className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {expanded === offer.id ? '▲ ukryj' : '▼ pozycje'}
+                      </button>
+                    </td>
+                  </tr>
+
+                  {/* Rozwinięty widok pozycji */}
+                  {expanded === offer.id && (
+                    <tr key={offer.id + '-expanded'}>
+                      <td colSpan={8} className="px-6 py-4 bg-blue-50 border-t border-blue-100">
+                        <div className="space-y-3">
+                          <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide">
+                            Pozycje oferty {offer.offer_number}
+                          </p>
+
+                          {/* Metadane */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                            {offer.prepared_by && (
+                              <div><span className="text-gray-500">Opiekun:</span> <strong>{offer.prepared_by}</strong></div>
+                            )}
+                            <div>
+                              <span className="text-gray-500">Ważność:</span>{' '}
+                              <strong>{offer.valid_days} dni</strong>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Płatność:</span>{' '}
+                              <strong>{offer.payment_days === 0 ? 'Przedpłata' : `${offer.payment_days} dni`}</strong>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Kurs EUR:</span>{' '}
+                              <strong>{offer.exchange_rate?.toFixed(4) ?? '—'} PLN</strong>
+                            </div>
+                            {(offer.delivery_cost_total != null && offer.delivery_cost_total > 0 || offer.delivery_paid_by === 'fca') && (
+                              <div>
+                                <span className="text-gray-500">Dostawa:</span>{' '}
+                                <strong className={
+                                  offer.delivery_paid_by === 'dap_extra' ? 'text-orange-600'
+                                  : offer.delivery_paid_by === 'fca' ? 'text-green-700'
+                                  : ''
+                                }>
+                                  {offer.delivery_paid_by === 'fca'
+                                    ? 'FCA – odbiór własny'
+                                    : currency === 'EUR' && offer.exchange_rate
+                                      ? `${formatEUR((offer.delivery_cost_total ?? 0) / offer.exchange_rate)} EUR`
+                                      : `${formatPLN(offer.delivery_cost_total ?? 0)} PLN`}
+                                  {' '}
+                                  <span className="font-normal text-xs">(
+                                    {offer.delivery_paid_by === 'dap_included' ? 'DAP – w cenie'
+                                    : offer.delivery_paid_by === 'dap_extra' ? 'DAP – refaktura'
+                                    : 'FCA'}
+                                  )</span>
+                                </strong>
+                              </div>
+                            )}
+                            {(offer.delivery_from || offer.delivery_to) && (
+                              <div className="col-span-2 sm:col-span-4">
+                                <span className="text-gray-500">Trasa:</span>{' '}
+                                <strong>🚛 {offer.delivery_from}{offer.delivery_to ? ` → ${offer.delivery_to}` : ''}</strong>
+                              </div>
+                            )}
+                            {offer.delivery_terms && (
+                              <div>
+                                <span className="text-gray-500">Incoterms:</span>{' '}
+                                <strong>
+                                  {offer.delivery_terms === 'DAP_EXTRA' ? 'DAP – refaktura' : offer.delivery_terms}
+                                  {offer.delivery_terms === 'FCA' && offer.fca_location ? ` (${offer.fca_location})` : ''}
+                                  {(offer.delivery_terms === 'DAP' || offer.delivery_terms === 'DAP_EXTRA') && offer.delivery_to ? ` (${offer.delivery_to})` : ''}
+                                </strong>
+                              </div>
+                            )}
+                            {offer.delivery_timeline && (
+                              <div className="col-span-2 sm:col-span-2">
+                                <span className="text-gray-500">Termin dostawy:</span>{' '}
+                                <strong>
+                                  {offer.delivery_timeline === 'huta'
+                                    ? `huta – kampania tyg. ${offer.campaign_weeks ?? '?'}${offer.campaign_delivery_weeks ? `, dostawy od tyg. ${offer.campaign_delivery_weeks}` : ''}`
+                                    : `magazyn – ${offer.warehouse_delivery_time ?? ''}`}
+                                </strong>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Tabela pozycji rur */}
+                          {offer.items && offer.items.length > 0 ? (
+                            <div className="rounded-lg overflow-hidden border border-blue-200">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="bg-blue-800 text-white">
+                                    <th className="text-left px-3 py-2 font-semibold">Typ / Stan</th>
+                                    <th className="text-left px-3 py-2 font-semibold">Norma / Gatunek</th>
+                                    <th className="text-left px-3 py-2 font-semibold">Powierzchnia</th>
+                                    <th className="text-right px-3 py-2 font-semibold">Ø × t [mm]</th>
+                                    <th className="text-right px-3 py-2 font-semibold">Ilość × dł.</th>
+                                    <th className="text-right px-3 py-2 font-semibold">kg/m</th>
+                                    <th className="text-right px-3 py-2 font-semibold">Masa [t]</th>
+                                    <th className="text-right px-3 py-2 font-semibold">Cena {currency}/t</th>
+                                    <th className="text-right px-3 py-2 font-semibold">Wartość</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {offer.items
+                                    .sort((a, b) => a.sort_order - b.sort_order)
+                                    .map((item, i) => (
+                                    <tr key={item.id} className={i % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
+                                      <td className="px-3 py-2">
+                                        <div className="font-semibold text-gray-800">{item.product_type}</div>
+                                        <div className="text-gray-500">{item.condition}</div>
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <div className="font-mono text-gray-800">{item.norm || '—'}</div>
+                                        <div className="text-gray-500">{item.steel_grade}</div>
+                                      </td>
+                                      <td className="px-3 py-2 text-gray-600 max-w-[180px] truncate" title={item.surface}>{item.surface}</td>
+                                      <td className="px-3 py-2 text-right text-gray-600 tabular-nums">{formatNumber(item.diameter_mm, 1)} × {formatNumber(item.wall_thickness_mm, 1)}</td>
+                                      <td className="px-3 py-2 text-right text-gray-600 tabular-nums">{item.quantity_szt} × {formatNumber(item.length_m, 2)} m</td>
+                                      <td className="px-3 py-2 text-right text-gray-600 tabular-nums">{formatNumber(item.kg_per_m, 3)}</td>
+                                      <td className="px-3 py-2 text-right text-gray-600 tabular-nums">{formatNumber(item.mass_t, 3)}</td>
+                                      <td className="px-3 py-2 text-right font-semibold text-gray-800 tabular-nums">{formatNumber(item.sell_price_per_ton, 2)}</td>
+                                      <td className="px-3 py-2 text-right font-bold text-gray-900 tabular-nums">
+                                        {currency === 'PLN'
+                                          ? `${formatPLN(item.sell_total)} PLN`
+                                          : `${formatEUR(item.sell_total)} EUR`}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                                <tfoot>
+                                  <tr className="bg-blue-50 border-t border-blue-200">
+                                    <td className="px-3 py-2 font-semibold text-blue-900" colSpan={6}>Razem:</td>
+                                    <td className="px-3 py-2 text-right font-semibold text-blue-900 tabular-nums">
+                                      {formatNumber(offer.items.reduce((s, i) => s + (i.mass_t ?? 0), 0), 3)} t
+                                    </td>
+                                    <td></td>
+                                    <td className="px-3 py-2 text-right font-bold text-blue-900 tabular-nums">
+                                      {currency === 'PLN'
+                                        ? `${formatPLN(offer.items.reduce((s, i) => s + (i.sell_total ?? 0), 0))} PLN`
+                                        : `${formatEUR(offer.items.reduce((s, i) => s + (i.sell_total ?? 0), 0))} EUR`}
+                                    </td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                          ) : null}
+
+                          {!offer.items?.length && (
+                            <p className="text-xs text-gray-400">Brak pozycji.</p>
+                          )}
+
+                          {offer.notes && (
+                            <p className="text-xs text-gray-600 italic">Notatki: {offer.notes}</p>
+                          )}
+
+                          {/* Przyciski akcji */}
+                          <div className="flex justify-between pt-2 border-t border-blue-200">
+                            <button
+                              onClick={() => handleDelete(offer)}
+                              className="inline-flex items-center gap-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 text-xs font-medium px-3 py-2 rounded-lg border border-red-200 transition-colors"
+                            >
+                              <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"/>
+                              </svg>
+                              Usuń
+                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setEditOffer(offer)}
+                                className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+                              >
+                                <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                                </svg>
+                                Edytuj
+                              </button>
+                              {/* PDF PL */}
+                              <button
+                                onClick={() => handleDownloadPDF(offer, 'pl')}
+                                disabled={pdfLoading === `${offer.id}-pl`}
+                                title="Pobierz ofertę PDF po polsku"
+                                className="inline-flex items-center gap-1.5 bg-blue-900 hover:bg-blue-800 disabled:bg-blue-300 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
+                              >
+                                {pdfLoading === `${offer.id}-pl` ? (
+                                  <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                                  </svg>
+                                ) : (
+                                  <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"/>
+                                  </svg>
+                                )}
+                                PDF PL
+                              </button>
+                              {/* PDF EN */}
+                              <button
+                                onClick={() => handleDownloadPDF(offer, 'en')}
+                                disabled={pdfLoading === `${offer.id}-en`}
+                                title="Download offer PDF in English"
+                                className="inline-flex items-center gap-1.5 bg-indigo-700 hover:bg-indigo-600 disabled:bg-indigo-300 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
+                              >
+                                {pdfLoading === `${offer.id}-en` ? (
+                                  <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                                  </svg>
+                                ) : (
+                                  <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"/>
+                                  </svg>
+                                )}
+                                PDF EN
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </td>
                     </tr>
-
-                    {/* Wiersz rozwinięty z pozycjami */}
-                    {isOpen && (
-                      <tr>
-                        <td colSpan={9} className="bg-gray-50 border-b border-gray-200 px-6 py-4">
-                          <ExpandedOfferDetails offer={offer} />
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Wiersz rozwinięty z pozycjami i warunkami dostawy ───────────────────────
-
-function ExpandedOfferDetails({ offer }: { offer: PipeSaleOffer }) {
-  const its = offer.items ?? [];
-  const currency = offer.currency || 'EUR';
-  const fmtSell = (v: number | null | undefined) => v == null ? '—' : currency === 'EUR' ? `${formatEUR(v)} EUR` : `${formatPLN(v)} PLN`;
-
-  return (
-    <div className="space-y-4">
-      {/* Metadane oferty */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-        <Meta label="Ważność" value={`${offer.valid_days} dni`} />
-        <Meta label="Termin płatności" value={`${offer.payment_days} dni`} />
-        <Meta label="Przygotował" value={offer.prepared_by || '—'} />
-        <Meta label="Kurs" value={offer.exchange_rate ? `${offer.exchange_rate.toFixed(4)} (${currency})` : currency} />
-        <Meta label="Warunki" value={offer.delivery_terms || '—'} />
-        <Meta label="Termin" value={
-          offer.delivery_timeline === 'huta'
-            ? `Kampania ${offer.campaign_weeks || '?'} → dostawa ${offer.campaign_delivery_weeks || '?'}`
-            : offer.warehouse_delivery_time || '—'
-        } />
-        <Meta label="Trasa" value={offer.delivery_from && offer.delivery_to ? `${offer.delivery_from} → ${offer.delivery_to}` : '—'} />
-        <Meta label="Transport" value={offer.delivery_cost_total ? `${offer.delivery_trucks} szt. × ${fmtSell(offer.delivery_cost_per_truck)}` : '—'} />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
-      {/* Tabela pozycji */}
-      {its.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-          <table className="w-full text-xs">
-            <thead className="bg-gray-100 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-2 py-1.5">Typ / Stan</th>
-                <th className="text-left px-2 py-1.5">Norma / Gatunek</th>
-                <th className="text-left px-2 py-1.5">Powierzchnia</th>
-                <th className="text-right px-2 py-1.5">Ø × t [mm]</th>
-                <th className="text-right px-2 py-1.5">Ilość × dł.</th>
-                <th className="text-right px-2 py-1.5">kg/m</th>
-                <th className="text-right px-2 py-1.5">Masa [t]</th>
-                <th className="text-right px-2 py-1.5">Cena {currency}/t</th>
-                <th className="text-right px-2 py-1.5">Wartość</th>
-              </tr>
-            </thead>
-            <tbody>
-              {its.map(i => (
-                <tr key={i.id} className="border-b border-gray-100 last:border-0">
-                  <td className="px-2 py-1.5">
-                    <div className="font-medium">{i.product_type}</div>
-                    <div className="text-gray-500">{i.condition}</div>
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <div className="font-mono">{i.norm || '—'}</div>
-                    <div className="text-gray-500">{i.steel_grade}</div>
-                  </td>
-                  <td className="px-2 py-1.5 text-gray-600 max-w-[180px] truncate" title={i.surface}>{i.surface}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums">{formatNumber(i.diameter_mm, 1)} × {formatNumber(i.wall_thickness_mm, 1)}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums">{i.quantity_szt} × {formatNumber(i.length_m, 2)} m</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums">{formatNumber(i.kg_per_m, 3)}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums">{formatNumber(i.mass_t, 3)}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums">{formatNumber(i.sell_price_per_ton, 2)}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums font-medium">{fmtSell(i.sell_total)}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot className="bg-blue-50 border-t border-blue-200">
-              <tr>
-                <td colSpan={6} className="px-2 py-2 text-right font-medium text-gray-700">Razem:</td>
-                <td className="px-2 py-2 text-right tabular-nums font-semibold">
-                  {formatNumber(its.reduce((s, i) => s + (i.mass_t ?? 0), 0), 3)} t
-                </td>
-                <td></td>
-                <td className="px-2 py-2 text-right tabular-nums font-semibold text-blue-900">
-                  {fmtSell(its.reduce((s, i) => s + (i.sell_total ?? 0), 0))}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
-
-      {/* Notatki */}
-      {offer.notes && (
-        <div className="text-xs text-gray-600">
-          <strong className="text-gray-800">Notatki: </strong>
-          <span className="italic">{offer.notes}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Meta({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-gray-500 uppercase tracking-wide">{label}</div>
-      <div className="font-medium text-gray-800">{value}</div>
+      <p className="text-xs text-gray-400">
+        {filtered.length} z {offers.length} ofert · kliknij „pozycje" aby zobaczyć szczegóły
+      </p>
     </div>
   );
 }

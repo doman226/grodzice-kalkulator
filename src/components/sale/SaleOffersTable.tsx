@@ -34,9 +34,7 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-// Marża liczona on-the-fly z pozycji (grodzice + zamki) – ignoruje margin_pct z bazy,
-// który mógł być zapisany błędnie (np. 0% dla ofert z samymi zamkami przed poprawką)
-function computeMargin(offer: SaleOffer): number | null {
+function computeMargin(offer: SaleOffer): { pct: number; amountEUR: number } | null {
   const items = offer.items ?? [];
   const locks = offer.lock_items ?? [];
   const sellEUR = items.reduce((s, i) => s + (i.sell_eur_total ?? 0), 0)
@@ -44,7 +42,7 @@ function computeMargin(offer: SaleOffer): number | null {
   const costEUR = items.reduce((s, i) => s + (i.cost_eur_total ?? 0), 0)
                 + locks.reduce((s, l) => s + (l.total_eur ?? 0), 0);
   if (sellEUR <= 0) return null;
-  return ((sellEUR - costEUR) / sellEUR) * 100;
+  return { pct: ((sellEUR - costEUR) / sellEUR) * 100, amountEUR: sellEUR - costEUR };
 }
 
 export default function SaleOffersTable({ offers, onOffersChange, clients, saleProfiles, onClientAdded }: Props) {
@@ -242,17 +240,25 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                   {/* Marża */}
                   <td className="px-4 py-3 text-right">
                     {(() => {
-                      const m = computeMargin(offer) ?? offer.margin_pct;
-                      return m != null ? (
-                        <span className={`font-semibold ${
-                          m < 0 ? 'text-red-600'
-                          : m < 5 ? 'text-orange-600'
-                          : m < 10 ? 'text-yellow-700'
-                          : 'text-green-700'
-                        }`}>
-                          {m.toFixed(1)}%
-                        </span>
-                      ) : '—';
+                      const result = computeMargin(offer);
+                      const m = result?.pct ?? offer.margin_pct;
+                      if (m == null) return '—';
+                      const colorClass = m < 0 ? 'text-red-600'
+                        : m < 5 ? 'text-orange-600'
+                        : m < 10 ? 'text-yellow-700'
+                        : 'text-green-700';
+                      const cur = (offer.currency ?? 'EUR');
+                      const amt = result ? (cur === 'EUR' ? result.amountEUR : result.amountEUR * (offer.exchange_rate ?? 1)) : null;
+                      return (
+                        <>
+                          <div className={`font-semibold ${colorClass}`}>{m.toFixed(1)}%</div>
+                          {amt != null && (
+                            <div className={`text-xs ${colorClass}`}>
+                              {cur === 'EUR' ? formatEUR(amt) : formatPLN(amt)} {cur}
+                            </div>
+                          )}
+                        </>
+                      );
                     })()}
                   </td>
 
