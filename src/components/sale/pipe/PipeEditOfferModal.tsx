@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
 import type { Client, PipeSaleOffer, PipeSaleOfferItem, OfferStatus } from '../../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../../lib/calculations';
+import { convertCurrencyValue } from '../../../lib/currency';
 import ClientSearchInput from '../../ClientSearchInput';
 import { SALES_REPS } from '../../../lib/constants';
 import {
@@ -228,31 +229,21 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose }:
     }));
   }
 
-  // ── Konwersja cen przy zmianie waluty (analogicznie do PipeSaleCalculator) ──
+  // ── Konwersja cen przy zmianie waluty ──
+  // Używa wspólnego helpera convertCurrencyValue (src/lib/currency.ts).
+  // Sprzedaż używa precision='whole' (PLN do całych, EUR do 2dp).
   function handleCurrencyChange(newCurrency: 'EUR' | 'PLN') {
     if (newCurrency === currency) return;
+    const conv = (v: number) => convertCurrencyValue(v, currency, newCurrency, exchangeRate, 'whole');
     setEditItems(prev => prev.map(item => ({
       ...item,
-      costPricePerTon: item.costPricePerTon
-        ? newCurrency === 'PLN'
-          ? Math.round(item.costPricePerTon * exchangeRate)
-          : Math.round((item.costPricePerTon / exchangeRate) * 100) / 100
-        : 0,
-      sellPricePerTon: item.sellPricePerTon
-        ? newCurrency === 'PLN'
-          ? Math.round(item.sellPricePerTon * exchangeRate)
-          : Math.round((item.sellPricePerTon / exchangeRate) * 100) / 100
-        : 0,
+      costPricePerTon: conv(item.costPricePerTon),
+      sellPricePerTon: conv(item.sellPricePerTon),
     })));
-    // FIX: koszt transportu/auto też jest "w walucie oferty" — toggle musi go przeliczyć.
-    // Bez tego: oferta z EUR ma 600 EUR/auto, po toggle na PLN dalej widzi "600 PLN/auto"
-    // (faktyczna wartość ~2551 PLN). Bug pojawiał się też w grodzicach.
-    setDeliveryCostPerTruck(prev => {
-      if (typeof prev !== 'number' || prev <= 0) return prev;
-      return newCurrency === 'PLN'
-        ? Math.round(prev * exchangeRate)
-        : Math.round((prev / exchangeRate) * 100) / 100;
-    });
+    // Transport "w walucie oferty" (patrz docs/CURRENCY-CONVERSION-PATTERN.md).
+    setDeliveryCostPerTruck(prev =>
+      typeof prev !== 'number' ? prev : conv(prev),
+    );
     setCurrency(newCurrency);
   }
 

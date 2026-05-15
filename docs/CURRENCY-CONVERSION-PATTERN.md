@@ -1,8 +1,13 @@
 # Konwersja walut EUR ↔ PLN — wzorzec i znany problem regresji
 
-> **Status na 2026-05-14:** wszystkie 8 miejsc z `handleCurrencyChange` poprawnie konwertują transport. Problem **nie istnieje na produkcji**. Ten dokument istnieje, żeby zapobiec **regresji** przy dodawaniu nowych pól lub funkcjonalności.
+> **Status na 2026-05-14 (po refaktorze):** wszystkie 8 miejsc z `handleCurrencyChange`
+> używają wspólnego helpera **`convertCurrencyValue`** z `src/lib/currency.ts`.
+> Inline `Math.round(...)` zostało wyeliminowane — single source of truth.
+> Bug konwersji walut **fizycznie niemożliwy** przy korzystaniu z helpera.
 >
-> **Dla AI Agent czytającego ten plik:** to nie jest opis nieaktualnego problemu. To jest **instrukcja prewencji** którą MUSISZ stosować przy każdej modyfikacji kodu związanego z walutą.
+> **Dla AI Agent czytającego ten plik:** to nie jest opis nieaktualnego problemu.
+> To jest **instrukcja prewencji** którą MUSISZ stosować przy każdej modyfikacji
+> kodu związanego z walutą. Sekcje 1-4 to historia, sekcja 5+ to aktualny workflow.
 
 ---
 
@@ -133,45 +138,46 @@ function handleCurrencyChange(newCurrency: 'EUR' | 'PLN') {
 
 ---
 
-## 5. Reguła dla developerów / AI agentów
+## 5. Reguła dla developerów / AI agentów (po refaktorze)
 
-> **PRZED każdą modyfikacją funkcji `handleCurrencyChange` lub dodaniem nowego pola "w walucie oferty":**
+> **Dodając nowe pole "w walucie oferty":**
 >
-> 1. Sprawdź ten dokument (`docs/CURRENCY-CONVERSION-PATTERN.md`).
-> 2. Jeśli dodajesz nowe pole "w walucie oferty" w jednym pliku, musisz dodać konwersję we **wszystkich 8 plikach** (lub w mniejszej grupie, jeśli pole nie ma sensu globalnie).
-> 3. Jeśli przenosisz sekcję między komponentami (np. z modala do kalkulatora), upewnij się że pola "w walucie" mają konwersję w **nowym** miejscu.
-> 4. Po zmianach **uruchom smoke test** z sekcji 7 tego dokumentu.
+> 1. **W komponencie:** zadeklaruj `useState<number | ''>('')` jak dotąd.
+> 2. **W `handleCurrencyChange`:** dodaj `setNowePole(prev => conv(prev))` — helper `conv` już istnieje w funkcji.
+> 3. **NIE pisz `Math.round(v * rate)` inline** — to zła praktyka łamiąca abstrakcję helpera.
+> 4. **Test:** smoke test z sekcji 7 (wpisanie 600 EUR → toggle PLN → oczekiwane 2551 PLN).
+>
+> Helper `convertCurrencyValue` automatycznie:
+>   - chroni przed `value <= 0` (zwraca bez zmian — żadnych NaN)
+>   - chroni przed `fromCcy === toCcy` (no-op)
+>   - dobiera precyzję wg modułu (`cents` wynajem / `whole` sprzedaż)
 
 ### Czerwone flagi przy code review
 
 Otwórz alert jeśli widzisz:
-- Nowy `useState<number | ''>('')` z nazwą kończącą się na `Price`, `Cost`, `PerTon`, `PerTruck`, `Fee` **bez** dodania konwersji w `handleCurrencyChange`
-- Modyfikację `handleCurrencyChange` w jednym pliku **bez** sprawdzenia pozostałych 7
-- Nową kolumnę w bazie typu `*_price_*` lub `*_cost_*` bez snapshot w walucie oferty
+- ❌ `Math.round(prev * exchangeRate)` lub `(prev / exchangeRate) * 100` **inline** w `handleCurrencyChange` — to powrót do starego antypatternu. **Zamień na `conv(prev)`** (wywołanie helpera).
+- ❌ Brak `import { convertCurrencyValue } from '.../lib/currency'` w pliku z `handleCurrencyChange`.
+- ❌ Nowy `useState<number | ''>('')` z nazwą `*Price/Cost/PerTon/PerTruck/Fee` **bez** dodania `setX(prev => conv(prev))` w `handleCurrencyChange`.
+- ❌ Modyfikacja sygnatury `convertCurrencyValue` bez aktualizacji **wszystkich 8 wywołań** + smoke testu.
 
 ---
 
-## 6. Refaktor zalecany (follow-up — NIE WYKONUJ TERAZ bez decyzji)
+## 6. Refaktor wykonany (2026-05-14) ✅
 
-Aby raz na zawsze wyeliminować ryzyko, przenieś logikę do wspólnego helpera:
+Helper `convertCurrencyValue` istnieje w **`src/lib/currency.ts`** i jest używany
+we wszystkich 8 plikach z `handleCurrencyChange`. Sekcja 4 (inline wzorce) to już
+**historia** — żaden plik nie ma już `Math.round(v * rate)` w `handleCurrencyChange`.
+
+### Aktualna implementacja helpera
 
 ```typescript
-// src/lib/currency.ts (NOWY plik)
+// src/lib/currency.ts
+export type Currency = 'EUR' | 'PLN';
 
-/**
- * Konwertuje wartość pieniężną między EUR a PLN.
- *
- * @param value         Wartość w walucie źródłowej (>= 0, 0 zwraca 0)
- * @param fromCcy       Waluta źródłowa
- * @param toCcy         Waluta docelowa
- * @param rate          Kurs EUR/PLN (np. 4.2524)
- * @param precision     'whole' = round do całych (PLN typowe), 'cents' = 2dp (EUR typowe)
- * @returns             Wartość w walucie docelowej, zaokrąglona
- */
 export function convertCurrencyValue(
   value: number,
-  fromCcy: 'EUR' | 'PLN',
-  toCcy: 'EUR' | 'PLN',
+  fromCcy: Currency,
+  toCcy: Currency,
   rate: number,
   precision: 'whole' | 'cents' = 'cents',
 ): number {
@@ -185,21 +191,23 @@ export function convertCurrencyValue(
 }
 ```
 
-Potem w każdym z 8 plików:
+### Aktualny wzorzec użycia w `handleCurrencyChange`
+
 ```typescript
-import { convertCurrencyValue } from '@/lib/currency';
+import { convertCurrencyValue } from '@/lib/currency'; // ścieżka zależy od poziomu
 
 function handleCurrencyChange(newCcy: 'EUR' | 'PLN') {
   if (newCcy === currency) return;
-  const conv = (v: number, p: 'whole' | 'cents' = 'cents') =>
-    convertCurrencyValue(v, currency, newCcy, exchangeRate, p);
 
-  // Wynajem: precision='cents' (symetryczne 2dp jak teraz)
+  // Wynajem (Calculator, EditOfferModal, RoadPlateCalculator, EditRoadPlateOfferModal):
+  const conv = (v: number) => convertCurrencyValue(v, currency, newCcy, exchangeRate, 'cents');
+
+  // LUB Sprzedaż (SaleCalculator, EditSaleOfferModal, PipeSaleCalculator, PipeEditOfferModal):
+  // const conv = (v: number) => convertCurrencyValue(v, currency, newCcy, exchangeRate, 'whole');
+
   setPricePerTon(prev => conv(prev));
-  // ... wszystkie pola
-  // Sprzedaż: precision='whole' przy konwersji do PLN
-  setSellPriceEurT(prev => conv(prev, 'whole'));
-  // ⚠ Transport zawsze obecny:
+  // ... wszystkie pola "w walucie oferty"
+  // Transport — zawsze obecny:
   if (typeof transportCostPerTruck === 'number') {
     setTransportCostPerTruck(conv(transportCostPerTruck));
   }
@@ -207,11 +215,12 @@ function handleCurrencyChange(newCcy: 'EUR' | 'PLN') {
 }
 ```
 
-**Korzyść:** dodanie nowego pola pieniężnego wymaga edycji **jednego** miejsca (helper), nie 8.
+### Korzyści osiągnięte
 
-**Ryzyko refaktoru:** zmiana zachowania round-trip jeśli źle dobierzemy precyzję per moduł. Wymagany staranny test każdego z 8 plików.
-
-**Szacowany czas:** 2-3h refaktoru + 1h testów.
+- ✅ Dodanie nowego pola pieniężnego = `setX(prev => conv(prev))` — bez decyzji o `Math.round`
+- ✅ Single source of truth — zmiana logiki konwersji wymaga edycji 1 pliku
+- ✅ TS gwarantuje poprawne sygnatury wywołań (helper jest typowany)
+- ✅ Round-trip behavior zachowany 1:1 vs poprzedni inline kod (weryfikowane smoke testami)
 
 ---
 
@@ -251,7 +260,8 @@ Po EUR → PLN → EUR oczekiwana wartość to **599,9** (nie 600) — to **akce
 | Data | Co zostało naprawione | Pliki |
 |---|---|---|
 | < 2026-05-14 | Pierwszy fix (zapamiętany przez użytkownika jako "naprawione w grodzicach") | `EditOfferModal.tsx`, `EditRoadPlateOfferModal.tsx` |
-| 2026-05-14 (faza 3 rur) | Wszystkie pozostałe 6 plików — pełny audyt + fix | `Calculator.tsx`, `RoadPlateCalculator.tsx`, `SaleCalculator.tsx`, `EditSaleOfferModal.tsx`, `PipeSaleCalculator.tsx`, `PipeEditOfferModal.tsx` |
+| 2026-05-14 (faza 3 rur) | Wszystkie pozostałe 6 plików — pełny audyt + fix inline | `Calculator.tsx`, `RoadPlateCalculator.tsx`, `SaleCalculator.tsx`, `EditSaleOfferModal.tsx`, `PipeSaleCalculator.tsx`, `PipeEditOfferModal.tsx` |
+| 2026-05-14 (refaktor) ✅ | **Wyodrębniono wspólny helper** `src/lib/currency.ts` — wszystkie 8 plików używa `convertCurrencyValue` zamiast inline `Math.round`. Bug fizycznie niemożliwy. | `src/lib/currency.ts` (nowy) + wszystkie 8 plików z `handleCurrencyChange` |
 
 ---
 

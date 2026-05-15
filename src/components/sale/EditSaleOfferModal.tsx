@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { Client, SaleOffer, SaleOfferItem, SaleProfile, SaleOfferLockItem } from '../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
+import { convertCurrencyValue } from '../../lib/currency';
 import ClientSearchInput from '../ClientSearchInput';
 import { SALES_REPS } from '../../lib/constants';
 
@@ -323,29 +324,21 @@ export default function EditSaleOfferModal({
 
   const isEUR = currency === 'EUR';
 
-  // ── Zmiana waluty – konwertuje ceny pozycji (identyczna logika jak SaleCalculator) ──
+  // ── Zmiana waluty — konwertuje ceny pozycji ──
+  // Używa wspólnego helpera convertCurrencyValue (src/lib/currency.ts).
+  // Sprzedaż używa precision='whole' (PLN do całych, EUR do 2dp).
   function handleCurrencyChange(newCurrency: 'EUR' | 'PLN') {
     if (newCurrency === currency) return;
+    const conv = (v: number) => convertCurrencyValue(v, currency, newCurrency, exchangeRate, 'whole');
     setEditItems(prev => prev.map(item => ({
       ...item,
-      costEurT: item.costEurT
-        ? newCurrency === 'PLN'
-          ? Math.round(item.costEurT * exchangeRate)
-          : Math.round((item.costEurT / exchangeRate) * 100) / 100
-        : 0,
-      sellEurT: item.sellEurT
-        ? newCurrency === 'PLN'
-          ? Math.round(item.sellEurT * exchangeRate)
-          : Math.round((item.sellEurT / exchangeRate) * 100) / 100
-        : 0,
+      costEurT: conv(item.costEurT),
+      sellEurT: conv(item.sellEurT),
     })));
-    // FIX: koszt transportu/auto też jest "w walucie oferty" — toggle musi go przeliczyć.
-    setDeliveryCostPerTruck(prev => {
-      if (typeof prev !== 'number' || prev <= 0) return prev;
-      return newCurrency === 'PLN'
-        ? Math.round(prev * exchangeRate)
-        : Math.round((prev / exchangeRate) * 100) / 100;
-    });
+    // Transport "w walucie oferty" (patrz docs/CURRENCY-CONVERSION-PATTERN.md).
+    setDeliveryCostPerTruck(prev =>
+      typeof prev !== 'number' ? prev : conv(prev),
+    );
     setCurrency(newCurrency);
   }
 

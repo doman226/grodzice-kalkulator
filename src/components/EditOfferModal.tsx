@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Offer, Profile, RentalPrices, Client, OfferItem } from '../types';
 import { calculateRentalCost, formatPLN, formatEUR, formatNumber } from '../lib/calculations';
+import { convertCurrencyValue } from '../lib/currency';
 import ClientSearchInput from './ClientSearchInput';
 import { SALES_REPS } from '../lib/constants';
 
@@ -128,8 +129,9 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
   // Przelicz wszystkie ceny przy zmianie waluty
   function handleCurrencyChange(newCur: 'EUR' | 'PLN') {
     if (newCur === currency) return;
-    const factor = newCur === 'EUR' ? 1 / exchangeRate : exchangeRate;
-    const conv = (v: number) => Math.round(v * factor * 100) / 100;
+    // Helper z src/lib/currency.ts — single source of truth.
+    // Wynajem używa precision='cents' (symetryczne 2dp w obie strony).
+    const conv = (v: number) => convertCurrencyValue(v, currency, newCur, exchangeRate, 'cents');
     setCustomBasePricePln(prev => conv(prev));
     setCustomPricePerWeek1(prev => conv(prev));
     setLossPrice(prev     => conv(prev));
@@ -138,9 +140,10 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
     setWeldingPrice(prev  => conv(prev));
     setCuttingPrice(prev  => conv(prev));
     setRepairPrice(prev   => conv(prev));
-    // Przelicz transport (jest w bieżącej walucie po poprzednim przeliczeniu)
+    // Transport "w walucie oferty" — toggle musi go przeliczyć
+    // (patrz docs/CURRENCY-CONVERSION-PATTERN.md).
     if (typeof transportCostPerTruck === 'number' && transportCostPerTruck > 0) {
-      setTransportCostPerTruck(Math.round(transportCostPerTruck * factor * 100) / 100);
+      setTransportCostPerTruck(conv(transportCostPerTruck));
     }
     setCurrency(newCur);
   }

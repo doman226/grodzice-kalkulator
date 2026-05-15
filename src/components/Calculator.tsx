@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import type { Profile, RentalPrices, Client, Offer } from '../types';
 import { calculateRentalCost, formatPLN, formatEUR, formatRound, formatNumber } from '../lib/calculations';
+import { convertCurrencyValue } from '../lib/currency';
 import SaveOfferModal, { type OfferItemInput } from './SaveOfferModal';
 
 interface NBPRate { rate: number; date: string; }
@@ -102,8 +103,9 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
 
   function handleCurrencyChange(newCur: 'EUR' | 'PLN') {
     if (newCur === currency) return;
-    const factor = newCur === 'EUR' ? 1 / exchangeRate : exchangeRate;
-    const conv = (v: number) => Math.round(v * factor * 100) / 100;
+    // Helper z src/lib/currency.ts — single source of truth dla konwersji walut.
+    // Wynajem używa precision='cents' (symetryczne 2dp w obie strony).
+    const conv = (v: number) => convertCurrencyValue(v, currency, newCur, exchangeRate, 'cents');
     setPricePerTon(prev => conv(prev));
     setPricePerWeek1(prev => conv(prev));
     setLossPrice(prev => conv(prev));
@@ -112,8 +114,8 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
     setWeldingPrice(prev => conv(prev));
     setCuttingPrice(prev => conv(prev));
     setRepairPrice(prev => conv(prev));
-    // FIX: transport jest "w walucie oferty" — toggle musi go przeliczyć.
-    // Bez tego po toggle EUR→PLN pole "Koszt / auto" zostawało w starej walucie z nową etykietą.
+    // Transport "w walucie oferty" — toggle musi go przeliczyć
+    // (patrz docs/CURRENCY-CONVERSION-PATTERN.md).
     if (typeof transportCostPerTruck === 'number' && transportCostPerTruck > 0) {
       setTransportCostPerTruck(conv(transportCostPerTruck));
     }

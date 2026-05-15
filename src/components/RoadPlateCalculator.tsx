@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import type { RoadPlateProfile, RoadPlateRentalPrices, Client, Offer } from '../types';
 import { calculateRentalCost, calculateRoadPlateMetrics, formatPLN, formatEUR, formatRound, formatNumber } from '../lib/calculations';
+import { convertCurrencyValue } from '../lib/currency';
 import SaveRoadPlateOfferModal, { type RoadPlateOfferItemInput } from './SaveRoadPlateOfferModal';
 
 interface NBPRate { rate: number; date: string; }
@@ -101,8 +102,9 @@ export default function RoadPlateCalculator({ profiles, prices, clients, onClien
 
   function handleCurrencyChange(newCur: 'EUR' | 'PLN') {
     if (newCur === currency) return;
-    const factor = newCur === 'EUR' ? 1 / exchangeRate : exchangeRate;
-    const conv = (v: number) => Math.round(v * factor * 100) / 100;
+    // Helper z src/lib/currency.ts — single source of truth.
+    // Wynajem używa precision='cents' (symetryczne 2dp w obie strony).
+    const conv = (v: number) => convertCurrencyValue(v, currency, newCur, exchangeRate, 'cents');
     setPricePerTon(prev => conv(prev));
     setPricePerWeek1(prev => conv(prev));
     setLossPrice(prev => conv(prev));
@@ -111,7 +113,8 @@ export default function RoadPlateCalculator({ profiles, prices, clients, onClien
     setM12WeldingPrice(prev => conv(prev));
     setCuttingHeadPrice(prev => conv(prev));
     setLiftingHolePrice(prev => conv(prev));
-    // FIX: transport jest "w walucie oferty" — toggle musi go przeliczyć.
+    // Transport "w walucie oferty" — toggle musi go przeliczyć
+    // (patrz docs/CURRENCY-CONVERSION-PATTERN.md).
     if (typeof transportCostPerTruck === 'number' && transportCostPerTruck > 0) {
       setTransportCostPerTruck(conv(transportCostPerTruck));
     }

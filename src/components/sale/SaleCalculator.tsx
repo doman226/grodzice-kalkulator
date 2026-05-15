@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatEUR, formatPLN, formatNumber } from '../../lib/calculations';
+import { convertCurrencyValue } from '../../lib/currency';
 import { fetchNBPRate, formatNBPDate } from '../../lib/nbp';
 import type { NBPRate } from '../../lib/nbp';
 import type { Client, SaleOffer, SaleWarehouse, SaleSteeelGrade, SaleProfile, SalePrice, SaleLock } from '../../types';
@@ -382,30 +383,22 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
   const lockSellCurrency      = currency === 'EUR' ? lockTotals.totalSellEUR : lockTotals.totalSellPLN;
   const totalForClientInCurrency = grodziceSellCurrency + lockSellCurrency + deliveryCostCurrency;
 
-  // Handler zmiany waluty – konwertuje istniejące ceny pozycji do nowej waluty
+  // Handler zmiany waluty — konwertuje istniejące ceny pozycji do nowej waluty.
+  // Używa wspólnego helpera convertCurrencyValue (src/lib/currency.ts).
+  // Sprzedaż używa precision='whole' (PLN do całych, EUR do 2dp).
   function handleCurrencyChange(newCurrency: 'EUR' | 'PLN') {
     if (newCurrency === currency) return;
+    const conv = (v: number) => convertCurrencyValue(v, currency, newCurrency, exchangeRate, 'whole');
     setItems(prev => prev.map(item => ({
       ...item,
-      costPriceEurT: item.costPriceEurT
-        ? newCurrency === 'PLN'
-          ? Math.round(item.costPriceEurT * exchangeRate)
-          : Math.round((item.costPriceEurT / exchangeRate) * 100) / 100
-        : 0,
-      sellPriceEurT: item.sellPriceEurT
-        ? newCurrency === 'PLN'
-          ? Math.round(item.sellPriceEurT * exchangeRate)
-          : Math.round((item.sellPriceEurT / exchangeRate) * 100) / 100
-        : 0,
+      costPriceEurT: conv(item.costPriceEurT),
+      sellPriceEurT: conv(item.sellPriceEurT),
     })));
-    // FIX: koszt transportu/auto też jest "w walucie oferty" — toggle musi go przeliczyć.
-    // Bez tego pole "Koszt / auto" zostawało w starej walucie z nową etykietą [PLN].
-    setDeliveryCostPerTruck(prev => {
-      if (typeof prev !== 'number' || prev <= 0) return prev;
-      return newCurrency === 'PLN'
-        ? Math.round(prev * exchangeRate)
-        : Math.round((prev / exchangeRate) * 100) / 100;
-    });
+    // Transport "w walucie oferty" — toggle musi go przeliczyć
+    // (patrz docs/CURRENCY-CONVERSION-PATTERN.md).
+    setDeliveryCostPerTruck(prev =>
+      typeof prev !== 'number' ? prev : conv(prev),
+    );
     setCurrency(newCurrency);
   }
   // Efektywna cena/t – tylko grodzice (bez zamków, transport pro-rata jeśli DAP)
