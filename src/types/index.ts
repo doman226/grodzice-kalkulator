@@ -303,6 +303,103 @@ export interface PipeSaleOfferItem {
   created_at: string;
 }
 
+// ─── Sprzedaż płyt drogowych (faza 3) ────────────────────────────────────────
+// Struktura analogiczna do PipeSale*, ale z FK profile_id do road_plate_profiles
+// (katalog wspólny z modułem wynajmu). Atrybuty profilu (wymiary, kg/m²)
+// duplikowane jako snapshoty — chroni historię ofert przy zmianach katalogu.
+
+/** Lista 4 gatunków stali dla płyt drogowych (sprzedaż + wynajem).
+ *  Wartości MUSZĄ odpowiadać CHECK constraint w road_plate_sale_offer_items
+ *  i road_plate_sale_prices (patrz migracja 2026-05-16-road-plate-sale.sql).
+ *  `as const` daje typu literal-union (RoadPlateSaleSteelGrade). */
+export const ROAD_PLATE_SALE_STEEL_GRADES = [
+  'min. S270GP',
+  'S270GP',
+  'min. S355GP',
+  'S355GP',
+] as const;
+export type RoadPlateSaleSteelGrade = typeof ROAD_PLATE_SALE_STEEL_GRADES[number];
+
+export interface RoadPlateSaleOffer {
+  id: string;
+  offer_number: string;                                   // SPP/YYYY/NNN
+  year: number;
+  sequence: number;
+  client_id?: string;
+  client?: Client;
+  status: OfferStatus;
+  notes?: string;
+  valid_days: number;
+  payment_days: number;
+  prepared_by?: string;
+  currency: 'EUR' | 'PLN';
+  exchange_rate?: number;
+  // Sumy snapshot
+  total_cost_eur?: number;
+  total_sell_eur?: number;
+  total_sell_pln?: number;
+  margin_pct?: number;
+  // Dostawa: koszty
+  delivery_trucks?: number;
+  delivery_cost_per_truck?: number;
+  delivery_cost_total?: number;
+  delivery_paid_by?: 'dap_included' | 'dap_extra' | 'fca';
+  delivery_from?: string;
+  delivery_to?: string;
+  // Warunki oferty
+  delivery_timeline?: 'huta' | 'magazyn';
+  campaign_weeks?: string;
+  campaign_delivery_weeks?: string;
+  warehouse_delivery_time?: string;
+  delivery_terms?: 'DAP' | 'DAP_EXTRA' | 'FCA';
+  fca_location?: string;
+  // Audit / soft-delete
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+  items?: RoadPlateSaleOfferItem[];
+}
+
+export interface RoadPlateSaleOfferItem {
+  id: string;
+  offer_id: string;
+  // FK do katalogu — może być NULL gdy profil został usunięty
+  // (ON DELETE SET NULL na poziomie DB).
+  profile_id?: string | null;
+  // Snapshot atrybutów profilu z momentu wystawienia oferty
+  profile_name: string;
+  steel_grade: RoadPlateSaleSteelGrade;
+  thickness_mm: number;
+  sheet_length_m: number;
+  sheet_width_m: number;
+  weight_kg_per_m2: number;
+  // Ilość i agregaty
+  quantity_szt: number;
+  total_area_m2: number;
+  mass_t: number;
+  // Ceny i sumy (w walucie oferty)
+  cost_price_per_ton?: number | null;
+  sell_price_per_ton: number;
+  cost_total?: number | null;
+  sell_total: number;
+  // Denominacja (zawsze obliczone)
+  sell_eur_total: number;
+  sell_pln_total: number;
+  margin_pct?: number | null;
+  // Sortowanie i audit
+  sort_order: number;
+  created_at: string;
+}
+
+export interface RoadPlateSalePrice {
+  id: string;
+  profile_id: string;
+  steel_grade: RoadPlateSaleSteelGrade;
+  price_eur_t: number | null;        // NULL = brak ceny w cenniku
+  available: boolean;
+  updated_at: string;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface CalculatorInput {

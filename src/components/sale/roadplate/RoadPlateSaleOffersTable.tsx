@@ -1,0 +1,479 @@
+import React, { useState } from 'react';
+import { supabase } from '../../../lib/supabase';
+import type { Client, RoadPlateProfile, RoadPlateSaleOffer, OfferStatus } from '../../../types';
+import { formatEUR, formatPLN, formatNumber } from '../../../lib/calculations';
+import RoadPlateEditOfferModal from './RoadPlateEditOfferModal';
+
+// PDF wkracza w Etapie 6 — na razie placeholder; przyciski disabled z tooltipem.
+// import { pdf } from '@react-pdf/renderer';
+// import RoadPlateSaleOfferPDF from './RoadPlateSaleOfferPDF';
+// import type { PdfLang } from '../../../lib/pdfStrings';
+
+interface Props {
+  offers: RoadPlateSaleOffer[];
+  onOffersChange: (offers: RoadPlateSaleOffer[]) => void;
+  clients: Client[];
+  profiles: RoadPlateProfile[];
+  onClientAdded: (c: Client) => void;
+}
+
+const STATUS_LABELS: Record<OfferStatus, string> = {
+  szkic:     'Szkic',
+  wysłana:   'Wysłana',
+  przyjęta:  'Przyjęta',
+  odrzucona: 'Odrzucona',
+};
+
+const STATUS_COLORS: Record<OfferStatus, string> = {
+  szkic:     'bg-gray-100 text-gray-600',
+  wysłana:   'bg-blue-100 text-blue-700',
+  przyjęta:  'bg-green-100 text-green-700',
+  odrzucona: 'bg-red-100 text-red-600',
+};
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+// Marża on-the-fly z pozycji — sell_eur_total / cost_total (cost_total w walucie oferty).
+function computeMargin(offer: RoadPlateSaleOffer): { pct: number; amountEUR: number } | null {
+  const its = offer.items ?? [];
+  const sellEUR = its.reduce((s, i) => s + (i.sell_eur_total ?? 0), 0);
+  const costEUR = its.reduce((s, i) => {
+    if (!i.cost_total) return s;
+    if (offer.currency === 'EUR') return s + i.cost_total;
+    return s + (offer.exchange_rate ? i.cost_total / offer.exchange_rate : 0);
+  }, 0);
+  if (sellEUR <= 0) return null;
+  return { pct: ((sellEUR - costEUR) / sellEUR) * 100, amountEUR: sellEUR - costEUR };
+}
+
+export default function RoadPlateSaleOffersTable({
+  offers, onOffersChange, clients, profiles, onClientAdded,
+}: Props) {
+  const [search, setSearch]             = useState('');
+  const [expanded, setExpanded]         = useState<string | null>(null);
+  const [statusSaving, setStatusSaving] = useState<string | null>(null);
+  const [toast, setToast]               = useState('');
+  const [error, setError]               = useState('');
+  const [editOffer, setEditOffer]       = useState<RoadPlateSaleOffer | null>(null);
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(''), 2500);
+  }
+
+  function handleOfferUpdated(updated: RoadPlateSaleOffer) {
+    onOffersChange(offers.map(o => o.id === updated.id ? updated : o));
+    setEditOffer(null);
+    showToast('Oferta zaktualizowana ✓');
+  }
+
+  async function changeStatus(offer: RoadPlateSaleOffer, newStatus: OfferStatus) {
+    setStatusSaving(offer.id);
+    const { error: err } = await supabase
+      .from('road_plate_sale_offers')
+      .update({ status: newStatus })
+      .eq('id', offer.id);
+    setStatusSaving(null);
+    if (err) { setError('Błąd: ' + err.message); return; }
+    onOffersChange(offers.map(o => o.id === offer.id ? { ...o, status: newStatus } : o));
+    showToast('Status zaktualizowany ✓');
+  }
+
+  async function handleDelete(offer: RoadPlateSaleOffer) {
+    if (!confirm(`Przenieść ofertę ${offer.offer_number} do kosza?\n(soft-delete — możliwa do przywrócenia w bazie przez UPDATE deleted_at = NULL)`)) return;
+    const { error: err } = await supabase
+      .from('road_plate_sale_offers')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', offer.id);
+    if (err) { setError('Błąd: ' + err.message); return; }
+    onOffersChange(offers.filter(o => o.id !== offer.id));
+    if (expanded === offer.id) setExpanded(null);
+    showToast('Oferta przeniesiona do kosza ✓');
+  }
+
+  const filtered = offers.filter(o => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      o.offer_number?.toLowerCase().includes(q) ||
+      o.client?.name?.toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <div className="space-y-4">
+
+      {/* Modal edycji */}
+      {editOffer && (
+        <RoadPlateEditOfferModal
+          offer={editOffer}
+          clients={clients}
+          profiles={profiles}
+          onSaved={handleOfferUpdated}
+          onClose={() => setEditOffer(null)}
+          onClientAdded={onClientAdded}
+        />
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 bg-green-700 text-white text-sm px-4 py-2 rounded-lg shadow-lg">
+          {toast}
+        </div>
+      )}
+
+      {/* Nagłówek + wyszukiwarka */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-800">Oferty sprzedaży płyt drogowych (SPP)</h2>
+          <p className="text-xs text-gray-400 mt-0.5">{offers.length} ofert w bazie</p>
+        </div>
+        <div className="sm:ml-auto">
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Szukaj po numerze lub kliencie..."
+            className="w-full sm:w-72 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-red-700 text-sm">{error}</div>
+      )}
+
+      {/* Tabela */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-blue-900 text-white">
+              <th className="text-left px-4 py-3 text-xs uppercase tracking-wide font-semibold">Numer</th>
+              <th className="text-left px-4 py-3 text-xs uppercase tracking-wide font-semibold">Klient</th>
+              <th className="text-left px-4 py-3 text-xs uppercase tracking-wide font-semibold">Data</th>
+              <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Masa [t]</th>
+              <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Wartość</th>
+              <th className="text-right px-4 py-3 text-xs uppercase tracking-wide font-semibold">Marża %</th>
+              <th className="text-center px-4 py-3 text-xs uppercase tracking-wide font-semibold">Status</th>
+              <th className="text-center px-4 py-3 text-xs uppercase tracking-wide font-semibold">Szczegóły</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="text-center py-12 text-gray-400 text-sm">
+                  {search ? 'Brak wyników dla podanego wyszukiwania.' : 'Brak ofert sprzedaży płyt. Użyj kalkulatora, aby stworzyć pierwszą.'}
+                </td>
+              </tr>
+            ) : filtered.map((offer, idx) => {
+              const totalMassT = (offer.items ?? []).reduce((s, i) => s + (i.mass_t ?? 0), 0);
+              const currency = offer.currency || 'EUR';
+
+              return (
+                <React.Fragment key={offer.id}>
+                  <tr className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
+                    {/* Numer */}
+                    <td className="px-4 py-3 font-mono font-semibold text-blue-900">
+                      {offer.offer_number || '—'}
+                    </td>
+
+                    {/* Klient */}
+                    <td className="px-4 py-3">
+                      <span className="font-medium text-gray-800">{offer.client?.name ?? '—'}</span>
+                      {offer.client?.country && offer.client.country !== 'PL' && (
+                        <span className="ml-1 text-xs text-gray-400">[{offer.client.country}]</span>
+                      )}
+                    </td>
+
+                    {/* Data */}
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                      {formatDate(offer.created_at)}
+                    </td>
+
+                    {/* Masa */}
+                    <td className="px-4 py-3 text-right text-gray-600">
+                      {formatNumber(totalMassT, 3)}
+                    </td>
+
+                    {/* Wartość — primary wg waluty oferty */}
+                    <td className="px-4 py-3 text-right">
+                      {currency === 'PLN' ? (
+                        <>
+                          <div className="font-semibold text-gray-800">
+                            {offer.total_sell_pln != null ? `${formatPLN(offer.total_sell_pln)} PLN` : '—'}
+                          </div>
+                          {offer.total_sell_eur != null && (
+                            <div className="text-xs text-gray-400">{formatEUR(offer.total_sell_eur)} EUR</div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <div className="font-semibold text-gray-800">
+                            {offer.total_sell_eur != null ? `${formatEUR(offer.total_sell_eur)} EUR` : '—'}
+                          </div>
+                          {offer.total_sell_pln != null && (
+                            <div className="text-xs text-gray-400">{formatPLN(offer.total_sell_pln)} PLN</div>
+                          )}
+                        </>
+                      )}
+                    </td>
+
+                    {/* Marża */}
+                    <td className="px-4 py-3 text-right">
+                      {(() => {
+                        const result = computeMargin(offer);
+                        const m = result?.pct ?? offer.margin_pct;
+                        if (m == null) return '—';
+                        const colorClass = m < 0 ? 'text-red-600'
+                          : m < 5 ? 'text-orange-600'
+                          : m < 10 ? 'text-yellow-700'
+                          : 'text-green-700';
+                        const amt = result ? (currency === 'EUR' ? result.amountEUR : result.amountEUR * (offer.exchange_rate ?? 1)) : null;
+                        return (
+                          <>
+                            <div className={`font-semibold ${colorClass}`}>{m.toFixed(1)}%</div>
+                            {amt != null && (
+                              <div className={`text-xs ${colorClass}`}>
+                                {currency === 'EUR' ? formatEUR(amt) : formatPLN(amt)} {currency}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-4 py-3 text-center">
+                      {statusSaving === offer.id ? (
+                        <span className="text-xs text-blue-400">...</span>
+                      ) : (
+                        <select
+                          value={offer.status}
+                          onChange={e => changeStatus(offer, e.target.value as OfferStatus)}
+                          className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${STATUS_COLORS[offer.status]}`}
+                        >
+                          {(Object.keys(STATUS_LABELS) as OfferStatus[]).map(s => (
+                            <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+
+                    {/* Szczegóły */}
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => setExpanded(expanded === offer.id ? null : offer.id)}
+                        className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {expanded === offer.id ? '▲ ukryj' : '▼ pozycje'}
+                      </button>
+                    </td>
+                  </tr>
+
+                  {/* Rozwinięty widok pozycji */}
+                  {expanded === offer.id && (
+                    <tr key={offer.id + '-expanded'}>
+                      <td colSpan={8} className="px-6 py-4 bg-blue-50 border-t border-blue-100">
+                        <div className="space-y-3">
+                          <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide">
+                            Pozycje oferty {offer.offer_number}
+                          </p>
+
+                          {/* Metadane */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                            {offer.prepared_by && (
+                              <div><span className="text-gray-500">Opiekun:</span> <strong>{offer.prepared_by}</strong></div>
+                            )}
+                            <div>
+                              <span className="text-gray-500">Ważność:</span>{' '}
+                              <strong>{offer.valid_days} dni</strong>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Płatność:</span>{' '}
+                              <strong>{offer.payment_days === 0 ? 'Przedpłata' : `${offer.payment_days} dni`}</strong>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Kurs EUR:</span>{' '}
+                              <strong>{offer.exchange_rate?.toFixed(4) ?? '—'} PLN</strong>
+                            </div>
+                            {((offer.delivery_cost_total != null && offer.delivery_cost_total > 0) || offer.delivery_paid_by === 'fca') && (
+                              <div>
+                                <span className="text-gray-500">Dostawa:</span>{' '}
+                                <strong className={
+                                  offer.delivery_paid_by === 'dap_extra' ? 'text-orange-600'
+                                  : offer.delivery_paid_by === 'fca' ? 'text-green-700'
+                                  : ''
+                                }>
+                                  {offer.delivery_paid_by === 'fca'
+                                    ? 'FCA – odbiór własny'
+                                    : currency === 'EUR' && offer.exchange_rate
+                                      ? `${formatEUR((offer.delivery_cost_total ?? 0) / offer.exchange_rate)} EUR`
+                                      : `${formatPLN(offer.delivery_cost_total ?? 0)} PLN`}
+                                  {' '}
+                                  <span className="font-normal text-xs">(
+                                    {offer.delivery_paid_by === 'dap_included' ? 'DAP – w cenie'
+                                    : offer.delivery_paid_by === 'dap_extra' ? 'DAP – refaktura'
+                                    : 'FCA'}
+                                  )</span>
+                                </strong>
+                              </div>
+                            )}
+                            {(offer.delivery_from || offer.delivery_to) && (
+                              <div className="col-span-2 sm:col-span-4">
+                                <span className="text-gray-500">Trasa:</span>{' '}
+                                <strong>🚛 {offer.delivery_from}{offer.delivery_to ? ` → ${offer.delivery_to}` : ''}</strong>
+                              </div>
+                            )}
+                            {offer.delivery_terms && (
+                              <div>
+                                <span className="text-gray-500">Incoterms:</span>{' '}
+                                <strong>
+                                  {offer.delivery_terms === 'DAP_EXTRA' ? 'DAP – refaktura' : offer.delivery_terms}
+                                  {offer.delivery_terms === 'FCA' && offer.fca_location ? ` (${offer.fca_location})` : ''}
+                                  {(offer.delivery_terms === 'DAP' || offer.delivery_terms === 'DAP_EXTRA') && offer.delivery_to ? ` (${offer.delivery_to})` : ''}
+                                </strong>
+                              </div>
+                            )}
+                            {offer.delivery_timeline && (
+                              <div className="col-span-2 sm:col-span-2">
+                                <span className="text-gray-500">Termin dostawy:</span>{' '}
+                                <strong>
+                                  {offer.delivery_timeline === 'huta'
+                                    ? `huta – kampania tyg. ${offer.campaign_weeks ?? '?'}${offer.campaign_delivery_weeks ? `, dostawy od tyg. ${offer.campaign_delivery_weeks}` : ''}`
+                                    : `magazyn – ${offer.warehouse_delivery_time ?? ''}`}
+                                </strong>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Tabela pozycji płyt */}
+                          {offer.items && offer.items.length > 0 ? (
+                            <div className="rounded-lg overflow-hidden border border-blue-200">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="bg-blue-800 text-white">
+                                    <th className="text-left  px-3 py-2 font-semibold">Profil</th>
+                                    <th className="text-left  px-3 py-2 font-semibold">Gatunek</th>
+                                    <th className="text-right px-3 py-2 font-semibold">Wymiary [m]</th>
+                                    <th className="text-right px-3 py-2 font-semibold">Grub. [mm]</th>
+                                    <th className="text-right px-3 py-2 font-semibold">Ilość [szt.]</th>
+                                    <th className="text-right px-3 py-2 font-semibold">Pow. [m²]</th>
+                                    <th className="text-right px-3 py-2 font-semibold">Masa [t]</th>
+                                    <th className="text-right px-3 py-2 font-semibold">Cena {currency}/t</th>
+                                    <th className="text-right px-3 py-2 font-semibold">Wartość</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {offer.items
+                                    .sort((a, b) => a.sort_order - b.sort_order)
+                                    .map((item, i) => (
+                                    <tr key={item.id} className={i % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
+                                      <td className="px-3 py-2 font-semibold text-gray-800">{item.profile_name}</td>
+                                      <td className="px-3 py-2 text-gray-600">{item.steel_grade}</td>
+                                      <td className="px-3 py-2 text-right text-gray-600 tabular-nums">
+                                        {formatNumber(item.sheet_width_m, 2)} × {formatNumber(item.sheet_length_m, 2)}
+                                      </td>
+                                      <td className="px-3 py-2 text-right text-gray-600 tabular-nums">{item.thickness_mm}</td>
+                                      <td className="px-3 py-2 text-right text-gray-600 tabular-nums">{item.quantity_szt}</td>
+                                      <td className="px-3 py-2 text-right text-gray-600 tabular-nums">{formatNumber(item.total_area_m2, 1)}</td>
+                                      <td className="px-3 py-2 text-right text-gray-600 tabular-nums">{formatNumber(item.mass_t, 3)}</td>
+                                      <td className="px-3 py-2 text-right font-semibold text-gray-800 tabular-nums">{formatNumber(item.sell_price_per_ton, 2)}</td>
+                                      <td className="px-3 py-2 text-right font-bold text-gray-900 tabular-nums">
+                                        {currency === 'PLN'
+                                          ? `${formatPLN(item.sell_total)} PLN`
+                                          : `${formatEUR(item.sell_total)} EUR`}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                                <tfoot>
+                                  <tr className="bg-blue-50 border-t border-blue-200">
+                                    <td className="px-3 py-2 font-semibold text-blue-900" colSpan={5}>Razem:</td>
+                                    <td className="px-3 py-2 text-right font-semibold text-blue-900 tabular-nums">
+                                      {formatNumber(offer.items.reduce((s, i) => s + (i.total_area_m2 ?? 0), 0), 1)} m²
+                                    </td>
+                                    <td className="px-3 py-2 text-right font-semibold text-blue-900 tabular-nums">
+                                      {formatNumber(totalMassT, 3)} t
+                                    </td>
+                                    <td></td>
+                                    <td className="px-3 py-2 text-right font-bold text-blue-900 tabular-nums">
+                                      {currency === 'PLN'
+                                        ? `${formatPLN(offer.items.reduce((s, i) => s + (i.sell_total ?? 0), 0))} PLN`
+                                        : `${formatEUR(offer.items.reduce((s, i) => s + (i.sell_total ?? 0), 0))} EUR`}
+                                    </td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gray-400">Brak pozycji.</p>
+                          )}
+
+                          {offer.notes && (
+                            <p className="text-xs text-gray-600 italic">Notatki: {offer.notes}</p>
+                          )}
+
+                          {/* Przyciski akcji */}
+                          <div className="flex justify-between pt-2 border-t border-blue-200">
+                            <button
+                              onClick={() => handleDelete(offer)}
+                              className="inline-flex items-center gap-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 text-xs font-medium px-3 py-2 rounded-lg border border-red-200 transition-colors"
+                            >
+                              <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"/>
+                              </svg>
+                              Usuń
+                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setEditOffer(offer)}
+                                className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+                              >
+                                <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                                </svg>
+                                Edytuj
+                              </button>
+                              {/* PDF — Etap 6 */}
+                              <button
+                                disabled
+                                title="PDF w kolejnym etapie wdrożenia (Etap 6)"
+                                className="inline-flex items-center gap-1.5 bg-blue-300 text-white text-xs font-semibold px-3 py-2 rounded-lg cursor-not-allowed opacity-60"
+                              >
+                                <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"/>
+                                </svg>
+                                PDF PL
+                              </button>
+                              <button
+                                disabled
+                                title="PDF w kolejnym etapie wdrożenia (Etap 6)"
+                                className="inline-flex items-center gap-1.5 bg-indigo-300 text-white text-xs font-semibold px-3 py-2 rounded-lg cursor-not-allowed opacity-60"
+                              >
+                                <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"/>
+                                </svg>
+                                PDF EN
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-xs text-gray-400">
+        {filtered.length} z {offers.length} ofert · kliknij „pozycje" aby zobaczyć szczegóły
+      </p>
+    </div>
+  );
+}

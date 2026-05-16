@@ -12,10 +12,12 @@ import RoadPlateCalculator from './components/RoadPlateCalculator';
 import SaleSection from './components/sale/SaleSection';
 import PipeSaleSection from './components/sale/pipe/PipeSaleSection';
 import type { PipeSaleTab } from './components/sale/pipe/PipeSaleSection';
+import RoadPlateSaleSection from './components/sale/roadplate/RoadPlateSaleSection';
+import type { RoadPlateSaleTab } from './components/sale/roadplate/RoadPlateSaleSection';
 
 type Mode = 'rental' | 'sale';
 type RentalSubMode = 'sheet_pile' | 'road_plate';
-type SaleSubMode = 'sheet_pile' | 'pipe';
+type SaleSubMode = 'sheet_pile' | 'pipe' | 'road_plate';
 type Tab = 'calculator' | 'profiles' | 'prices' | 'clients' | 'offers';
 type SaleTab = 'calculator' | 'offers' | 'clients' | 'prices' | 'profiles';
 
@@ -26,8 +28,10 @@ function App() {
   const [activeTab, setActiveTab]         = useState<Tab>('calculator');
   const [saleActiveTab, setSaleActiveTab] = useState<SaleTab>('calculator');
   const [pipeSaleActiveTab, setPipeSaleActiveTab] = useState<PipeSaleTab>('calculator');
+  const [roadPlateSaleActiveTab, setRoadPlateSaleActiveTab] = useState<RoadPlateSaleTab>('calculator');
   const [saleOffersCount, setSaleOffersCount] = useState(0);
   const [pipeSaleOffersCount, setPipeSaleOffersCount] = useState(0);
+  const [roadPlateSaleOffersCount, setRoadPlateSaleOffersCount] = useState(0);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [prices, setPrices] = useState<RentalPrices | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
@@ -135,20 +139,31 @@ function App() {
     { id: 'clients',    label: 'Klienci',    badge: clients.length        || undefined },
   ];
 
-  // Wspólna lista zakładek dla nawigacji — string id, bo trzy różne discriminated unions.
+  // Faza 3: płyty drogowe sprzedaż — kalkulator, oferty SPP, klienci.
+  const roadPlateSaleTabs: { id: RoadPlateSaleTab; label: string; badge?: number }[] = [
+    { id: 'calculator', label: 'Kalkulator' },
+    { id: 'offers',     label: 'Oferty SPP', badge: roadPlateSaleOffersCount || undefined },
+    { id: 'clients',    label: 'Klienci',    badge: clients.length           || undefined },
+  ];
+
+  // Wspólna lista zakładek dla nawigacji — string id, bo cztery różne discriminated unions.
   const currentTabs: { id: string; label: string; badge?: number }[] =
     mode === 'rental'
       ? tabs
       : saleSubMode === 'pipe'
         ? pipeSaleTabs
-        : saleTabs;
+        : saleSubMode === 'road_plate'
+          ? roadPlateSaleTabs
+          : saleTabs;
 
   const currentActiveTab: string =
     mode === 'rental'
       ? activeTab
       : saleSubMode === 'pipe'
         ? pipeSaleActiveTab
-        : saleActiveTab;
+        : saleSubMode === 'road_plate'
+          ? roadPlateSaleActiveTab
+          : saleActiveTab;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -164,7 +179,9 @@ function App() {
                 {mode === 'sale'
                   ? (saleSubMode === 'pipe'
                       ? 'Kalkulator Sprzedaży Rur Stalowych'
-                      : 'Kalkulator Sprzedaży Grodzic Stalowych')
+                      : saleSubMode === 'road_plate'
+                        ? 'Kalkulator Sprzedaży Płyt Drogowych'
+                        : 'Kalkulator Sprzedaży Grodzic Stalowych')
                   : rentalSubMode === 'road_plate'
                   ? 'Kalkulator Wynajmu Płyt Drogowych'
                   : 'Kalkulator Wynajmu Grodzic Stalowych'}
@@ -226,7 +243,7 @@ function App() {
           </div>
         )}
 
-        {/* Sub-toggle GRODZICE / RURY STALOWE — widoczny tylko w trybie sprzedaży */}
+        {/* Sub-toggle GRODZICE / PŁYTY DROGOWE / RURY STALOWE — widoczny tylko w trybie sprzedaży */}
         {mode === 'sale' && (
           <div className="max-w-7xl mx-auto px-4 pb-3">
             <div className="flex rounded-lg overflow-hidden border border-blue-700 text-xs font-medium w-fit">
@@ -239,6 +256,16 @@ function App() {
                 }`}
               >
                 Grodzice
+              </button>
+              <button
+                onClick={() => setSaleSubMode('road_plate')}
+                className={`px-4 py-1.5 transition-colors ${
+                  saleSubMode === 'road_plate'
+                    ? 'bg-blue-100 text-blue-900'
+                    : 'bg-blue-800 text-blue-200 hover:bg-blue-700'
+                }`}
+              >
+                Płyty drogowe
               </button>
               <button
                 onClick={() => setSaleSubMode('pipe')}
@@ -265,6 +292,7 @@ function App() {
                   onClick={() => {
                     if (mode === 'rental') setActiveTab(tab.id as Tab);
                     else if (saleSubMode === 'pipe') setPipeSaleActiveTab(tab.id as PipeSaleTab);
+                    else if (saleSubMode === 'road_plate') setRoadPlateSaleActiveTab(tab.id as RoadPlateSaleTab);
                     else setSaleActiveTab(tab.id as SaleTab);
                   }}
                   className={`px-5 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${
@@ -313,6 +341,16 @@ function App() {
               activeTab={pipeSaleActiveTab}
               onTabChange={setPipeSaleActiveTab}
               onOffersCountChange={setPipeSaleOffersCount}
+            />
+          ) : saleSubMode === 'road_plate' ? (
+            <RoadPlateSaleSection
+              clients={clients}
+              profiles={roadPlateProfiles}
+              onClientAdded={(c) => setClients(prev => [...prev, c])}
+              onClientsChange={setClients}
+              activeTab={roadPlateSaleActiveTab}
+              onTabChange={setRoadPlateSaleActiveTab}
+              onOffersCountChange={setRoadPlateSaleOffersCount}
             />
           ) : (
             <SaleSection
