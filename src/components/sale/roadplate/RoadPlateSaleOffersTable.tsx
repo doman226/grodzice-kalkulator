@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
+import { pdf } from '@react-pdf/renderer';
 import { supabase } from '../../../lib/supabase';
 import type { Client, RoadPlateProfile, RoadPlateSaleOffer, OfferStatus } from '../../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../../lib/calculations';
 import RoadPlateEditOfferModal from './RoadPlateEditOfferModal';
-
-// PDF wkracza w Etapie 6 — na razie placeholder; przyciski disabled z tooltipem.
-// import { pdf } from '@react-pdf/renderer';
-// import RoadPlateSaleOfferPDF from './RoadPlateSaleOfferPDF';
-// import type { PdfLang } from '../../../lib/pdfStrings';
+import RoadPlateSaleOfferPDF from './RoadPlateSaleOfferPDF';
+import type { PdfLang } from '../../../lib/pdfStrings';
 
 interface Props {
   offers: RoadPlateSaleOffer[];
@@ -58,10 +56,30 @@ export default function RoadPlateSaleOffersTable({
   const [toast, setToast]               = useState('');
   const [error, setError]               = useState('');
   const [editOffer, setEditOffer]       = useState<RoadPlateSaleOffer | null>(null);
+  // pdfLoading format: "offerId-pl" | "offerId-en"
+  const [pdfLoading, setPdfLoading]     = useState<string | null>(null);
 
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(''), 2500);
+  }
+
+  async function handleDownloadPDF(offer: RoadPlateSaleOffer, lang: PdfLang = 'pl') {
+    const key = `${offer.id}-${lang}`;
+    setPdfLoading(key);
+    try {
+      const blob = await pdf(<RoadPlateSaleOfferPDF offer={offer} lang={lang} />).toBlob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `${offer.offer_number.replace(/\//g, '-')}-${lang.toUpperCase()}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError('Błąd generowania PDF: ' + (err as Error).message);
+    } finally {
+      setPdfLoading(null);
+    }
   }
 
   function handleOfferUpdated(updated: RoadPlateSaleOffer) {
@@ -437,25 +455,42 @@ export default function RoadPlateSaleOffersTable({
                                 </svg>
                                 Edytuj
                               </button>
-                              {/* PDF — Etap 6 */}
+                              {/* PDF PL */}
                               <button
-                                disabled
-                                title="PDF w kolejnym etapie wdrożenia (Etap 6)"
-                                className="inline-flex items-center gap-1.5 bg-blue-300 text-white text-xs font-semibold px-3 py-2 rounded-lg cursor-not-allowed opacity-60"
+                                onClick={() => handleDownloadPDF(offer, 'pl')}
+                                disabled={pdfLoading === `${offer.id}-pl`}
+                                title="Pobierz ofertę PDF po polsku"
+                                className="inline-flex items-center gap-1.5 bg-blue-900 hover:bg-blue-800 disabled:bg-blue-300 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
                               >
-                                <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"/>
-                                </svg>
+                                {pdfLoading === `${offer.id}-pl` ? (
+                                  <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                                  </svg>
+                                ) : (
+                                  <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"/>
+                                  </svg>
+                                )}
                                 PDF PL
                               </button>
+                              {/* PDF EN */}
                               <button
-                                disabled
-                                title="PDF w kolejnym etapie wdrożenia (Etap 6)"
-                                className="inline-flex items-center gap-1.5 bg-indigo-300 text-white text-xs font-semibold px-3 py-2 rounded-lg cursor-not-allowed opacity-60"
+                                onClick={() => handleDownloadPDF(offer, 'en')}
+                                disabled={pdfLoading === `${offer.id}-en`}
+                                title="Download offer PDF in English"
+                                className="inline-flex items-center gap-1.5 bg-indigo-700 hover:bg-indigo-600 disabled:bg-indigo-300 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
                               >
-                                <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"/>
-                                </svg>
+                                {pdfLoading === `${offer.id}-en` ? (
+                                  <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                                  </svg>
+                                ) : (
+                                  <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"/>
+                                  </svg>
+                                )}
                                 PDF EN
                               </button>
                             </div>

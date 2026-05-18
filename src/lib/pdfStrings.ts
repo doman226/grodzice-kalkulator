@@ -1225,3 +1225,282 @@ export const PIPE_SALE_PDF_STRINGS: Record<PdfLang, PipeSalePdfStrings> = {
   pl: pipeSale_pl,
   en: pipeSale_en,
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── PDF: Road Plate Sale (sprzedaż płyt drogowych) ────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Różnice względem PipeSalePdfStrings:
+//   - Bez `thNorm`, `thLengthM`, `thKgPerM` (płyty nie mają norm dynamicznych)
+//   - Bez `techCondition*`, `techSurface*`, `techNormMultiple/NoCert`
+//     (płyty mają zawsze stałe warunki techniczne dla stali konstrukcyjnej)
+//   - Dodane: `thProfile`, `thDimensions` (W×L), `thThickness`, `thArea`
+//   - `priceBreakdownPlates` zamiast `priceBreakdownPipes` (etykieta sumy)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface RoadPlateSalePdfStrings {
+  // Document
+  docTitle:        (offerNo: string) => string;
+  docLanguage:     string;
+  offerTitle:      string;
+
+  // Meta block
+  date:            string;
+  offerNumber:     string;
+  salesRep:        string;
+  phone:           string;
+  exchangeRate:    string;
+  customerLabel:   string;
+  vatLabel:        (country: string) => string;
+
+  // Greeting & intro
+  greeting:        string;
+  intro:           string;
+
+  // Items table — 9 kolumn (Profil, Gatunek, Wymiary W×L, Grub., Ilość, Pow., Masa, Cena/t, Wartość)
+  thProfile:       string;
+  thSteelGrade:    string;
+  thDimensions:    string;   // "Wymiary [W×L m]"
+  thThickness:     string;   // "Grub. [mm]"
+  thQty:           string;   // "Ilość [szt.]"
+  thArea:          string;   // "Pow. [m²]"
+  thMass:          string;
+  thPricePerT:     string;
+  thValue:         string;
+
+  // Table body
+  unitPcs:         string;
+  unitArea:        string;   // "m²"
+  totalRow:        string;
+
+  // Price box
+  priceLabel:                 string;
+  priceBreakdownPlates:       (val: string) => string;
+  priceBreakdownTransport:    (val: string) => string;
+  priceBreakdownRecharge:     string;
+  netSuffix:                  string;
+
+  // Transport
+  sectionTransport:   string;
+  labelDelivery:      string;
+  labelRoute:         string;
+  labelTrucks:        string;
+  labelCostPerTruck:  string;
+  labelTotalDelivery: string;
+  labelSettlement:    string;
+  labelPickupFrom:    string;
+  valueDapIncluded:   string;
+  valueDapExtra:      string;
+  valueFca:           string;
+  valueRecharge:      string;
+
+  // Sekcje
+  sectionDeliveryTime:   string;
+  sectionDeliveryTerms:  string;
+  sectionTechnical:      string;
+  sectionCommercial:     string;
+  sectionValidity:       string;
+
+  // Termin dostawy
+  deliveryFromMill:   (weeks: string, deliveryWeeks?: string) => string;
+  deliveryFromStock:  (time?: string) => string;
+
+  // Warunki dostawy (Incoterms)
+  deliveryFca:      (location: string) => string;
+  deliveryDap:      (address: string) => string;
+  deliveryDapExtra: (address: string) => string;
+
+  // Warunki techniczne — 4 linie statyczne, identyczne z PDF wynajmu płyt
+  // (decyzja biznesowa: spójność warunków między ofertą wynajmu a sprzedaży).
+  techGrade:           string;   // "- gatunek stali zgodny z ofertą."
+  techToleranceWidth:  string;   // "- tolerancja szerokości −0/+100 mm (mill edges)."
+  techToleranceLength: string;   // "- tolerancja długości −0/+200 mm (mill edges)."
+  techWeighing:        string;   // "- fakturowanie wg wagi rzeczywistej."
+
+  // Płatność
+  paymentPrepaid: string;
+  paymentCredit:  (days: number) => string;
+
+  // Ważność
+  validityLine1:  (label: string) => string;
+  validityLine2:  string;
+  validityLabel:  (days: number) => string;
+
+  // Notes
+  notesLabel: string;
+}
+
+// ─── POLISH ───────────────────────────────────────────────────────────────────
+
+const roadPlateSale_pl: RoadPlateSalePdfStrings = {
+  docTitle:     offerNo => `Oferta sprzedaży płyt drogowych ${offerNo}`,
+  docLanguage:  'pl',
+  offerTitle:   'OFERTA SPRZEDAŻY',
+
+  date:         'Data:',
+  offerNumber:  'Numer oferty:',
+  salesRep:     'Opiekun handlowy:',
+  phone:        'Telefon:',
+  exchangeRate: 'Kurs:',
+  customerLabel:'Klient:',
+  vatLabel:     country => country === 'PL' ? 'NIP:' : 'VAT:',
+
+  greeting: 'Dzień dobry,',
+  intro:    'W nawiązaniu do przesłanego zapytania oraz naszych Ogólnych Warunków Sprzedaży i Płatności, oferujemy sprzedaż płyt drogowych na poniższych warunkach:',
+
+  thProfile:    'Profil',
+  thSteelGrade: 'Gatunek',
+  thDimensions: 'Wymiary [W×L m]',
+  thThickness:  'Grub. [mm]',
+  thQty:        'Ilość [szt.]',
+  thArea:       'Pow. [m²]',
+  thMass:       'Masa [t]',
+  thPricePerT:  'Cena [waluta/t]',
+  thValue:      'Wartość',
+
+  unitPcs:      'szt.',
+  unitArea:     'm²',
+  totalRow:     'RAZEM',
+
+  priceLabel:               'Cena sprzedaży',
+  priceBreakdownPlates:     val => `płyty ${val}`,
+  priceBreakdownTransport:  val => `transport ${val}`,    // unused — DAP w cenie ukrywa transport
+  priceBreakdownRecharge:   '+ transport refakturowany osobno',
+  netSuffix:                'netto',
+
+  sectionTransport:   'Transport',
+  labelDelivery:      'Dostawa:',
+  labelRoute:         'Trasa:',
+  labelTrucks:        'Liczba aut:',
+  labelCostPerTruck:  'Koszt / auto:',
+  labelTotalDelivery: 'Razem transport:',
+  labelSettlement:    'Rozliczenie:',
+  labelPickupFrom:    'Odbiór z:',
+  valueDapIncluded:   'DAP – transport w cenie',
+  valueDapExtra:      'DAP – transport refakturowany',
+  valueFca:           'FCA – odbiór własny',
+  valueRecharge:      '⚠ Refakturowany na klienta',
+
+  sectionDeliveryTime:   'Termin dostawy',
+  sectionDeliveryTerms:  'Warunki dostawy (Incoterms 2020)',
+  sectionTechnical:      'Warunki techniczne',
+  sectionCommercial:     'Warunki handlowe:',
+  sectionValidity:       'Ważność oferty:',
+
+  deliveryFromMill: (weeks, deliveryWeeks) =>
+    deliveryWeeks
+      ? `Produkcja w tygodniach ${weeks}, dostawa w tygodniach ${deliveryWeeks} (czas produkcyjny huty).`
+      : `Produkcja w tygodniach ${weeks} (czas produkcyjny huty).`,
+  deliveryFromStock: time =>
+    time ? `Dostawa z magazynu w czasie: ${time}.` : 'Dostawa z magazynu — termin do uzgodnienia.',
+
+  deliveryFca:      location => `Dostawa zgodnie z FCA. Odbiór własny z: ${location}.`,
+  deliveryDap:      address  => `Dostawa zgodnie z DAP do: ${address}.`,
+  deliveryDapExtra: address  => `Dostawa zgodnie z DAP do: ${address}. Koszt transportu refakturowany na klienta.`,
+
+  techGrade:           'gatunek stali zgodny z ofertą.',
+  techToleranceWidth:  'tolerancja szerokości −0/+100 mm (mill edges).',
+  techToleranceLength: 'tolerancja długości −0/+200 mm (mill edges).',
+  techWeighing:        'fakturowanie wg wagi rzeczywistej.',
+
+  paymentPrepaid: 'przedpłata 100%.',
+  paymentCredit:  days =>
+    `${days} dni od daty wystawienia faktury, z zastrzeżeniem uzyskania zabezpieczenia wartości zamówienia (Limit kupiecki, gwarancja bankowa, gwarancja płatności publicznego inwestora lub inne zabezpieczenie zaakceptowane przez Intra BV).`,
+
+  validityLine1:  label => `- Oferta ważna ${label} od daty wysłania i wymaga finalnego potwierdzenia.`,
+  validityLine2:  '- Oferta nie rezerwuje dostępności magazynowych oraz możliwości produkcyjnych.',
+  validityLabel:  days  => days === 1 ? '24h' : `${days} dni`,
+
+  notesLabel: 'Uwagi',
+};
+
+// ─── ENGLISH ──────────────────────────────────────────────────────────────────
+
+const roadPlateSale_en: RoadPlateSalePdfStrings = {
+  docTitle:     offerNo => `Road plate sales offer ${offerNo}`,
+  docLanguage:  'en',
+  offerTitle:   'SALES OFFER',
+
+  date:         'Date:',
+  offerNumber:  'Offer number:',
+  salesRep:     'Sales contact:',
+  phone:        'Phone:',
+  exchangeRate: 'Exchange rate:',
+  customerLabel:'Customer:',
+  vatLabel:     country => country === 'PL' ? 'NIP:' : 'VAT:',
+
+  greeting: 'Dear Sir or Madam,',
+  intro:    'With reference to your enquiry and our General Terms and Conditions of Sale and Payment, we are pleased to offer road plates on the following terms:',
+
+  thProfile:    'Profile',
+  thSteelGrade: 'Steel grade',
+  thDimensions: 'Dimensions [W×L m]',
+  thThickness:  'Thick. [mm]',
+  thQty:        'Qty [pcs]',
+  thArea:       'Area [m²]',
+  thMass:       'Mass [t]',
+  thPricePerT:  'Price [currency/t]',
+  thValue:      'Value',
+
+  unitPcs:      'pcs',
+  unitArea:     'm²',
+  totalRow:     'TOTAL',
+
+  priceLabel:               'Sale price',
+  priceBreakdownPlates:     val => `plates ${val}`,
+  priceBreakdownTransport:  val => `transport ${val}`,
+  priceBreakdownRecharge:   '+ transport recharged separately',
+  netSuffix:                'net',
+
+  sectionTransport:   'Transport',
+  labelDelivery:      'Delivery:',
+  labelRoute:         'Route:',
+  labelTrucks:        'Number of trucks:',
+  labelCostPerTruck:  'Cost / truck:',
+  labelTotalDelivery: 'Total transport:',
+  labelSettlement:    'Settlement:',
+  labelPickupFrom:    'Pick-up from:',
+  valueDapIncluded:   'DAP – delivery included in price',
+  valueDapExtra:      'DAP – transport recharged',
+  valueFca:           'FCA – customer collection',
+  valueRecharge:      '⚠ Recharged to customer',
+
+  sectionDeliveryTime:   'Delivery time',
+  sectionDeliveryTerms:  'Delivery terms (Incoterms 2020)',
+  sectionTechnical:      'Technical conditions',
+  sectionCommercial:     'Commercial terms:',
+  sectionValidity:       'Validity of offer:',
+
+  deliveryFromMill: (weeks, deliveryWeeks) =>
+    deliveryWeeks
+      ? `Production in weeks ${weeks}, delivery in weeks ${deliveryWeeks} (mill production time).`
+      : `Production in weeks ${weeks} (mill production time).`,
+  deliveryFromStock: time =>
+    time ? `Delivery from stock within: ${time}.` : 'Delivery from stock — date to be agreed.',
+
+  deliveryFca:      location => `Delivery according to FCA. Collection from: ${location}.`,
+  deliveryDap:      address  => `Delivery according to DAP to: ${address}.`,
+  deliveryDapExtra: address  => `Delivery according to DAP to: ${address}. Transport cost recharged to customer.`,
+
+  techGrade:           'steel grade as stated in this offer.',
+  techToleranceWidth:  'width tolerance −0/+100 mm (mill edges).',
+  techToleranceLength: 'length tolerance −0/+200 mm (mill edges).',
+  techWeighing:        'invoicing based on actual weight.',
+
+  paymentPrepaid: '100% prepayment.',
+  paymentCredit:  days =>
+    `${days} days from invoice date, subject to obtaining security for the order value (Credit limit, bank guarantee, payment guarantee from a public investor, or other security accepted by Intra B.V.).`,
+
+  validityLine1:  label => `- This quotation is valid for ${label} from the date of issue and requires final confirmation.`,
+  validityLine2:  '- This quotation does not reserve stock availability or production capacity.',
+  validityLabel:  days  => days === 1 ? '24 hours' : `${days} days`,
+
+  notesLabel: 'Notes',
+};
+
+// ─── Export (Road Plate Sale) ─────────────────────────────────────────────────
+
+export const ROAD_PLATE_SALE_PDF_STRINGS: Record<PdfLang, RoadPlateSalePdfStrings> = {
+  pl: roadPlateSale_pl,
+  en: roadPlateSale_en,
+};
