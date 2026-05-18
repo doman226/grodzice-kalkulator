@@ -3,13 +3,15 @@ import { supabase } from '../../../lib/supabase';
 import type { Client, RoadPlateProfile, RoadPlateSaleOffer, RoadPlateSalePrice } from '../../../types';
 import RoadPlateSaleCalculator from './RoadPlateSaleCalculator';
 import RoadPlateSaleOffersTable from './RoadPlateSaleOffersTable';
+import RoadPlateSalePriceTable from './RoadPlateSalePriceTable';
 import ClientsTable from '../../ClientsTable';
 
 // Komponent kontrolowany — analogicznie do PipeSaleSection i SaleSection.
 // Etap 5: dodana pełna tabela ofert (RoadPlateSaleOffersTable) + edit modal.
-// Etap 7 doda prices i profiles.
+// Etap 7: dodana zakładka cennika (RoadPlateSalePriceTable).
+// Profile płyt — wspólny katalog z modułem wynajmu (zakładka Wynajem → Profile płyt).
 
-export type RoadPlateSaleTab = 'calculator' | 'offers' | 'clients';
+export type RoadPlateSaleTab = 'calculator' | 'offers' | 'clients' | 'prices';
 
 interface Props {
   clients: Client[];
@@ -125,6 +127,19 @@ export default function RoadPlateSaleSection({
       )}
       {activeTab === 'clients' && (
         <ClientsTable clients={clients} onClientsChange={onClientsChange} />
+      )}
+      {activeTab === 'prices' && (
+        loading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-900" />
+          </div>
+        ) : (
+          <RoadPlateSalePriceTable
+            profiles={profiles}
+            prices={prices}
+            onPricesChange={setPrices}
+          />
+        )
       )}
     </div>
   );

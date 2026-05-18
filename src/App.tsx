@@ -139,11 +139,13 @@ function App() {
     { id: 'clients',    label: 'Klienci',    badge: clients.length        || undefined },
   ];
 
-  // Faza 3: płyty drogowe sprzedaż — kalkulator, oferty SPP, klienci.
+  // Faza 3: płyty drogowe sprzedaż — kalkulator, oferty SPP, klienci, cennik.
+  // Profile płyt to wspólny katalog z modułem wynajmu — edycja w Wynajem → Profile płyt.
   const roadPlateSaleTabs: { id: RoadPlateSaleTab; label: string; badge?: number }[] = [
     { id: 'calculator', label: 'Kalkulator' },
     { id: 'offers',     label: 'Oferty SPP', badge: roadPlateSaleOffersCount || undefined },
     { id: 'clients',    label: 'Klienci',    badge: clients.length           || undefined },
+    { id: 'prices',     label: 'Cennik' },
   ];
 
   // Wspólna lista zakładek dla nawigacji — string id, bo cztery różne discriminated unions.
