@@ -27,6 +27,7 @@ interface Props {
   clients: Client[];
   onSaved: (offer: Offer) => void;
   onClose: () => void;
+  mode?: 'edit' | 'copy';
 }
 
 const TRUCK_CAPACITY_T = 24.5;
@@ -61,7 +62,8 @@ function itemsFromOffer(offer: Offer, profiles: Profile[]): CalcItem[] {
   }];
 }
 
-export default function EditOfferModal({ offer, profiles, prices, clients, onSaved, onClose }: Props) {
+export default function EditOfferModal({ offer, profiles, prices, clients, onSaved, onClose, mode = 'edit' }: Props) {
+  const isCopy = mode === 'copy';
   const [items, setItems] = useState<CalcItem[]>(() => itemsFromOffer(offer, profiles));
   const [rentalWeeks, setRentalWeeks] = useState(offer.rental_weeks);
   const [displayUnit, setDisplayUnit] = useState<'weeks' | 'months'>(offer.display_unit ?? 'weeks');
@@ -234,8 +236,7 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
       transportCalc.costPerTruck > 0 && transportPaidBy === 'dap_included' ? transportCalc.totalCost : 0
     );
 
-    // 1. Aktualizuj główny rekord oferty
-    const { data, error: err } = await supabase.from('offers').update({
+    const offerPayload = {
       client_id: clientId,
       profile_name: mainProfileName,
       profile_type: mainProfileType,
@@ -275,13 +276,8 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
       valid_days: validDays,
       payment_days: paymentDays,
       prepared_by: preparedBy,
-      updated_at: new Date().toISOString(),
-    }).eq('id', offer.id).select('*, client:clients(*)').single();
+    };
 
-    if (err) { setSaving(false); return setError('Błąd zapisu: ' + err.message); }
-
-    // 2. Atomowe zastąpienie pozycji przez Postgres RPC (DELETE + INSERT w jednej transakcji)
-    // Jeśli INSERT się nie powiedzie, DELETE jest automatycznie cofany
     const newItems = items.flatMap((item, idx) => {
       const r = itemResults[idx];
       if (!r.profile || !r.valid) return [];
@@ -298,34 +294,68 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
       }];
     });
 
-    const { data: rpcItems, error: rpcErr } = await supabase
-      .rpc('update_offer_items_atomic_v2', {
-        p_offer_id: offer.id,
-        p_items: newItems,
-      });
-    if (rpcErr) {
-      // Nagłówek oferty już zaktualizowany – cofnij do poprzednich wartości
-      await supabase.from('offers').update({
-        mass_t: offer.mass_t,
-        total_length_m: offer.total_length_m,
-        wall_area_m2: offer.wall_area_m2,
-        rental_cost_pln: offer.rental_cost_pln,
-        rental_cost_eur: offer.rental_cost_eur,
-        currency: offer.currency,
-        exchange_rate: offer.exchange_rate,
-        cost_per_m2: offer.cost_per_m2,
-        cost_per_ton: offer.cost_per_ton,
-        quantity: offer.quantity,
-        updated_at: offer.updated_at,
-      }).eq('id', offer.id);
-      setSaving(false);
-      return setError('Błąd aktualizacji pozycji – przywrócono poprzedni stan oferty. Spróbuj ponownie: ' + rpcErr.message);
-    }
-    setSaving(false);
+    if (isCopy) {
+      // INSERT nowej oferty — numer nadaje trigger DB
+      const { data, error: err } = await supabase.from('offers').insert({
+        ...offerPayload,
+        offer_number: '',
+        item_type: offer.item_type ?? 'sheet_pile',
+        status: 'szkic',
+      }).select('*, client:clients(*)').single();
 
-    const updatedOffer = data as Offer;
-    updatedOffer.items = Array.isArray(rpcItems) ? rpcItems : [];
-    onSaved(updatedOffer);
+      if (err) { setSaving(false); return setError('Błąd zapisu kopii: ' + err.message); }
+
+      const savedOffer = data as Offer;
+
+      const { data: insertedItems, error: itemsErr } = await supabase.from('offer_items').insert(
+        newItems.map(ni => ({ ...ni, offer_id: savedOffer.id }))
+      ).select();
+
+      if (itemsErr) {
+        await supabase.rpc('soft_delete_offer', { p_offer_id: savedOffer.id });
+        setSaving(false);
+        return setError('Błąd zapisu pozycji kopii – oferta anulowana. Spróbuj ponownie: ' + itemsErr.message);
+      }
+      setSaving(false);
+      savedOffer.items = (insertedItems ?? []) as typeof savedOffer.items;
+      onSaved(savedOffer);
+    } else {
+      // UPDATE istniejącej oferty
+      const { data, error: err } = await supabase.from('offers').update({
+        ...offerPayload,
+        updated_at: new Date().toISOString(),
+      }).eq('id', offer.id).select('*, client:clients(*)').single();
+
+      if (err) { setSaving(false); return setError('Błąd zapisu: ' + err.message); }
+
+      const { data: rpcItems, error: rpcErr } = await supabase
+        .rpc('update_offer_items_atomic_v2', {
+          p_offer_id: offer.id,
+          p_items: newItems,
+        });
+      if (rpcErr) {
+        await supabase.from('offers').update({
+          mass_t: offer.mass_t,
+          total_length_m: offer.total_length_m,
+          wall_area_m2: offer.wall_area_m2,
+          rental_cost_pln: offer.rental_cost_pln,
+          rental_cost_eur: offer.rental_cost_eur,
+          currency: offer.currency,
+          exchange_rate: offer.exchange_rate,
+          cost_per_m2: offer.cost_per_m2,
+          cost_per_ton: offer.cost_per_ton,
+          quantity: offer.quantity,
+          updated_at: offer.updated_at,
+        }).eq('id', offer.id);
+        setSaving(false);
+        return setError('Błąd aktualizacji pozycji – przywrócono poprzedni stan oferty. Spróbuj ponownie: ' + rpcErr.message);
+      }
+      setSaving(false);
+
+      const updatedOffer = data as Offer;
+      updatedOffer.items = Array.isArray(rpcItems) ? rpcItems : [];
+      onSaved(updatedOffer);
+    }
   }
 
   return (
@@ -333,8 +363,8 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-100 flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-800">Edytuj ofertę</h3>
-            <p className="text-xs text-gray-400 mt-0.5 font-mono">{offer.offer_number}</p>
+            <h3 className="text-lg font-semibold text-gray-800">{isCopy ? 'Kopiuj ofertę' : 'Edytuj ofertę'}</h3>
+            <p className="text-xs text-gray-400 mt-0.5 font-mono">{isCopy ? `na podstawie ${offer.offer_number}` : offer.offer_number}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
         </div>
@@ -695,7 +725,7 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
         <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">Anuluj</button>
           <button onClick={handleSave} disabled={saving} className="px-6 py-2 text-sm text-white bg-blue-900 rounded-lg hover:bg-blue-800 font-medium disabled:opacity-50">
-            {saving ? 'Zapisywanie...' : 'Zapisz zmiany'}
+            {saving ? 'Zapisywanie...' : isCopy ? 'Zapisz kopię' : 'Zapisz zmiany'}
           </button>
         </div>
       </div>

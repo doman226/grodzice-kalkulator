@@ -46,6 +46,7 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
   const [statusSaving, setStatusSaving] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading]     = useState<string | null>(null);
   const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
+  const [copyingOffer, setCopyingOffer] = useState<Offer | null>(null);
   const [toast, setToast]               = useState('');
   const [error, setError]               = useState('');
 
@@ -396,6 +397,15 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
                             Usuń
                           </button>
                           <button
+                            onClick={() => setCopyingOffer(offer)}
+                            className="inline-flex items-center gap-1.5 text-green-700 hover:text-green-900 hover:bg-green-50 text-xs font-medium px-3 py-2 rounded-lg border border-green-300 transition-colors"
+                          >
+                            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M7 2a2 2 0 00-2 2v1a2 2 0 00-2 2v9a2 2 0 002 2h6a2 2 0 002-2v-1a2 2 0 002-2V4a2 2 0 00-2-2H7zm0 2h6v9H5V7h2V4zm-2 5v5h6v-1H7a2 2 0 01-2-2V9z"/>
+                            </svg>
+                            Kopiuj
+                          </button>
+                          <button
                             onClick={() => setEditingOffer(offer)}
                             className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
                           >
@@ -490,6 +500,46 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
             showToast('Oferta zaktualizowana ✓');
           }}
           onClose={() => setEditingOffer(null)}
+        />
+      ) : null}
+
+      {copyingOffer && copyingOffer.item_type === 'road_plate' ? (
+        roadPlateProfiles && roadPlatePrices ? (
+          <EditRoadPlateOfferModal
+            offer={copyingOffer}
+            mode="copy"
+            profiles={roadPlateProfiles}
+            prices={roadPlatePrices}
+            clients={clients}
+            onSaved={(newOffer) => {
+              onOffersChange([newOffer, ...offers]);
+              setCopyingOffer(null);
+              showToast('Kopia oferty utworzona ✓');
+            }}
+            onClose={() => setCopyingOffer(null)}
+          />
+        ) : (
+          <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md text-center">
+              <p className="text-red-700 font-medium mb-3">Brak danych do kopiowania oferty płyty drogowej</p>
+              <p className="text-sm text-gray-600 mb-4">Komponent OffersTable nie otrzymał profili lub cennika road_plate.</p>
+              <button onClick={() => setCopyingOffer(null)} className="px-4 py-2 bg-gray-100 rounded-lg text-sm">Zamknij</button>
+            </div>
+          </div>
+        )
+      ) : copyingOffer ? (
+        <EditOfferModal
+          offer={copyingOffer}
+          mode="copy"
+          profiles={profiles}
+          prices={prices}
+          clients={clients}
+          onSaved={(newOffer) => {
+            onOffersChange([newOffer, ...offers]);
+            setCopyingOffer(null);
+            showToast('Kopia oferty utworzona ✓');
+          }}
+          onClose={() => setCopyingOffer(null)}
         />
       ) : null}
     </div>

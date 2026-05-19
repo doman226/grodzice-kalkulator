@@ -24,6 +24,7 @@ interface Props {
   clients: Client[];
   onSaved: (offer: Offer) => void;
   onClose: () => void;
+  mode?: 'edit' | 'copy';
 }
 
 const TRUCK_CAPACITY_T = 24.5;
@@ -55,7 +56,8 @@ function itemsFromOffer(offer: Offer, profiles: RoadPlateProfile[]): CalcItem[] 
   }];
 }
 
-export default function EditRoadPlateOfferModal({ offer, profiles, prices, clients, onSaved, onClose }: Props) {
+export default function EditRoadPlateOfferModal({ offer, profiles, prices, clients, onSaved, onClose, mode = 'edit' }: Props) {
+  const isCopy = mode === 'copy';
   const [items, setItems] = useState<CalcItem[]>(() => itemsFromOffer(offer, profiles));
   const [rentalWeeks, setRentalWeeks] = useState(offer.rental_weeks);
   const [displayUnit, setDisplayUnit] = useState<'weeks' | 'months'>(offer.display_unit ?? 'weeks');
@@ -222,8 +224,7 @@ export default function EditRoadPlateOfferModal({ offer, profiles, prices, clien
       transportCalc.costPerTruck > 0 && transportPaidBy === 'dap_included' ? transportCalc.totalCost : 0
     );
 
-    // 1. Aktualizuj główny rekord oferty
-    const { data, error: err } = await supabase.from('offers').update({
+    const offerPayload = {
       client_id: clientId,
       profile_name: mainProfileName,
       profile_type: 'PLATE',
@@ -251,7 +252,6 @@ export default function EditRoadPlateOfferModal({ offer, profiles, prices, clien
       base_price_pln: toPLN(customBasePricePln),
       weekly_cost_pln: totals.totalMassT * toPLN(customPricePerWeek1),
       price_per_week_1: toPLN(customPricePerWeek1),
-      // Damage snapshot — zawsze w PLN canonical (przeliczone z waluty oferty)
       rp_loss_price_pln:    toPLN(lossPrice),
       rp_service_hour_pln:  toPLN(serviceHourPrice),
       rp_sorting_price_pln: toPLN(sortingPrice),
@@ -262,13 +262,8 @@ export default function EditRoadPlateOfferModal({ offer, profiles, prices, clien
       valid_days: validDays,
       payment_days: paymentDays,
       prepared_by: preparedBy,
-      updated_at: new Date().toISOString(),
-    }).eq('id', offer.id).select('*, client:clients(*)').single();
+    };
 
-    if (err) { setSaving(false); return setError('Błąd zapisu oferty: ' + err.message); }
-
-    // 2. Atomowa aktualizacja pozycji przez RPC update_offer_items_atomic_v2
-    //    (DELETE + INSERT w jednej transakcji DB — Postgres rollbackuje przy błędzie)
     const newItems = items.flatMap((item, idx) => {
       const r = itemResults[idx];
       if (!r.profile || !r.valid) return [];
@@ -290,44 +285,73 @@ export default function EditRoadPlateOfferModal({ offer, profiles, prices, clien
       }];
     });
 
-    const { data: rpcItems, error: rpcErr } = await supabase
-      .rpc('update_offer_items_atomic_v2', {
-        p_offer_id: offer.id,
-        p_items: newItems,
-      });
+    if (isCopy) {
+      const { data, error: err } = await supabase.from('offers').insert({
+        ...offerPayload,
+        offer_number: '',
+        item_type: 'road_plate',
+        status: 'szkic',
+      }).select('*, client:clients(*)').single();
 
-    if (rpcErr) {
-      // Nagłówek oferty już zaktualizowany — cofnij do wartości sprzed edycji.
-      // Pozycje w bazie NIE zostały dotknięte (RPC rollbackowane przez Postgres).
-      await supabase.from('offers').update({
-        mass_t: offer.mass_t,
-        total_length_m: offer.total_length_m,
-        wall_area_m2: offer.wall_area_m2,
-        rental_cost_pln: offer.rental_cost_pln,
-        rental_cost_eur: offer.rental_cost_eur,
-        currency: offer.currency,
-        exchange_rate: offer.exchange_rate,
-        cost_per_m2: offer.cost_per_m2,
-        cost_per_ton: offer.cost_per_ton,
-        quantity: offer.quantity,
-        rp_loss_price_pln:    offer.rp_loss_price_pln    ?? null,
-        rp_service_hour_pln:  offer.rp_service_hour_pln  ?? null,
-        rp_sorting_price_pln: offer.rp_sorting_price_pln ?? null,
-        rp_m12_welding_pln:   offer.rp_m12_welding_pln   ?? null,
-        rp_cutting_head_pln:  offer.rp_cutting_head_pln  ?? null,
-        rp_lifting_hole_pln:  offer.rp_lifting_hole_pln  ?? null,
-        updated_at: offer.updated_at,
-      }).eq('id', offer.id);
+      if (err) { setSaving(false); return setError('Błąd zapisu kopii: ' + err.message); }
+
+      const savedOffer = data as Offer;
+
+      const { data: insertedItems, error: itemsErr } = await supabase.from('offer_items').insert(
+        newItems.map(ni => ({ ...ni, offer_id: savedOffer.id }))
+      ).select();
+
+      if (itemsErr) {
+        await supabase.rpc('soft_delete_offer', { p_offer_id: savedOffer.id });
+        setSaving(false);
+        return setError('Błąd zapisu pozycji kopii – oferta anulowana. Spróbuj ponownie: ' + itemsErr.message);
+      }
       setSaving(false);
-      return setError('Błąd aktualizacji pozycji – przywrócono poprzedni stan oferty. Spróbuj ponownie: ' + rpcErr.message);
+      savedOffer.items = (insertedItems ?? []) as typeof savedOffer.items;
+      onSaved(savedOffer);
+    } else {
+      const { data, error: err } = await supabase.from('offers').update({
+        ...offerPayload,
+        updated_at: new Date().toISOString(),
+      }).eq('id', offer.id).select('*, client:clients(*)').single();
+
+      if (err) { setSaving(false); return setError('Błąd zapisu oferty: ' + err.message); }
+
+      const { data: rpcItems, error: rpcErr } = await supabase
+        .rpc('update_offer_items_atomic_v2', {
+          p_offer_id: offer.id,
+          p_items: newItems,
+        });
+
+      if (rpcErr) {
+        await supabase.from('offers').update({
+          mass_t: offer.mass_t,
+          total_length_m: offer.total_length_m,
+          wall_area_m2: offer.wall_area_m2,
+          rental_cost_pln: offer.rental_cost_pln,
+          rental_cost_eur: offer.rental_cost_eur,
+          currency: offer.currency,
+          exchange_rate: offer.exchange_rate,
+          cost_per_m2: offer.cost_per_m2,
+          cost_per_ton: offer.cost_per_ton,
+          quantity: offer.quantity,
+          rp_loss_price_pln:    offer.rp_loss_price_pln    ?? null,
+          rp_service_hour_pln:  offer.rp_service_hour_pln  ?? null,
+          rp_sorting_price_pln: offer.rp_sorting_price_pln ?? null,
+          rp_m12_welding_pln:   offer.rp_m12_welding_pln   ?? null,
+          rp_cutting_head_pln:  offer.rp_cutting_head_pln  ?? null,
+          rp_lifting_hole_pln:  offer.rp_lifting_hole_pln  ?? null,
+          updated_at: offer.updated_at,
+        }).eq('id', offer.id);
+        setSaving(false);
+        return setError('Błąd aktualizacji pozycji – przywrócono poprzedni stan oferty. Spróbuj ponownie: ' + rpcErr.message);
+      }
+
+      setSaving(false);
+      const updatedOffer = data as Offer;
+      updatedOffer.items = Array.isArray(rpcItems) ? (rpcItems as typeof updatedOffer.items) : [];
+      onSaved(updatedOffer);
     }
-
-    setSaving(false);
-    const insertedItems = Array.isArray(rpcItems) ? rpcItems : [];
-
-    const updatedOffer = data as Offer;
-    updatedOffer.items = (insertedItems ?? []) as typeof updatedOffer.items;
-    onSaved(updatedOffer);
   }
 
   return (
@@ -335,8 +359,8 @@ export default function EditRoadPlateOfferModal({ offer, profiles, prices, clien
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-100 flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-800">Edytuj ofertę — płyty drogowe</h3>
-            <p className="text-xs text-gray-400 mt-0.5 font-mono">{offer.offer_number}</p>
+            <h3 className="text-lg font-semibold text-gray-800">{isCopy ? 'Kopiuj ofertę — płyty drogowe' : 'Edytuj ofertę — płyty drogowe'}</h3>
+            <p className="text-xs text-gray-400 mt-0.5 font-mono">{isCopy ? `na podstawie ${offer.offer_number}` : offer.offer_number}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
         </div>
@@ -672,7 +696,7 @@ export default function EditRoadPlateOfferModal({ offer, profiles, prices, clien
         <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">Anuluj</button>
           <button onClick={handleSave} disabled={saving} className="px-6 py-2 text-sm text-white bg-blue-900 rounded-lg hover:bg-blue-800 font-medium disabled:opacity-50">
-            {saving ? 'Zapisywanie...' : 'Zapisz zmiany'}
+            {saving ? 'Zapisywanie...' : isCopy ? 'Zapisz kopię' : 'Zapisz zmiany'}
           </button>
         </div>
       </div>
