@@ -37,6 +37,7 @@ interface Props {
   onSaved: (offer: RoadPlateSaleOffer) => void;
   onClose: () => void;
   onClientAdded: (c: Client) => void;
+  mode?: 'edit' | 'copy';
 }
 
 // ─── Stałe ──────────────────────────────────────────────────────────────────
@@ -93,8 +94,9 @@ function marginColor(pct: number): string {
 // ─── Komponent ────────────────────────────────────────────────────────────────
 
 export default function RoadPlateEditOfferModal({
-  offer, clients, profiles, onSaved, onClose, onClientAdded,
+  offer, clients, profiles, onSaved, onClose, onClientAdded, mode = 'edit',
 }: Props) {
+  const isCopy = mode === 'copy';
   // ── Stan: lazy initial dla pre-fillu ──
   const [editItems, setEditItems]     = useState<EditableItem[]>(() => itemsFromOffer(offer));
   const [clientId, setClientId]       = useState(offer.client_id ?? '');
@@ -325,63 +327,41 @@ export default function RoadPlateEditOfferModal({
 
     const hasTransport = deliveryPaidBy !== 'fca' && deliveryCalc !== null && deliveryCalc.costPerTruck > 0;
 
-    // KROK 1: UPDATE oferty
-    const { data: updatedOffer, error: updateErr } = await supabase
-      .from('road_plate_sale_offers')
-      .update({
-        client_id:                 clientId,
-        status,
-        notes:                     notes.trim() || null,
-        valid_days:                validDays,
-        payment_days:              paymentDays,
-        prepared_by:               preparedBy,
-        currency,
-        exchange_rate:             exchangeRate,
-        total_cost_eur:            totalCostEUR || null,
-        total_sell_eur:            totalSellEUR || null,
-        total_sell_pln:            totalSellPLN || null,
-        margin_pct:                totals.totalMarginPct,
-        delivery_trucks:           hasTransport ? deliveryCalc!.trucks       : null,
-        delivery_cost_per_truck:   hasTransport ? deliveryCalc!.costPerTruck : null,
-        delivery_cost_total:       hasTransport ? deliveryCalc!.totalCostPLN : null,
-        delivery_paid_by:          deliveryPaidBy,
-        delivery_from:             deliveryFrom.trim() || null,
-        delivery_to:               deliveryTo.trim()   || null,
-        delivery_timeline:         deliveryTimeline,
-        campaign_weeks:            deliveryTimeline === 'huta'    ? campaignWeeks.trim()                : null,
-        campaign_delivery_weeks:   deliveryTimeline === 'huta'    ? (campaignDeliveryWeeks.trim() || null) : null,
-        warehouse_delivery_time:   deliveryTimeline === 'magazyn' ? warehouseDeliveryTime               : null,
-        delivery_terms:            deliveryTerms,
-        fca_location:              deliveryTerms === 'FCA' ? fcaLocation.trim() : null,
-      })
-      .eq('id', offer.id)
-      .select('*, client:clients(*)')
-      .single();
+    // Wspólny payload oferty (bez offer_number/id — różnią się tryby edit vs copy)
+    const offerPayload = {
+      client_id:                 clientId,
+      status:                    isCopy ? 'szkic' : status,   // kopia zawsze startuje jako szkic
+      notes:                     notes.trim() || null,
+      valid_days:                validDays,
+      payment_days:              paymentDays,
+      prepared_by:               preparedBy,
+      currency,
+      exchange_rate:             exchangeRate,
+      total_cost_eur:            totalCostEUR || null,
+      total_sell_eur:            totalSellEUR || null,
+      total_sell_pln:            totalSellPLN || null,
+      margin_pct:                totals.totalMarginPct,
+      delivery_trucks:           hasTransport ? deliveryCalc!.trucks       : null,
+      delivery_cost_per_truck:   hasTransport ? deliveryCalc!.costPerTruck : null,
+      delivery_cost_total:       hasTransport ? deliveryCalc!.totalCostPLN : null,
+      delivery_paid_by:          deliveryPaidBy,
+      delivery_from:             deliveryFrom.trim() || null,
+      delivery_to:               deliveryTo.trim()   || null,
+      delivery_timeline:         deliveryTimeline,
+      campaign_weeks:            deliveryTimeline === 'huta'    ? campaignWeeks.trim()                : null,
+      campaign_delivery_weeks:   deliveryTimeline === 'huta'    ? (campaignDeliveryWeeks.trim() || null) : null,
+      warehouse_delivery_time:   deliveryTimeline === 'magazyn' ? warehouseDeliveryTime               : null,
+      delivery_terms:            deliveryTerms,
+      fca_location:              deliveryTerms === 'FCA' ? fcaLocation.trim() : null,
+    };
 
-    if (updateErr) {
-      setSaving(false);
-      return setError('Błąd aktualizacji oferty: ' + updateErr.message);
-    }
-
-    // KROK 2: DELETE starych pozycji
-    const { error: deleteErr } = await supabase
-      .from('road_plate_sale_offer_items')
-      .delete()
-      .eq('offer_id', offer.id);
-
-    if (deleteErr) {
-      setSaving(false);
-      return setError('Błąd usuwania starych pozycji: ' + deleteErr.message);
-    }
-
-    // KROK 3: INSERT nowych pozycji
+    // Pozycje BEZ offer_id — wstrzykiwane przy .insert() (nowe ID dla kopii, stare dla edycji)
     const newItemsPayload = editItems.flatMap((it, idx) => {
       const r = itemResults[idx];
       if (!r) return [];
       const sellEurTotal = currency === 'EUR' ? r.sellTotal : r.sellTotal / exchangeRate;
       const sellPlnTotal = currency === 'PLN' ? r.sellTotal : r.sellTotal * exchangeRate;
       return [{
-        offer_id:           offer.id,
         profile_id:         it.profileId,
         profile_name:       it.profileName,
         steel_grade:        it.steelGrade,
@@ -403,9 +383,68 @@ export default function RoadPlateEditOfferModal({
       }];
     });
 
+    if (isCopy) {
+      // ── KOPIA: INSERT nowej oferty (numer nadaje trigger DB: SPP/YYYY/NNN) ──
+      const { data: newOffer, error: insertOfferErr } = await supabase
+        .from('road_plate_sale_offers')
+        .insert({ ...offerPayload, offer_number: '', deleted_at: null })
+        .select('*, client:clients(*)')
+        .single();
+
+      if (insertOfferErr) {
+        setSaving(false);
+        return setError('Błąd zapisu kopii oferty: ' + insertOfferErr.message);
+      }
+
+      const saved = newOffer as RoadPlateSaleOffer;
+
+      const { data: insertedItems, error: insertItemsErr } = await supabase
+        .from('road_plate_sale_offer_items')
+        .insert(newItemsPayload.map(it => ({ ...it, offer_id: saved.id })))
+        .select();
+
+      if (insertItemsErr) {
+        // Rollback: soft-delete świeżo utworzonej oferty (UPDATE deleted_at — jak przycisk Usuń)
+        await supabase.from('road_plate_sale_offers').update({ deleted_at: new Date().toISOString() }).eq('id', saved.id);
+        setSaving(false);
+        return setError('Błąd zapisu pozycji kopii – oferta anulowana. Spróbuj ponownie: ' + insertItemsErr.message);
+      }
+
+      setSaving(false);
+      saved.items = (insertedItems ?? []) as RoadPlateSaleOfferItem[];
+      onSaved(saved);
+      return;
+    }
+
+    // ── EDYCJA: saga UPDATE → DELETE items → INSERT items ──
+    // KROK 1: UPDATE oferty
+    const { data: updatedOffer, error: updateErr } = await supabase
+      .from('road_plate_sale_offers')
+      .update(offerPayload)
+      .eq('id', offer.id)
+      .select('*, client:clients(*)')
+      .single();
+
+    if (updateErr) {
+      setSaving(false);
+      return setError('Błąd aktualizacji oferty: ' + updateErr.message);
+    }
+
+    // KROK 2: DELETE starych pozycji
+    const { error: deleteErr } = await supabase
+      .from('road_plate_sale_offer_items')
+      .delete()
+      .eq('offer_id', offer.id);
+
+    if (deleteErr) {
+      setSaving(false);
+      return setError('Błąd usuwania starych pozycji: ' + deleteErr.message);
+    }
+
+    // KROK 3: INSERT nowych pozycji
     const { data: insertedItems, error: insertErr } = await supabase
       .from('road_plate_sale_offer_items')
-      .insert(newItemsPayload)
+      .insert(newItemsPayload.map(it => ({ ...it, offer_id: offer.id })))
       .select();
 
     if (insertErr) {
@@ -433,7 +472,7 @@ export default function RoadPlateEditOfferModal({
         <div className="p-5 border-b border-gray-100 sticky top-0 bg-white z-10">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-800">Edycja oferty {offer.offer_number}</h3>
+              <h3 className="text-lg font-semibold text-gray-800">{isCopy ? `Kopiuj ofertę (na podstawie ${offer.offer_number})` : `Edycja oferty ${offer.offer_number}`}</h3>
               <p className="text-xs text-gray-400 mt-0.5">
                 Płyty drogowe · {editItems.length} poz. · {formatNumber(totals.totalMassT, 3)} t
               </p>
@@ -782,7 +821,7 @@ export default function RoadPlateEditOfferModal({
           <button onClick={onClose} disabled={saving} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50">Anuluj</button>
           <button onClick={handleSave} disabled={saving || !clientId}
             className="bg-blue-900 hover:bg-blue-800 disabled:bg-blue-300 text-white text-sm font-semibold px-6 py-2 rounded-lg">
-            {saving ? 'Zapisywanie...' : '💾 Zapisz zmiany'}
+            {saving ? 'Zapisywanie...' : isCopy ? '💾 Zapisz kopię' : '💾 Zapisz zmiany'}
           </button>
         </div>
       </div>
