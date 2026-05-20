@@ -53,6 +53,7 @@ interface Props {
   onSaved: (offer: SaleOffer) => void;
   onClose: () => void;
   onClientAdded?: (c: Client) => void;
+  mode?: 'edit' | 'copy';
 }
 
 // ─── Pomocnicze ──────────────────────────────────────────────────────────────
@@ -103,8 +104,9 @@ function lockItemsFromOffer(offer: SaleOffer): EditableLockItem[] {
 // ─── Komponent ───────────────────────────────────────────────────────────────
 
 export default function EditSaleOfferModal({
-  offer, clients, saleProfiles, onSaved, onClose,
+  offer, clients, saleProfiles, onSaved, onClose, mode = 'edit',
 }: Props) {
+  const isCopy = mode === 'copy';
 
   // ── Dane słownikowe (z DB) ──
   const [steelGrades, setSteelGrades] = useState<{ id: string; name: string }[]>([]);
@@ -387,58 +389,39 @@ export default function EditSaleOfferModal({
 
     const hasTransport = deliveryPaidBy !== 'fca' && deliveryCalc !== null && deliveryCalc.costPerTruck > 0;
 
-    const { data, error: err } = await supabase
-      .from('sale_offers')
-      .update({
-        client_id:                 clientId,
-        notes:                     notes.trim() || null,
-        valid_days:                validDays,
-        payment_days:              paymentDays,
-        prepared_by:               preparedBy,
-        currency,
-        exchange_rate:             exchangeRate,
-        total_cost_eur:            totals.totalCostEUR,
-        total_sell_eur:            totals.totalSellEUR + lockTotals.totalSellEUR,
-        total_sell_pln:            totals.totalSellPLN + lockTotals.totalSellPLN,
-        margin_pct:                combinedMarginPct,
-        delivery_trucks:           hasTransport ? deliveryCalc!.trucks         : null,
-        delivery_cost_per_truck:   hasTransport ? deliveryCalc!.costPerTruck   : null,
-        delivery_cost_total:       hasTransport ? deliveryCalc!.totalCostPLN   : null,
-        delivery_paid_by:          deliveryPaidBy,
-        delivery_from:             deliveryFrom.trim() || null,
-        delivery_to:               deliveryTo.trim()   || null,
-        delivery_timeline:         deliveryTimeline,
-        campaign_weeks:            deliveryTimeline === 'huta'    ? campaignWeeks.trim()         : null,
-        campaign_delivery_weeks:   deliveryTimeline === 'huta'    ? campaignDeliveryWeeks.trim() || null : null,
-        warehouse_delivery_time:   deliveryTimeline === 'magazyn' ? warehouseDeliveryTime        : null,
-        delivery_terms:            deliveryTerms,
-        fca_location:              deliveryTerms === 'FCA' ? fcaLocation.trim() : null,
-        updated_at:                new Date().toISOString(),
-      })
-      .eq('id', offer.id)
-      .select('*, client:clients(*)')
-      .single();
+    // Wspólny payload oferty (bez offer_number/id/updated_at — różnią się tryby)
+    const offerPayload = {
+      client_id:                 clientId,
+      notes:                     notes.trim() || null,
+      valid_days:                validDays,
+      payment_days:              paymentDays,
+      prepared_by:               preparedBy,
+      currency,
+      exchange_rate:             exchangeRate,
+      total_cost_eur:            totals.totalCostEUR,
+      total_sell_eur:            totals.totalSellEUR + lockTotals.totalSellEUR,
+      total_sell_pln:            totals.totalSellPLN + lockTotals.totalSellPLN,
+      margin_pct:                combinedMarginPct,
+      delivery_trucks:           hasTransport ? deliveryCalc!.trucks         : null,
+      delivery_cost_per_truck:   hasTransport ? deliveryCalc!.costPerTruck   : null,
+      delivery_cost_total:       hasTransport ? deliveryCalc!.totalCostPLN   : null,
+      delivery_paid_by:          deliveryPaidBy,
+      delivery_from:             deliveryFrom.trim() || null,
+      delivery_to:               deliveryTo.trim()   || null,
+      delivery_timeline:         deliveryTimeline,
+      campaign_weeks:            deliveryTimeline === 'huta'    ? campaignWeeks.trim()         : null,
+      campaign_delivery_weeks:   deliveryTimeline === 'huta'    ? campaignDeliveryWeeks.trim() || null : null,
+      warehouse_delivery_time:   deliveryTimeline === 'magazyn' ? warehouseDeliveryTime        : null,
+      delivery_terms:            deliveryTerms,
+      fca_location:              deliveryTerms === 'FCA' ? fcaLocation.trim() : null,
+    };
 
-    if (err) { setSaving(false); return setError('Błąd zapisu oferty: ' + err.message); }
-
-    // Usuń stare pozycje
-    const { error: deleteErr } = await supabase
-      .from('sale_offer_items')
-      .delete()
-      .eq('offer_id', offer.id);
-
-    if (deleteErr) {
-      setSaving(false);
-      return setError('Błąd usuwania pozycji: ' + deleteErr.message);
-    }
-
-    // Wstaw nowe pozycje
+    // Pozycje grodzic BEZ offer_id — wstrzykiwane przy .insert()
     const newItemsPayload = editItems.flatMap((item, idx) => {
       const r = itemResults[idx];
       if (!r || !item.profileName) return [];
       const wh = warehouses.find(w => w.id === item.warehouseId);
       return [{
-        offer_id:       offer.id,
         warehouse_id:   item.warehouseId || null,
         warehouse_name: wh?.name ?? null,
         profile_name:   item.profileName,
@@ -459,9 +442,101 @@ export default function EditSaleOfferModal({
       }];
     });
 
+    // Pozycje zamków BEZ offer_id — wstrzykiwane przy .insert()
+    const newLockItemsPayload = editLockItems.map((item, idx) => {
+      const quantityMb = item.quantitySzt * item.lengthM;
+      const massT = item.weightKgM > 0 ? (quantityMb * item.weightKgM) / 1000 : 0;
+      return {
+        lock_name:    item.lockName,
+        steel_grade:  item.steelGrade || null,
+        quantity_szt: item.quantitySzt,
+        length_m:     item.lengthM,
+        quantity_mb:  quantityMb,
+        price_eur_mb:     item.priceEurMb,
+        total_eur:        quantityMb * item.priceEurMb,
+        total_pln:        quantityMb * item.priceEurMb * exchangeRate,
+        sell_price_eur_mb: item.sellPriceEurMb,
+        sell_eur_total:   quantityMb * item.sellPriceEurMb,
+        sell_pln_total:   quantityMb * item.sellPriceEurMb * exchangeRate,
+        mass_t:           massT,
+        sort_order:       idx,
+      };
+    });
+
+    if (isCopy) {
+      // ── KOPIA: 3 INSERTy w serii (numer nadaje trigger DB: SP/YYYY/NNN) ──
+      const { data: newOffer, error: insertOfferErr } = await supabase
+        .from('sale_offers')
+        .insert({ ...offerPayload, offer_number: '', status: 'szkic', deleted_at: null })
+        .select('*, client:clients(*)')
+        .single();
+
+      if (insertOfferErr) {
+        setSaving(false);
+        return setError('Błąd zapisu kopii oferty: ' + insertOfferErr.message);
+      }
+
+      const saved = newOffer as SaleOffer;
+
+      // INSERT pozycji grodzic
+      const { data: insertedItems, error: insertItemsErr } = await supabase
+        .from('sale_offer_items')
+        .insert(newItemsPayload.map(it => ({ ...it, offer_id: saved.id })))
+        .select();
+
+      if (insertItemsErr) {
+        await supabase.rpc('soft_delete_sale_offer', { p_offer_id: saved.id });
+        setSaving(false);
+        return setError('Błąd dodawania pozycji kopii – oferta anulowana. Spróbuj ponownie: ' + insertItemsErr.message);
+      }
+
+      // INSERT pozycji zamków (jeśli są)
+      let savedLockItems: SaleOfferLockItem[] = [];
+      if (newLockItemsPayload.length > 0) {
+        const { data: insertedLocks, error: locksErr } = await supabase
+          .from('sale_offer_lock_items')
+          .insert(newLockItemsPayload.map(it => ({ ...it, offer_id: saved.id })))
+          .select();
+        if (locksErr) {
+          await supabase.rpc('soft_delete_sale_offer', { p_offer_id: saved.id });
+          setSaving(false);
+          return setError('Błąd zapisu zamków kopii – oferta anulowana. Spróbuj ponownie: ' + locksErr.message);
+        }
+        savedLockItems = (insertedLocks ?? []) as SaleOfferLockItem[];
+      }
+
+      setSaving(false);
+      saved.items      = (insertedItems ?? []) as SaleOfferItem[];
+      saved.lock_items = savedLockItems;
+      onSaved(saved);
+      return;
+    }
+
+    // ── EDYCJA: UPDATE → DELETE+INSERT items → DELETE+INSERT locks ──
+    const { data, error: err } = await supabase
+      .from('sale_offers')
+      .update({ ...offerPayload, updated_at: new Date().toISOString() })
+      .eq('id', offer.id)
+      .select('*, client:clients(*)')
+      .single();
+
+    if (err) { setSaving(false); return setError('Błąd zapisu oferty: ' + err.message); }
+
+    // Usuń stare pozycje
+    const { error: deleteErr } = await supabase
+      .from('sale_offer_items')
+      .delete()
+      .eq('offer_id', offer.id);
+
+    if (deleteErr) {
+      setSaving(false);
+      return setError('Błąd usuwania pozycji: ' + deleteErr.message);
+    }
+
+    // Wstaw nowe pozycje
     const { data: insertedItems, error: insertErr } = await supabase
       .from('sale_offer_items')
-      .insert(newItemsPayload)
+      .insert(newItemsPayload.map(it => ({ ...it, offer_id: offer.id })))
       .select();
 
     if (insertErr) {
@@ -472,29 +547,10 @@ export default function EditSaleOfferModal({
     // Zamki: usuń stare i wstaw nowe, pobierz wynik z ID
     let savedLockItems: SaleOfferLockItem[] = [];
     await supabase.from('sale_offer_lock_items').delete().eq('offer_id', offer.id);
-    if (editLockItems.length > 0) {
+    if (newLockItemsPayload.length > 0) {
       const { data: insertedLocks, error: locksErr } = await supabase
         .from('sale_offer_lock_items')
-        .insert(editLockItems.map((item, idx) => {
-          const quantityMb = item.quantitySzt * item.lengthM;
-          const massT = item.weightKgM > 0 ? (quantityMb * item.weightKgM) / 1000 : 0;
-          return {
-            offer_id:     offer.id,
-            lock_name:    item.lockName,
-            steel_grade:  item.steelGrade || null,
-            quantity_szt: item.quantitySzt,
-            length_m:     item.lengthM,
-            quantity_mb:  quantityMb,
-            price_eur_mb:     item.priceEurMb,
-            total_eur:        quantityMb * item.priceEurMb,
-            total_pln:        quantityMb * item.priceEurMb * exchangeRate,
-            sell_price_eur_mb: item.sellPriceEurMb,
-            sell_eur_total:   quantityMb * item.sellPriceEurMb,
-            sell_pln_total:   quantityMb * item.sellPriceEurMb * exchangeRate,
-            mass_t:           massT,
-            sort_order:       idx,
-          };
-        }))
+        .insert(newLockItemsPayload.map(it => ({ ...it, offer_id: offer.id })))
         .select();
       if (locksErr) {
         setSaving(false);
@@ -517,8 +573,8 @@ export default function EditSaleOfferModal({
         {/* Nagłówek */}
         <div className="p-6 border-b border-gray-100 flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-800">Edytuj ofertę sprzedaży</h3>
-            <p className="text-xs text-gray-400 mt-0.5 font-mono">{offer.offer_number}</p>
+            <h3 className="text-lg font-semibold text-gray-800">{isCopy ? 'Kopiuj ofertę sprzedaży' : 'Edytuj ofertę sprzedaży'}</h3>
+            <p className="text-xs text-gray-400 mt-0.5 font-mono">{isCopy ? `na podstawie ${offer.offer_number}` : offer.offer_number}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
         </div>
@@ -1282,7 +1338,7 @@ export default function EditSaleOfferModal({
             </button>
             <button onClick={handleSave} disabled={saving}
               className="px-6 py-2 text-sm text-white bg-blue-900 rounded-lg hover:bg-blue-800 font-medium disabled:opacity-50">
-              {saving ? 'Zapisywanie...' : 'Zapisz zmiany SP'}
+              {saving ? 'Zapisywanie...' : isCopy ? 'Zapisz kopię SP' : 'Zapisz zmiany SP'}
             </button>
           </div>
         </div>
