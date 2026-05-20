@@ -63,7 +63,7 @@ const s = StyleSheet.create({
     fontSize: 9,
     color: C.gray800,
     paddingTop: 108,
-    paddingBottom: 145,
+    paddingBottom: 130,
     paddingHorizontal: 42,
     backgroundColor: C.white,
   },
@@ -580,7 +580,7 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
 
         {/* ── TRANSPORT ── */}
         {(offer.transport_cost_per_truck != null || tPaidBy === 'fca') && (
-          <>
+          <View wrap={false}>
             <Text style={s.sectionTitle}>{t.sectionTransport}</Text>
             <View style={s.transportBox}>
               {tPaidBy === 'dap_included' && (
@@ -653,7 +653,7 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
                 </>
               )}
             </View>
-          </>
+          </View>
         )}
 
         {/* ── WARUNKI DZIERŻAWY ── */}
