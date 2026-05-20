@@ -51,6 +51,7 @@ export default function PipeOffersTable({ offers, onOffersChange, clients }: Pro
   const [toast, setToast]               = useState('');
   const [error, setError]               = useState('');
   const [editOffer, setEditOffer]       = useState<PipeSaleOffer | null>(null);
+  const [copyOffer, setCopyOffer]       = useState<PipeSaleOffer | null>(null);
   const [pdfLoading, setPdfLoading]     = useState<string | null>(null);
 
   function showToast(msg: string) {
@@ -62,6 +63,14 @@ export default function PipeOffersTable({ offers, onOffersChange, clients }: Pro
     onOffersChange(offers.map(o => o.id === updated.id ? updated : o));
     setEditOffer(null);
     showToast('Oferta zaktualizowana ✓');
+  }
+
+  function handleOfferCopied(created: PipeSaleOffer) {
+    // Kopia = nowy rekord → prepend (lista posortowana created_at DESC)
+    onOffersChange([created, ...offers]);
+    setCopyOffer(null);
+    setExpanded(null);
+    showToast(`Utworzono kopię: ${created.offer_number} ✓`);
   }
 
   async function handleDownloadPDF(offer: PipeSaleOffer, lang: PdfLang = 'pl') {
@@ -125,6 +134,17 @@ export default function PipeOffersTable({ offers, onOffersChange, clients }: Pro
           clients={clients}
           onSaved={handleOfferUpdated}
           onClose={() => setEditOffer(null)}
+        />
+      )}
+
+      {/* Modal kopiowania — ten sam komponent, mode="copy" → INSERT nowej oferty */}
+      {copyOffer && (
+        <PipeEditOfferModal
+          offer={copyOffer}
+          clients={clients}
+          mode="copy"
+          onSaved={handleOfferCopied}
+          onClose={() => setCopyOffer(null)}
         />
       )}
 
@@ -449,6 +469,17 @@ export default function PipeOffersTable({ offers, onOffersChange, clients }: Pro
                                   <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
                                 </svg>
                                 Edytuj
+                              </button>
+                              {/* Kopiuj — otwiera modal edycji w trybie copy (nowy numer SR/YYYY/NNN) */}
+                              <button
+                                onClick={() => setCopyOffer(offer)}
+                                title="Utwórz nową ofertę na podstawie tej (kopia z nowym numerem)"
+                                className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+                              >
+                                <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M7 3a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V5a2 2 0 00-2-2H7zM3 7a2 2 0 012-2v10h8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+                                </svg>
+                                Kopiuj
                               </button>
                               {/* PDF PL */}
                               <button
