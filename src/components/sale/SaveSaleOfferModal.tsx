@@ -69,6 +69,7 @@ interface Props {
   exchangeRate: number;
   nbpDate: string;
   delivery: DeliveryData | null;
+  taskName?: string;
   onSaved: (offer: SaleOffer) => void;
   onClose: () => void;
   onClientAdded: (c: Client) => void;
@@ -87,10 +88,11 @@ const WAREHOUSE_DELIVERY_OPTIONS = [
 
 export default function SaveSaleOfferModal({
   clients, items, lockItems, totals, currency, exchangeRate, nbpDate, delivery,
-  onSaved, onClose, onClientAdded,
+  onSaved, onClose, onClientAdded, taskName: initialTaskName,
 }: Props) {
   // ── Podstawowe pola ──
   const [clientId, setClientId]       = useState('');
+  const [taskName, setTaskName]       = useState(initialTaskName ?? '');
   const [preparedBy, setPreparedBy]   = useState(SALES_REPS[0].name);
   const [notes, setNotes]             = useState('');
   const [validDays, setValidDays]     = useState(1);
@@ -177,6 +179,7 @@ export default function SaveSaleOfferModal({
       .insert({
         offer_number:              '',
         client_id:                 clientId,
+        task_name:                 taskName.trim() || null,
         status:                    'szkic' as OfferStatus,
         notes:                     notes.trim() || null,
         valid_days:                validDays,
@@ -411,6 +414,12 @@ export default function SaveSaleOfferModal({
                 </>
               )}
             </div>
+          </div>
+
+          {/* ── Nazwa zadania (opcjonalnie) ── */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nazwa zadania (opcjonalnie)</label>
+            <input type="text" value={taskName} maxLength={35} onChange={e => setTaskName(e.target.value)} placeholder="np. Budowa S5 odcinek Korzeńsko" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
           </div>
 
           {/* ── Klient ── */}

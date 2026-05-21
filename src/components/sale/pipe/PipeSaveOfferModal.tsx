@@ -55,6 +55,7 @@ interface Props {
   currency: 'EUR' | 'PLN';
   exchangeRate: number;
   delivery: PipeDeliverySnapshot;
+  taskName?: string;
   onSaved: (offer: PipeSaleOffer) => void;
   onClose: () => void;
   onClientAdded: (c: Client) => void;
@@ -64,10 +65,11 @@ interface Props {
 
 export default function PipeSaveOfferModal({
   clients, items, totals, currency, exchangeRate, delivery,
-  onSaved, onClose, onClientAdded,
+  onSaved, onClose, onClientAdded, taskName: initialTaskName,
 }: Props) {
   // ── Podstawowe pola ──
   const [clientId, setClientId]       = useState('');
+  const [taskName, setTaskName]       = useState(initialTaskName ?? '');
   const [preparedBy, setPreparedBy]   = useState(SALES_REPS[0].name);
   const [notes, setNotes]             = useState('');
   const [validDays, setValidDays]     = useState(1);   // standard: 1 dzień (PDF pokaże "24h")
@@ -165,6 +167,7 @@ export default function PipeSaveOfferModal({
       .insert({
         offer_number:              '',
         client_id:                 clientId,
+        task_name:                 taskName.trim() || null,
         status:                    'szkic' as OfferStatus,
         notes:                     notes.trim() || null,
         valid_days:                validDays,
@@ -260,6 +263,12 @@ export default function PipeSaveOfferModal({
 
         {/* Scrollable body */}
         <div className="px-6 py-4 overflow-y-auto flex-1 space-y-6">
+
+          {/* ── Nazwa zadania (opcjonalnie) ── */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nazwa zadania (opcjonalnie)</label>
+            <input type="text" value={taskName} maxLength={35} onChange={e => setTaskName(e.target.value)} placeholder="np. Budowa S5 odcinek Korzeńsko" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
 
           {/* ── Klient ── */}
           <section>

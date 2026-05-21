@@ -60,6 +60,7 @@ interface Props {
   nbpDate: string;
   transport: TransportData;
   prices: EffectivePrices;
+  taskName?: string;
   onSaved: (offer: Offer) => void;
   onClose: () => void;
   onClientAdded: (client: Client) => void;
@@ -68,9 +69,10 @@ interface Props {
 
 
 export default function SaveRoadPlateOfferModal({
-  clients, offerItems, rentalWeeks, displayUnit, totals, currency, exchangeRate, nbpDate, transport, prices, onSaved, onClose, onClientAdded,
+  clients, offerItems, rentalWeeks, displayUnit, totals, currency, exchangeRate, nbpDate, transport, prices, onSaved, onClose, onClientAdded, taskName: initialTaskName,
 }: Props) {
   const [clientId, setClientId] = useState('');
+  const [taskName, setTaskName] = useState(initialTaskName ?? '');
   const [preparedBy, setPreparedBy] = useState(SALES_REPS[0].name);
   const [notes, setNotes] = useState('');
   const [validDays, setValidDays] = useState(1);
@@ -150,6 +152,7 @@ export default function SaveRoadPlateOfferModal({
       offer_number: '',
       item_type: 'road_plate',
       client_id: clientId,
+      task_name: taskName.trim() || null,
       profile_name: mainProfileName,
       profile_type: 'PLATE',
       quantity: offerItems.reduce((s, i) => s + i.quantity, 0),
@@ -312,6 +315,12 @@ export default function SaveRoadPlateOfferModal({
             {transport.to && (
               <p className="text-xs text-gray-500 mt-2">🚛 {transport.from} → {transport.to}</p>
             )}
+          </div>
+
+          {/* Nazwa zadania (opcjonalnie) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nazwa zadania (opcjonalnie)</label>
+            <input type="text" value={taskName} maxLength={35} onChange={e => setTaskName(e.target.value)} placeholder="np. Budowa S5 odcinek Korzeńsko" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
           </div>
 
           {/* Wybór klienta */}
