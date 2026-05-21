@@ -99,6 +99,7 @@ export interface SaleOffer {
   sequence: number;
   client_id?: string;
   client?: Client;
+  task_name?: string;
   status: OfferStatus;
   notes?: string;
   valid_days: number;
@@ -237,6 +238,7 @@ export interface PipeSaleOffer {
   sequence: number;
   client_id?: string;
   client?: Client;
+  task_name?: string;
   status: OfferStatus;
   notes?: string;
   valid_days: number;
@@ -327,6 +329,7 @@ export interface RoadPlateSaleOffer {
   sequence: number;
   client_id?: string;
   client?: Client;
+  task_name?: string;
   status: OfferStatus;
   notes?: string;
   valid_days: number;
@@ -464,6 +467,7 @@ export interface Offer {
   sequence: number;
   client_id?: string;
   client?: Client;
+  task_name?: string;
   profile_name: string;
   profile_type: string;
   quantity: number;
