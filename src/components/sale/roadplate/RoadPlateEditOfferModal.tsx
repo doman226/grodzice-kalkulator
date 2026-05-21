@@ -100,6 +100,7 @@ export default function RoadPlateEditOfferModal({
   // ── Stan: lazy initial dla pre-fillu ──
   const [editItems, setEditItems]     = useState<EditableItem[]>(() => itemsFromOffer(offer));
   const [clientId, setClientId]       = useState(offer.client_id ?? '');
+  const [taskName, setTaskName]       = useState(offer.task_name ?? '');
   const [status, setStatus]           = useState<OfferStatus>(offer.status);
   const [preparedBy, setPreparedBy]   = useState(offer.prepared_by ?? SALES_REPS[0].name);
   const [notes, setNotes]             = useState(offer.notes ?? '');
@@ -330,6 +331,7 @@ export default function RoadPlateEditOfferModal({
     // Wspólny payload oferty (bez offer_number/id — różnią się tryby edit vs copy)
     const offerPayload = {
       client_id:                 clientId,
+      task_name:                 taskName.trim() || null,
       status:                    isCopy ? 'szkic' : status,   // kopia zawsze startuje jako szkic
       notes:                     notes.trim() || null,
       valid_days:                validDays,
@@ -482,6 +484,12 @@ export default function RoadPlateEditOfferModal({
         </div>
 
         <div className="p-5 space-y-5">
+
+          {/* Nazwa zadania (opcjonalnie) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nazwa zadania (opcjonalnie)</label>
+            <input type="text" value={taskName} maxLength={35} onChange={e => setTaskName(e.target.value)} placeholder="np. Budowa S5 odcinek Korzeńsko" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
 
           {/* Klient */}
           <div>

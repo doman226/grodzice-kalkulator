@@ -125,6 +125,7 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose, m
   // ── Stan: lazy initial dla pre-fillu ──
   const [editItems, setEditItems]     = useState<EditablePipeItem[]>(() => itemsFromOffer(offer));
   const [clientId, setClientId]       = useState(offer.client_id ?? '');
+  const [taskName, setTaskName]       = useState(offer.task_name ?? '');
   const [status, setStatus]           = useState<OfferStatus>(offer.status);
   const [preparedBy, setPreparedBy]   = useState(offer.prepared_by ?? SALES_REPS[0].name);
   const [notes, setNotes]             = useState(offer.notes ?? '');
@@ -316,6 +317,7 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose, m
     // Wspólny payload oferty (bez offer_number/id — różnią się tryby edit vs copy)
     const offerPayload = {
       client_id:                 clientId,
+      task_name:                 taskName.trim() || null,
       status:                    isCopy ? 'szkic' : status,   // kopia zawsze startuje jako szkic
       notes:                     notes.trim() || null,
       valid_days:                validDays,
@@ -471,6 +473,12 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose, m
 
         {/* Scrollable body */}
         <div className="px-6 py-4 overflow-y-auto flex-1 space-y-6">
+
+          {/* Nazwa zadania (opcjonalnie) */}
+          <div className="mb-4">
+            <label className="block text-xs font-medium text-gray-600 mb-1">Nazwa zadania (opcjonalnie)</label>
+            <input type="text" value={taskName} maxLength={35} onChange={e => setTaskName(e.target.value)} placeholder="np. Budowa S5 odcinek Korzeńsko" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
 
           {/* ── Klient + Status + Waluta + Kurs ── */}
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">

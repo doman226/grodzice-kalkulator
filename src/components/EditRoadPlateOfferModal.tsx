@@ -64,6 +64,7 @@ export default function EditRoadPlateOfferModal({ offer, profiles, prices, clien
   const weeksToMonths = (w: number) => w / 4;
   const monthsToWeeks = (m: number) => Math.max(1, m * 4);
   const [clientId, setClientId] = useState(offer.client_id ?? '');
+  const [taskName, setTaskName] = useState(offer.task_name ?? '');
   const [notes, setNotes] = useState(offer.notes ?? '');
   const [deliveryInfo, setDeliveryInfo] = useState(offer.delivery_info ?? '');
   const [validDays, setValidDays] = useState(offer.valid_days);
@@ -226,6 +227,7 @@ export default function EditRoadPlateOfferModal({ offer, profiles, prices, clien
 
     const offerPayload = {
       client_id: clientId,
+      task_name: taskName.trim() || null,
       profile_name: mainProfileName,
       profile_type: 'PLATE',
       quantity: items.reduce((s, i) => s + i.quantity, 0),
@@ -581,6 +583,12 @@ export default function EditRoadPlateOfferModal({ offer, profiles, prices, clien
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Klient</label>
             <ClientSearchInput clients={clients} value={clientId} onChange={setClientId} />
+          </div>
+
+          {/* Nazwa zadania (opcjonalnie) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nazwa zadania (opcjonalnie)</label>
+            <input type="text" value={taskName} maxLength={35} onChange={e => setTaskName(e.target.value)} placeholder="np. Budowa S5 odcinek Korzeńsko" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
           </div>
 
           {/* Transport */}

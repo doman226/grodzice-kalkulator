@@ -166,6 +166,7 @@ export default function EditSaleOfferModal({
 
   // ── Podstawowe pola ──
   const [clientId,    setClientId]    = useState(offer.client_id ?? '');
+  const [taskName,    setTaskName]    = useState(offer.task_name ?? '');
   const [preparedBy,  setPreparedBy]  = useState(offer.prepared_by ?? SALES_REPS[0].name);
   const [notes,       setNotes]       = useState(offer.notes ?? '');
   const [validDays,   setValidDays]   = useState(offer.valid_days);
@@ -392,6 +393,7 @@ export default function EditSaleOfferModal({
     // Wspólny payload oferty (bez offer_number/id/updated_at — różnią się tryby)
     const offerPayload = {
       client_id:                 clientId,
+      task_name:                 taskName.trim() || null,
       notes:                     notes.trim() || null,
       valid_days:                validDays,
       payment_days:              paymentDays,
@@ -1015,6 +1017,12 @@ export default function EditSaleOfferModal({
               Klient <span className="text-red-500">*</span>
             </label>
             <ClientSearchInput clients={clients} value={clientId} onChange={setClientId} />
+          </div>
+
+          {/* ── Nazwa zadania (opcjonalnie) ── */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nazwa zadania (opcjonalnie)</label>
+            <input type="text" value={taskName} maxLength={35} onChange={e => setTaskName(e.target.value)} placeholder="np. Budowa S5 odcinek Korzeńsko" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
           </div>
 
           {/* ── Opiekun handlowy ── */}
