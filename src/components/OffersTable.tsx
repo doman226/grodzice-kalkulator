@@ -3,6 +3,7 @@ import { pdf } from '@react-pdf/renderer';
 import { supabase } from '../lib/supabase';
 import type { Offer, OfferStatus, Profile, RentalPrices, Client, RoadPlateProfile, RoadPlateRentalPrices } from '../types';
 import { formatPLN, formatEUR, formatRound, formatNumber } from '../lib/calculations';
+import { buildPdfFilenameBase } from '../lib/pdfFilename';
 import OfferPDF from './OfferPDF';
 import RoadPlateOfferPDF from './RoadPlateOfferPDF';
 import type { PdfLang } from '../lib/pdfStrings';
@@ -68,7 +69,7 @@ export default function OffersTable({ offers, onOffersChange, profiles, prices, 
       const a    = document.createElement('a');
       a.href     = url;
       const suffix = lang === 'en' ? '-EN' : '';
-      a.download = `${offer.offer_number.replace(/\//g, '-')}${suffix}.pdf`;
+      a.download = `${buildPdfFilenameBase(offer.offer_number, offer.client?.name, offer.task_name)}${suffix}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

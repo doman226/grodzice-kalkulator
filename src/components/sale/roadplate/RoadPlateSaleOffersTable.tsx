@@ -3,6 +3,7 @@ import { pdf } from '@react-pdf/renderer';
 import { supabase } from '../../../lib/supabase';
 import type { Client, RoadPlateProfile, RoadPlateSaleOffer, OfferStatus } from '../../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../../lib/calculations';
+import { buildPdfFilenameBase } from '../../../lib/pdfFilename';
 import RoadPlateEditOfferModal from './RoadPlateEditOfferModal';
 import RoadPlateSaleOfferPDF from './RoadPlateSaleOfferPDF';
 import type { PdfLang } from '../../../lib/pdfStrings';
@@ -73,7 +74,7 @@ export default function RoadPlateSaleOffersTable({
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
       a.href     = url;
-      a.download = `${offer.offer_number.replace(/\//g, '-')}-${lang.toUpperCase()}.pdf`;
+      a.download = `${buildPdfFilenameBase(offer.offer_number, offer.client?.name, offer.task_name)}-${lang.toUpperCase()}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
