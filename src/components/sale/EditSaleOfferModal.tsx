@@ -14,8 +14,8 @@ interface EditableLockItem {
   uid: string;
   lockName: string;
   steelGrade: string;
-  quantitySzt: number;
-  lengthM: number;
+  quantitySzt: number | '';
+  lengthM: number | '';
   priceEurMb: number;
   sellPriceEurMb: number;   // cena sprzedaży [EUR/mb]
   weightKgM: number;  // z cennika – do wyliczenia mass_t przy zapisie
@@ -38,8 +38,8 @@ interface EditableItem {
   uid: string;
   profileName: string;
   steelGrade: string;
-  quantity: number;
-  lengthM: number;
+  quantity: number | '';
+  lengthM: number | '';
   isPaired: boolean;
   warehouseId: string;
   costEurT: number;
@@ -62,7 +62,7 @@ function itemsFromOffer(offer: SaleOffer): EditableItem[] {
   if (!offer.items || offer.items.length === 0) {
     return [{
       uid: crypto.randomUUID(), profileName: '', steelGrade: '',
-      quantity: 1, lengthM: 12, isPaired: false, warehouseId: '', costEurT: 0, sellEurT: 0,
+      quantity: '', lengthM: '', isPaired: false, warehouseId: '', costEurT: 0, sellEurT: 0,
     }];
   }
   return offer.items
@@ -218,7 +218,7 @@ export default function EditSaleOfferModal({
     setEditItems(prev => [...prev, {
       uid: crypto.randomUUID(),
       profileName: prof, steelGrade: gr,
-      quantity: 1, lengthM: 12, isPaired: false,
+      quantity: '', lengthM: '', isPaired: false,
       warehouseId: wh,
       costEurT: lookupCostPrice(wh, prof, gr),
       sellEurT: 0,
@@ -247,8 +247,8 @@ export default function EditSaleOfferModal({
       uid:            crypto.randomUUID(),
       lockName:       def.name,
       steelGrade:     '',
-      quantitySzt:    10,
-      lengthM:        12,
+      quantitySzt:    '',
+      lengthM:        '',
       priceEurMb:     def.price_eur_mb,
       sellPriceEurMb: def.price_eur_mb ?? 0,
       weightKgM:      def.weight_kg_m,
@@ -273,8 +273,10 @@ export default function EditSaleOfferModal({
   const itemResults = useMemo(() =>
     editItems.map(item => {
       const profile = saleProfiles.find(p => p.name === item.profileName);
-      if (!profile || item.quantity <= 0 || item.lengthM <= 0) return null;
-      const totalLengthM  = item.quantity * item.lengthM * (item.isPaired ? 2 : 1);
+      const qty = Number(item.quantity) || 0;
+      const lengthM = Number(item.lengthM) || 0;
+      if (!profile || qty <= 0 || lengthM <= 0) return null;
+      const totalLengthM  = qty * lengthM * (item.isPaired ? 2 : 1);
       const massT         = Math.round(totalLengthM * profile.weight_kg_per_m / 1000 * 1000) / 1000;
       const wallAreaM2    = totalLengthM * (profile.width_mm / 1000);
       // costEurT / sellEurT trzymają wartość w walucie oferty (EUR lub PLN)
@@ -307,7 +309,7 @@ export default function EditSaleOfferModal({
   const lockTotals = useMemo(() => {
     let totalEUR = 0, totalPLN = 0, totalSellEUR = 0, totalSellPLN = 0;
     for (const item of editLockItems) {
-      const qMb  = item.quantitySzt * item.lengthM;
+      const qMb  = (Number(item.quantitySzt) || 0) * (Number(item.lengthM) || 0);
       const eur  = qMb * item.priceEurMb;
       const sell = qMb * item.sellPriceEurMb;
       totalEUR     += eur;
@@ -350,7 +352,7 @@ export default function EditSaleOfferModal({
   const deliveryCalc = useMemo(() => {
     // Masa łączna = grodzice + zamki (przy ofercie samych zamków totals.totalMassT = 0)
     const lockMassT = editLockItems.reduce((s, item) => {
-      const qMb = item.quantitySzt * item.lengthM;
+      const qMb = (Number(item.quantitySzt) || 0) * (Number(item.lengthM) || 0);
       return s + (item.weightKgM > 0 ? qMb * item.weightKgM / 1000 : 0);
     }, 0);
     const combinedMassT = totals.totalMassT + lockMassT;
@@ -376,6 +378,10 @@ export default function EditSaleOfferModal({
     if (editItems.length === 0 && editLockItems.length === 0) return setError('Dodaj przynajmniej jedną pozycję (grodzice lub zamki).');
     const hasValidItem = editItems.length === 0 || itemResults.some((r, i) => r !== null && editItems[i].profileName);
     if (editItems.length > 0 && !hasValidItem) return setError('Brak prawidłowych pozycji grodzic. Sprawdź nazwy profili.');
+    // Blokada zapisu: pozycja z wybranym profilem musi mieć dodatnią ilość i długość
+    const hasEmptyPile = editItems.some(i => i.profileName && (!(Number(i.quantity) > 0) || !(Number(i.lengthM) > 0)));
+    const hasEmptyLock = editLockItems.some(i => !(Number(i.quantitySzt) > 0) || !(Number(i.lengthM) > 0));
+    if (hasEmptyPile || hasEmptyLock) return setError('Uzupełnij ilość i długość we wszystkich pozycjach — pozycje bez wartości nie mogą zostać zapisane.');
     const itemsWithProfile = editItems.filter(i => i.profileName);
     const validGradeIds = steelGrades.map(g => g.id);
     const missingGrade = steelGrades.length > 0 && itemsWithProfile.some(i => !i.steelGrade || !validGradeIds.includes(i.steelGrade));
@@ -428,8 +434,8 @@ export default function EditSaleOfferModal({
         warehouse_name: wh?.name ?? null,
         profile_name:   item.profileName,
         steel_grade:    item.steelGrade,
-        quantity:       item.quantity,
-        length_m:       item.lengthM,
+        quantity:       Number(item.quantity) || 0,
+        length_m:       Number(item.lengthM) || 0,
         is_paired:      item.isPaired,
         total_length_m: r.totalLengthM,
         mass_t:         r.massT,
@@ -446,13 +452,13 @@ export default function EditSaleOfferModal({
 
     // Pozycje zamków BEZ offer_id — wstrzykiwane przy .insert()
     const newLockItemsPayload = editLockItems.map((item, idx) => {
-      const quantityMb = item.quantitySzt * item.lengthM;
+      const quantityMb = (Number(item.quantitySzt) || 0) * (Number(item.lengthM) || 0);
       const massT = item.weightKgM > 0 ? (quantityMb * item.weightKgM) / 1000 : 0;
       return {
         lock_name:    item.lockName,
         steel_grade:  item.steelGrade || null,
-        quantity_szt: item.quantitySzt,
-        length_m:     item.lengthM,
+        quantity_szt: Number(item.quantitySzt) || 0,
+        length_m:     Number(item.lengthM) || 0,
         quantity_mb:  quantityMb,
         price_eur_mb:     item.priceEurMb,
         total_eur:        quantityMb * item.priceEurMb,
@@ -652,16 +658,16 @@ export default function EditSaleOfferModal({
                       </div>
                       <div className="col-span-1">
                         {idx === 0 && <p className="text-xs text-gray-400 mb-1">Ilość</p>}
-                        <input type="number" min={1} value={item.quantity}
-                          onChange={e => updateItem(item.uid, { quantity: Math.max(1, parseInt(e.target.value) || 1) })}
-                          className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        <input type="number" min={1} placeholder="np. 10" value={item.quantity}
+                          onChange={e => updateItem(item.uid, { quantity: e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0) })}
+                          className={`w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 ${!(Number(item.quantity) > 0) ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`}
                         />
                       </div>
                       <div className="col-span-1">
                         {idx === 0 && <p className="text-xs text-gray-400 mb-1">Dług.[m]</p>}
-                        <input type="number" min={0.1} step={0.5} value={item.lengthM}
-                          onChange={e => updateItem(item.uid, { lengthM: Math.max(0.1, parseFloat(e.target.value) || 0) })}
-                          className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        <input type="number" min={0.1} step={0.5} placeholder="np. 12" value={item.lengthM}
+                          onChange={e => updateItem(item.uid, { lengthM: e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0) })}
+                          className={`w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 ${!(Number(item.lengthM) > 0) ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`}
                         />
                       </div>
                       <div className="col-span-2">
@@ -786,7 +792,7 @@ export default function EditSaleOfferModal({
                   {editLockItems.map((item, idx) => {
                     const def      = lockDefs.find(l => l.name === item.lockName);
                     const defPrice = def?.price_eur_mb ?? 0;
-                    const qMb      = item.quantitySzt * item.lengthM;
+                    const qMb      = (Number(item.quantitySzt) || 0) * (Number(item.lengthM) || 0);
                     const massT    = item.weightKgM > 0 ? (qMb * item.weightKgM) / 1000 : 0;
 
                     return (
@@ -822,16 +828,16 @@ export default function EditSaleOfferModal({
                           {/* Ilość szt. */}
                           <div className="col-span-1">
                             {idx === 0 && <p className="text-xs text-gray-400 mb-1">Szt.</p>}
-                            <input type="number" min={1} step={1} value={item.quantitySzt}
-                              onChange={e => updateLockItem(item.uid, { quantitySzt: Math.max(1, parseInt(e.target.value) || 1) })}
-                              className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            <input type="number" min={1} step={1} placeholder="np. 10" value={item.quantitySzt}
+                              onChange={e => updateLockItem(item.uid, { quantitySzt: e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0) })}
+                              className={`w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 ${!(Number(item.quantitySzt) > 0) ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`} />
                           </div>
                           {/* Długość */}
                           <div className="col-span-1">
                             {idx === 0 && <p className="text-xs text-gray-400 mb-1">Dł. [m]</p>}
-                            <input type="number" min={0.1} step={0.1} value={item.lengthM}
-                              onChange={e => updateLockItem(item.uid, { lengthM: Math.max(0.1, parseFloat(e.target.value) || 0.1) })}
-                              className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            <input type="number" min={0.1} step={0.1} placeholder="np. 12" value={item.lengthM}
+                              onChange={e => updateLockItem(item.uid, { lengthM: e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0) })}
+                              className={`w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 ${!(Number(item.lengthM) > 0) ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`} />
                           </div>
                           {/* Cena/mb (koszt) */}
                           <div className="col-span-2">
@@ -906,7 +912,7 @@ export default function EditSaleOfferModal({
                         <span>
                           Sprzedaż: {isEUR ? `${formatEUR(lockTotals.totalSellEUR)} EUR` : `${formatPLN(lockTotals.totalSellPLN)} PLN`}
                         </span>
-                        <span className="text-gray-500 font-normal">· {formatNumber(editLockItems.reduce((s, item) => s + (item.weightKgM > 0 ? (item.quantitySzt * item.lengthM) * item.weightKgM / 1000 : 0), 0), 3)} t</span>
+                        <span className="text-gray-500 font-normal">· {formatNumber(editLockItems.reduce((s, item) => s + (item.weightKgM > 0 ? ((Number(item.quantitySzt) || 0) * (Number(item.lengthM) || 0)) * item.weightKgM / 1000 : 0), 0), 3)} t</span>
                       </span>
                     </div>
                   )}
@@ -923,7 +929,7 @@ export default function EditSaleOfferModal({
                 <div>
                   <span className="text-gray-500">Masa łączna:</span>{' '}
                   <strong>{formatNumber(
-                    totals.totalMassT + editLockItems.reduce((s, item) => s + (item.weightKgM > 0 ? (item.quantitySzt * item.lengthM) * item.weightKgM / 1000 : 0), 0),
+                    totals.totalMassT + editLockItems.reduce((s, item) => s + (item.weightKgM > 0 ? ((Number(item.quantitySzt) || 0) * (Number(item.lengthM) || 0)) * item.weightKgM / 1000 : 0), 0),
                     3
                   )} t</strong>
                 </div>

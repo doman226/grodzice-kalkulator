@@ -20,12 +20,12 @@ interface CalcItem {
   uid: string;
   profileId: string;
   steelGrade: string;
-  quantity: number;
+  quantity: number | '';
 }
 
 export default function RoadPlateCalculator({ profiles, prices, clients, onClientAdded, onOfferSaved }: Props) {
   const [items, setItems] = useState<CalcItem[]>([
-    { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: STEEL_GRADES[0], quantity: 10 },
+    { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: STEEL_GRADES[0], quantity: '' },
   ]);
   const [rentalWeeks, setRentalWeeks] = useState<number>(8);
   const [displayUnit, setDisplayUnit] = useState<'weeks' | 'months'>('weeks');
@@ -89,7 +89,7 @@ export default function RoadPlateCalculator({ profiles, prices, clients, onClien
   function addItem() {
     setItems(prev => [
       ...prev,
-      { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: STEEL_GRADES[0], quantity: 10 },
+      { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: STEEL_GRADES[0], quantity: '' },
     ]);
   }
 
@@ -126,10 +126,11 @@ export default function RoadPlateCalculator({ profiles, prices, clients, onClien
   const itemResults = useMemo(() =>
     items.map(item => {
       const profile = profiles.find(p => p.id === item.profileId) ?? null;
-      if (!profile || item.quantity <= 0) {
+      const qty = Number(item.quantity) || 0;
+      if (!profile || qty <= 0) {
         return { profile, totalLengthM: 0, areaM2: 0, massT: 0, valid: false };
       }
-      const m = calculateRoadPlateMetrics(item.quantity, profile.sheet_length_m, profile.sheet_width_m, profile.weight_kg_per_m2);
+      const m = calculateRoadPlateMetrics(qty, profile.sheet_length_m, profile.sheet_width_m, profile.weight_kg_per_m2);
       return { profile, ...m, valid: m.massT > 0 };
     }),
     [items, profiles],
@@ -148,6 +149,15 @@ export default function RoadPlateCalculator({ profiles, prices, clients, onClien
   }, [itemResults]);
 
   const isValid = totals.totalMassT > 0;
+  // Każda pozycja musi mieć dodatnią ilość — pusta/zerowa blokuje zapis
+  const allItemsValid = items.length > 0 && itemResults.every(r => r.valid);
+  const [showItemError, setShowItemError] = useState(false);
+
+  function handleSaveClick() {
+    if (!allItemsValid) { setShowItemError(true); return; }
+    setShowItemError(false);
+    setShowSaveModal(true);
+  }
 
   // Koszt = masa [t] × cena [currency/t]
   const rentalCost = useMemo(() =>
@@ -179,7 +189,7 @@ export default function RoadPlateCalculator({ profiles, prices, clients, onClien
         profileId: item.profileId,
         profileName: r.profile.name,
         steelGrade: item.steelGrade,
-        quantity: item.quantity,
+        quantity: Number(item.quantity) || 0,
         thicknessMm: r.profile.thickness_mm,
         sheetLengthM: r.profile.sheet_length_m,
         sheetWidthM: r.profile.sheet_width_m,
@@ -223,6 +233,7 @@ export default function RoadPlateCalculator({ profiles, prices, clients, onClien
           {items.map((item, idx) => {
             const r = itemResults[idx];
             const profile = r.profile;
+            const qtyInvalid = !(Number(item.quantity) > 0);
             return (
               <div key={item.uid} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-3 bg-gray-50 rounded-lg border border-gray-200">
                 {/* Profil */}
@@ -264,11 +275,12 @@ export default function RoadPlateCalculator({ profiles, prices, clients, onClien
                 <div className="sm:col-span-2">
                   {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Ilość [szt.]</label>}
                   <input
-                    type="number" min={1} step={1}
+                    type="number" min={1} step={1} placeholder="np. 10"
                     value={item.quantity}
-                    onChange={e => updateItem(item.uid, { quantity: Math.max(1, parseInt(e.target.value) || 0) })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={e => updateItem(item.uid, { quantity: e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0) })}
+                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${qtyInvalid ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`}
                   />
+                  {qtyInvalid && <p className="text-xs text-red-600 mt-0.5">Wpisz ilość</p>}
                 </div>
 
                 {/* Masa tej pozycji */}
@@ -646,9 +658,14 @@ export default function RoadPlateCalculator({ profiles, prices, clients, onClien
           </div>
 
           {/* Przycisk zapisu */}
+          {showItemError && !allItemsValid && (
+            <div className="bg-red-50 border border-red-300 rounded-xl p-4 text-red-700 text-sm text-center font-medium">
+              Uzupełnij ilość we wszystkich pozycjach — pozycje bez wartości nie mogą zostać zapisane.
+            </div>
+          )}
           <button
-            onClick={() => setShowSaveModal(true)}
-            className="w-full py-3 bg-green-700 hover:bg-green-600 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors"
+            onClick={handleSaveClick}
+            className={`w-full py-3 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors ${allItemsValid ? 'bg-green-700 hover:bg-green-600' : 'bg-gray-300 cursor-not-allowed'}`}
           >
             💾 Zapisz jako ofertę
           </button>
@@ -662,7 +679,7 @@ export default function RoadPlateCalculator({ profiles, prices, clients, onClien
       )}
 
       {/* Modal zapisu */}
-      {showSaveModal && isValid && transportCalc && (
+      {showSaveModal && isValid && allItemsValid && transportCalc && (
         <SaveRoadPlateOfferModal
           clients={clients}
           offerItems={offerItems}

@@ -20,13 +20,13 @@ interface CalcItem {
   uid: string;
   profileId: string;
   steelGrade: string;
-  quantity: number;
-  lengthM: number;
+  quantity: number | '';
+  lengthM: number | '';
 }
 
 export default function Calculator({ profiles, prices, clients, onClientAdded, onOfferSaved }: Props) {
   const [items, setItems] = useState<CalcItem[]>([
-    { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: STEEL_GRADES[0], quantity: 10, lengthM: 12 },
+    { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: STEEL_GRADES[0], quantity: '', lengthM: '' },
   ]);
   const [rentalWeeks, setRentalWeeks] = useState<number>(8);
   const [displayUnit, setDisplayUnit] = useState<'weeks' | 'months'>('weeks');
@@ -90,7 +90,7 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
   function addItem() {
     setItems(prev => [
       ...prev,
-      { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: STEEL_GRADES[0], quantity: 10, lengthM: 12 },
+      { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: STEEL_GRADES[0], quantity: '', lengthM: '' },
     ]);
   }
 
@@ -127,10 +127,12 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
   const itemResults = useMemo(() =>
     items.map(item => {
       const profile = profiles.find(p => p.id === item.profileId) ?? null;
-      if (!profile || item.quantity <= 0 || item.lengthM <= 0) {
+      const qty = Number(item.quantity) || 0;
+      const lengthM = Number(item.lengthM) || 0;
+      if (!profile || qty <= 0 || lengthM <= 0) {
         return { profile, totalLengthM: 0, massT: 0, wallAreaM2: 0, valid: false };
       }
-      const totalLengthM = item.quantity * item.lengthM;
+      const totalLengthM = qty * lengthM;
       const massT = (totalLengthM * profile.weight_kg_per_m) / 1000;
       const wallAreaM2 = totalLengthM * (profile.width_mm / 1000);
       return { profile, totalLengthM, massT, wallAreaM2, valid: true };
@@ -151,6 +153,15 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
   }, [itemResults]);
 
   const isValid = totals.totalMassT > 0;
+  // Każda pozycja musi mieć dodatnią ilość i długość — pusta/zerowa blokuje zapis
+  const allItemsValid = items.length > 0 && itemResults.every(r => r.valid);
+  const [showItemError, setShowItemError] = useState(false);
+
+  function handleSaveClick() {
+    if (!allItemsValid) { setShowItemError(true); return; }
+    setShowItemError(false);
+    setShowSaveModal(true);
+  }
 
   // Koszt = masa [t] × cena [currency/t]
   const rentalCost = useMemo(() =>
@@ -186,8 +197,8 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
         profileName: r.profile.name,
         profileType: r.profile.type,
         steelGrade: item.steelGrade,
-        quantity: item.quantity,
-        lengthM: item.lengthM,
+        quantity: Number(item.quantity) || 0,
+        lengthM: Number(item.lengthM) || 0,
         totalLengthM: r.totalLengthM,
         massT: r.massT,
         wallAreaM2: r.wallAreaM2,
@@ -228,6 +239,8 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
           {items.map((item, idx) => {
             const r = itemResults[idx];
             const profile = r.profile;
+            const qtyInvalid = !(Number(item.quantity) > 0);
+            const lenInvalid = !(Number(item.lengthM) > 0);
             return (
               <div key={item.uid} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-3 bg-gray-50 rounded-lg border border-gray-200">
                 {/* Profil */}
@@ -265,22 +278,24 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
                 <div className="sm:col-span-2">
                   {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Ilość [szt.]</label>}
                   <input
-                    type="number" min={1} step={1}
+                    type="number" min={1} step={1} placeholder="np. 10"
                     value={item.quantity}
-                    onChange={e => updateItem(item.uid, { quantity: Math.max(1, parseInt(e.target.value) || 0) })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={e => updateItem(item.uid, { quantity: e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0) })}
+                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${qtyInvalid ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`}
                   />
+                  {qtyInvalid && <p className="text-xs text-red-600 mt-0.5">Wpisz ilość</p>}
                 </div>
 
                 {/* Długość */}
                 <div className="sm:col-span-2">
                   {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Długość [m]</label>}
                   <input
-                    type="number" min={0.1} step={0.5}
+                    type="number" min={0.1} step={0.5} placeholder="np. 12"
                     value={item.lengthM}
-                    onChange={e => updateItem(item.uid, { lengthM: Math.max(0.1, parseFloat(e.target.value) || 0) })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={e => updateItem(item.uid, { lengthM: e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0) })}
+                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${lenInvalid ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`}
                   />
+                  {lenInvalid && <p className="text-xs text-red-600 mt-0.5">Wpisz długość</p>}
                 </div>
 
                 {/* Masa tej pozycji */}
@@ -660,9 +675,14 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
           </div>
 
           {/* Przycisk zapisu */}
+          {showItemError && !allItemsValid && (
+            <div className="bg-red-50 border border-red-300 rounded-xl p-4 text-red-700 text-sm text-center font-medium">
+              Uzupełnij ilość i długość we wszystkich pozycjach — pozycje bez wartości nie mogą zostać zapisane.
+            </div>
+          )}
           <button
-            onClick={() => setShowSaveModal(true)}
-            className="w-full py-3 bg-green-700 hover:bg-green-600 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors"
+            onClick={handleSaveClick}
+            className={`w-full py-3 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors ${allItemsValid ? 'bg-green-700 hover:bg-green-600' : 'bg-gray-300 cursor-not-allowed'}`}
           >
             💾 Zapisz jako ofertę
           </button>
@@ -676,7 +696,7 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
       )}
 
       {/* Modal zapisu */}
-      {showSaveModal && isValid && transportCalc && (
+      {showSaveModal && isValid && allItemsValid && transportCalc && (
         <SaveOfferModal
           clients={clients}
           offerItems={offerItems}

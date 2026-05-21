@@ -15,8 +15,8 @@ interface SaleCalcItem {
   warehouseId: string;
   profileName: string;
   steelGrade: string;
-  quantity: number;
-  lengthM: number;
+  quantity: number | '';
+  lengthM: number | '';
   isPaired: boolean;
   costPriceEurT: number;
   sellPriceEurT: number;
@@ -38,8 +38,8 @@ interface SaleLockCalcItem {
   uid: string;
   lockName: string;
   steelGrade: string;   // gatunek stali – informacyjnie
-  quantitySzt: number;  // liczba sztuk
-  lengthM: number;      // długość jednej sztuki [m]
+  quantitySzt: number | '';  // liczba sztuk
+  lengthM: number | '';      // długość jednej sztuki [m]
   priceEurMb: number;   // zawsze EUR – nie przeliczamy przy zmianie waluty
   sellPriceEurMb: number;
 }
@@ -177,7 +177,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
       setItems([{
         uid: crypto.randomUUID(),
         warehouseId: wh, profileName: prof, steelGrade: gr,
-        quantity: 10, lengthM: 12,
+        quantity: '', lengthM: '',
         isPaired: false,
         costPriceEurT: costEurT,
         sellPriceEurT: 0,
@@ -216,7 +216,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
     setItems(prev => [...prev, {
       uid: crypto.randomUUID(),
       warehouseId: wh, profileName: prof, steelGrade: gr,
-      quantity: 10, lengthM: 12,
+      quantity: '', lengthM: '',
       isPaired: false,
       costPriceEurT: lookupCostInCurrency(wh, prof, gr),
       sellPriceEurT: 0,
@@ -254,8 +254,8 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
       uid:            crypto.randomUUID(),
       lockName:       def.name,
       steelGrade:     grades[0]?.id ?? '',
-      quantitySzt:    10,
-      lengthM:        12,
+      quantitySzt:    '',
+      lengthM:        '',
       priceEurMb:     def.price_eur_mb,
       sellPriceEurMb: def.price_eur_mb,
     }]);
@@ -285,11 +285,13 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
   const itemResults = useMemo((): ItemResult[] =>
     items.map(item => {
       const profile = profiles.find(p => p.name === item.profileName) ?? null;
-      if (!profile || item.quantity <= 0 || item.lengthM <= 0) {
+      const qty = Number(item.quantity) || 0;
+      const lengthM = Number(item.lengthM) || 0;
+      if (!profile || qty <= 0 || lengthM <= 0) {
         return { valid: false, piles: 0, totalLengthM: 0, massT: 0, wallAreaM2: 0, costEUR: 0, sellEUR: 0, marginPct: 0, profile: null };
       }
-      const piles        = item.isPaired ? item.quantity * 2 : item.quantity;
-      const totalLengthM = piles * item.lengthM;
+      const piles        = item.isPaired ? qty * 2 : qty;
+      const totalLengthM = piles * lengthM;
       const massT        = Math.round((totalLengthM * profile.weight_kg_per_m) / 1000 * 1000) / 1000;
       const wallAreaM2   = totalLengthM * (profile.width_mm / 1000);
       // Ceny w stanie są w bieżącej walucie (EUR lub PLN) – przeliczamy do EUR do obliczeń
@@ -306,7 +308,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
   const lockResults = useMemo((): LockItemResult[] =>
     lockItems.map(item => {
       const def = locks.find(l => l.name === item.lockName);
-      const quantityMb = item.quantitySzt * item.lengthM;
+      const quantityMb = (Number(item.quantitySzt) || 0) * (Number(item.lengthM) || 0);
       if (!def || quantityMb <= 0 || item.priceEurMb <= 0) {
         return { valid: false, totalEUR: 0, totalPLN: 0, totalSellEUR: 0, totalSellPLN: 0, marginPct: null, massT: 0 };
       }
@@ -357,8 +359,12 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
   const isValid          = totals.totalMassT > 0;
   const hasAllSellPrices = items.every(i => i.sellPriceEurT > 0);
   const hasValidLocks    = lockResults.some(r => r.valid);
-  // Można zapisać gdy: jest cokolwiek (grodzice lub zamki) i wszystkie grodzice mają ceny sprzedaży
-  const canSave = (isValid || hasValidLocks) && (items.length === 0 || hasAllSellPrices);
+  // Każda dodana pozycja (grodzica/zamek) musi mieć dodatnią ilość i długość — pusta/0 blokuje zapis
+  const allItemsValid    = itemResults.every(r => r.valid);
+  const allLocksValid    = lockResults.every(r => r.valid);
+  const hasEmptyItems    = !allItemsValid || !allLocksValid;
+  // Można zapisać gdy: jest cokolwiek (grodzice lub zamki), wszystkie grodzice mają ceny sprzedaży i żadna pozycja nie jest pusta
+  const canSave = (isValid || hasValidLocks) && (items.length === 0 || hasAllSellPrices) && !hasEmptyItems;
 
   // Obliczenia dostawy
   // Masa łączna = grodzice + zamki (oba typy produktów ładowane na auto)
@@ -514,6 +520,8 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
         <div className="space-y-4">
           {items.map((item, idx) => {
             const r = itemResults[idx];
+            const qtyInvalid = !(Number(item.quantity) > 0);
+            const lenInvalid = !(Number(item.lengthM) > 0);
             const warehouse = warehouses.find(w => w.id === item.warehouseId);
             const costFromMatrixEur = lookupCostPrice(item.warehouseId, item.profileName, item.steelGrade);
             // Przelicz do bieżącej waluty – pole costPriceEurT trzyma wartość w walucie widoku
@@ -558,17 +566,17 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                   {/* Ilość */}
                   <div className="sm:col-span-1">
                     {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Ilość</label>}
-                    <input type="number" min={1} step={1} value={item.quantity}
-                      onChange={e => updateItem(item.uid, { quantity: Math.max(1, parseInt(e.target.value) || 1) })}
-                      className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <input type="number" min={1} step={1} placeholder="np. 10" value={item.quantity}
+                      onChange={e => updateItem(item.uid, { quantity: e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0) })}
+                      className={`w-full border rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 ${qtyInvalid ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`} />
                   </div>
 
                   {/* Długość */}
                   <div className="sm:col-span-1">
                     {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Dług. [m]</label>}
-                    <input type="number" min={0.5} step={0.5} value={item.lengthM}
-                      onChange={e => updateItem(item.uid, { lengthM: Math.max(0.5, parseFloat(e.target.value) || 0.5) })}
-                      className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <input type="number" min={0.5} step={0.5} placeholder="np. 12" value={item.lengthM}
+                      onChange={e => updateItem(item.uid, { lengthM: e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0) })}
+                      className={`w-full border rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 ${lenInvalid ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`} />
                   </div>
 
                   {/* Parowane */}
@@ -742,7 +750,9 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                 ? Math.round(defPrice * exchangeRate * 100) / 100
                 : defPrice;
 
-              const quantityMb = item.quantitySzt * item.lengthM;
+              const quantityMb = (Number(item.quantitySzt) || 0) * (Number(item.lengthM) || 0);
+              const lockQtyInvalid = !(Number(item.quantitySzt) > 0);
+              const lockLenInvalid = !(Number(item.lengthM) > 0);
 
               return (
                 <div key={item.uid} className="border border-gray-200 rounded-xl p-4 bg-gray-50">
@@ -775,19 +785,19 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                     {/* 3. Ilość [szt.] */}
                     <div className="sm:col-span-1">
                       {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Ilość [szt.]</label>}
-                      <input type="number" min={1} step={1}
+                      <input type="number" min={1} step={1} placeholder="np. 10"
                         value={item.quantitySzt}
-                        onChange={e => updateLockItem(item.uid, { quantitySzt: Math.max(1, parseInt(e.target.value) || 1) })}
-                        className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        onChange={e => updateLockItem(item.uid, { quantitySzt: e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0) })}
+                        className={`w-full border rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 ${lockQtyInvalid ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`} />
                     </div>
 
                     {/* 4. Długość [m] */}
                     <div className="sm:col-span-1">
                       {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Dł. [m]</label>}
-                      <input type="number" min={0.1} step={0.1}
+                      <input type="number" min={0.1} step={0.1} placeholder="np. 12"
                         value={item.lengthM}
-                        onChange={e => updateLockItem(item.uid, { lengthM: Math.max(0.1, parseFloat(e.target.value) || 0.1) })}
-                        className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        onChange={e => updateLockItem(item.uid, { lengthM: e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0) })}
+                        className={`w-full border rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 ${lockLenInvalid ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`} />
                     </div>
 
                     {/* mb (obliczone) */}
@@ -1243,11 +1253,16 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
           </div>
 
           {/* Przycisk zapisu oferty */}
+          {hasEmptyItems && (isValid || hasValidLocks) && (
+            <div className="bg-red-50 border border-red-300 rounded-xl p-4 mb-3 text-red-700 text-sm text-center font-medium">
+              Uzupełnij ilość i długość we wszystkich pozycjach — pozycje bez wartości nie mogą zostać zapisane.
+            </div>
+          )}
           <button
             onClick={() => setShowSaveModal(true)}
             disabled={!canSave}
             className="w-full py-3 bg-green-700 hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl shadow-sm transition-colors"
-            title={!canSave ? 'Wpisz ceny sprzedaży dla wszystkich pozycji lub dodaj zamki' : ''}
+            title={!canSave ? 'Uzupełnij ilość/długość i ceny sprzedaży we wszystkich pozycjach' : ''}
           >
             💾 Zapisz jako ofertę SP
           </button>
@@ -1266,8 +1281,8 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
               warehouseName: wh?.name ?? '',
               profileName:   item.profileName,
               steelGrade:    item.steelGrade,
-              quantity:      item.quantity,
-              lengthM:       item.lengthM,
+              quantity:      Number(item.quantity) || 0,
+              lengthM:       Number(item.lengthM) || 0,
               isPaired:      item.isPaired,
               totalLengthM:  r.totalLengthM,
               massT:         r.massT,
@@ -1288,9 +1303,9 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
             return {
               lockName:       item.lockName,
               steelGrade:     item.steelGrade,
-              quantitySzt:    item.quantitySzt,
-              lengthM:        item.lengthM,
-              quantityMb:     item.quantitySzt * item.lengthM,
+              quantitySzt:    Number(item.quantitySzt) || 0,
+              lengthM:        Number(item.lengthM) || 0,
+              quantityMb:     (Number(item.quantitySzt) || 0) * (Number(item.lengthM) || 0),
               priceEurMb:     item.priceEurMb,
               totalEUR:       r.totalEUR,
               totalPLN:       r.totalPLN,

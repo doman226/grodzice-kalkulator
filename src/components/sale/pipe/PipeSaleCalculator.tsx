@@ -37,8 +37,8 @@ interface PipeCalcItem {
   surface: PipeSurface;
   diameterMm: number;
   wallThicknessMm: number;
-  quantitySzt: number;
-  lengthM: number;
+  quantitySzt: number | '';
+  lengthM: number | '';
   costPricePerTon: number;   // cena zakupu (w walucie oferty)
   sellPricePerTon: number;   // cena sprzedaży (w walucie oferty)
 }
@@ -81,8 +81,8 @@ function defaultItem(): PipeCalcItem {
     surface: PIPE_SURFACES[0],
     diameterMm: 168.3,
     wallThicknessMm: 6.3,
-    quantitySzt: 10,
-    lengthM: 12,
+    quantitySzt: '',
+    lengthM: '',
     costPricePerTon: 0,
     sellPricePerTon: 0,
   };
@@ -204,10 +204,12 @@ export default function PipeSaleCalculator({ clients, onClientAdded, onOfferSave
   const results: ItemResult[] = useMemo(
     () => items.map(it => {
       const kgPerM = pipeKgPerM(it.diameterMm, it.wallThicknessMm);
-      if (kgPerM <= 0 || it.quantitySzt <= 0 || it.lengthM <= 0) {
+      const qty = Number(it.quantitySzt) || 0;
+      const lengthM = Number(it.lengthM) || 0;
+      if (kgPerM <= 0 || qty <= 0 || lengthM <= 0) {
         return { valid: false, kgPerM, totalLengthM: 0, massT: 0, costTotal: 0, sellTotal: 0, marginPct: null };
       }
-      const totalLengthM = it.quantitySzt * it.lengthM;
+      const totalLengthM = qty * lengthM;
       // Zaokrąglenie do 3dp zgodnie z konwencją CLAUDE.md
       // (wyświetlana masa × cena = wyświetlana wartość).
       const massT = Math.round((totalLengthM * kgPerM) / 1000 * 1000) / 1000;
@@ -260,8 +262,8 @@ export default function PipeSaleCalculator({ clients, onClientAdded, onOfferSave
         surface:          it.surface,
         diameterMm:       it.diameterMm,
         wallThicknessMm:  it.wallThicknessMm,
-        quantitySzt:      it.quantitySzt,
-        lengthM:          it.lengthM,
+        quantitySzt:      Number(it.quantitySzt) || 0,
+        lengthM:          Number(it.lengthM) || 0,
         kgPerM:           r.kgPerM,
         totalLengthM:     r.totalLengthM,
         massT:            r.massT,
@@ -315,8 +317,11 @@ export default function PipeSaleCalculator({ clients, onClientAdded, onOfferSave
   // Tryb własnego magazynu — gdy deliveryFrom nie jest żadnym ze stałych magazynów
   const isCustomWarehouse = !(PIPE_WAREHOUSES as readonly string[]).includes(deliveryFrom);
 
+  // Każda dodana pozycja musi mieć dodatnią ilość i długość — pusta/0 blokuje zapis
+  const allItemsValid = items.length > 0 && results.every(r => r.valid);
+  const hasEmptyItems = items.length > 0 && !allItemsValid;
   // Sprawdzamy czy są poprawne pozycje z ceną sprzedaży > 0 (warunek zapisu).
-  const canSave = snapshots.length > 0 && snapshots.every(s => s.sellPricePerTon > 0);
+  const canSave = allItemsValid && snapshots.length > 0 && snapshots.every(s => s.sellPricePerTon > 0);
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -422,13 +427,19 @@ export default function PipeSaleCalculator({ clients, onClientAdded, onOfferSave
             <button
               onClick={() => setShowSaveModal(true)}
               disabled={!canSave}
-              title={!canSave ? 'Każda pozycja musi mieć cenę sprzedaży > 0' : 'Zapisz ofertę do bazy z numerem SR/YYYY/NNN'}
+              title={!canSave ? 'Uzupełnij ilość/długość i cenę sprzedaży > 0 w każdej pozycji' : 'Zapisz ofertę do bazy z numerem SR/YYYY/NNN'}
               className="px-3 py-1.5 text-sm font-medium bg-blue-900 text-white rounded-lg hover:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Zapisz ofertę
             </button>
           </div>
         </div>
+
+        {hasEmptyItems && (
+          <div className="bg-red-50 border border-red-300 rounded-xl p-4 mb-4 text-red-700 text-sm text-center font-medium">
+            Uzupełnij ilość i długość we wszystkich pozycjach — pozycje bez wartości nie mogą zostać zapisane.
+          </div>
+        )}
 
         {items.length === 0 && (
           <p className="text-sm text-gray-400 text-center py-6">
@@ -554,18 +565,18 @@ export default function PipeSaleCalculator({ clients, onClientAdded, onOfferSave
                   </Field>
                   <Field label="Ilość [szt]">
                     <input
-                      type="number" step={1} min={0}
+                      type="number" step={1} min={0} placeholder="np. 10"
                       value={item.quantitySzt}
-                      onChange={e => updateItem(item.uid, { quantitySzt: parseInt(e.target.value, 10) || 0 })}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={e => updateItem(item.uid, { quantitySzt: e.target.value === '' ? '' : (parseInt(e.target.value, 10) || 0) })}
+                      className={`w-full px-2 py-1.5 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 ${!(Number(item.quantitySzt) > 0) ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`}
                     />
                   </Field>
                   <Field label="Długość 1 szt [m]">
                     <input
-                      type="number" step="0.01" min={0}
+                      type="number" step="0.01" min={0} placeholder="np. 12"
                       value={item.lengthM}
-                      onChange={e => updateItem(item.uid, { lengthM: parseFloat(e.target.value) || 0 })}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={e => updateItem(item.uid, { lengthM: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0) })}
+                      className={`w-full px-2 py-1.5 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 ${!(Number(item.lengthM) > 0) ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`}
                     />
                   </Field>
                   <Field label={`Cena zakupu [${currency}/t]`}>

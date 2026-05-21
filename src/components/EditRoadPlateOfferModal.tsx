@@ -14,7 +14,7 @@ interface CalcItem {
   uid: string;
   profileId: string;
   steelGrade: string;
-  quantity: number;
+  quantity: number | '';
 }
 
 interface Props {
@@ -154,7 +154,7 @@ export default function EditRoadPlateOfferModal({ offer, profiles, prices, clien
   const [error, setError] = useState('');
 
   function addItem() {
-    setItems(prev => [...prev, { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: STEEL_GRADES[0], quantity: 10 }]);
+    setItems(prev => [...prev, { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: STEEL_GRADES[0], quantity: '' }]);
   }
   function removeItem(uid: string) {
     setItems(prev => prev.filter(i => i.uid !== uid));
@@ -167,10 +167,11 @@ export default function EditRoadPlateOfferModal({ offer, profiles, prices, clien
   const itemResults = useMemo(() =>
     items.map(item => {
       const profile = profiles.find(p => p.id === item.profileId) ?? null;
-      if (!profile || item.quantity <= 0) {
+      const qty = Number(item.quantity) || 0;
+      if (!profile || qty <= 0) {
         return { profile, totalLengthM: 0, areaM2: 0, massT: 0, valid: false };
       }
-      const m = calculateRoadPlateMetrics(item.quantity, profile.sheet_length_m, profile.sheet_width_m, profile.weight_kg_per_m2);
+      const m = calculateRoadPlateMetrics(qty, profile.sheet_length_m, profile.sheet_width_m, profile.weight_kg_per_m2);
       return { profile, ...m, valid: m.massT > 0 };
     }),
     [items, profiles],
@@ -206,6 +207,7 @@ export default function EditRoadPlateOfferModal({ offer, profiles, prices, clien
   async function handleSave() {
     if (!clientId) return setError('Wybierz klienta.');
     if (validItems.length === 0) return setError('Dodaj przynajmniej jedną pozycję.');
+    if (validItems.length !== items.length) return setError('Uzupełnij ilość we wszystkich pozycjach — pozycje bez wartości nie mogą zostać zapisane.');
     setSaving(true);
     setError('');
 
@@ -230,7 +232,7 @@ export default function EditRoadPlateOfferModal({ offer, profiles, prices, clien
       task_name: taskName.trim() || null,
       profile_name: mainProfileName,
       profile_type: 'PLATE',
-      quantity: items.reduce((s, i) => s + i.quantity, 0),
+      quantity: items.reduce((s, i) => s + (Number(i.quantity) || 0), 0),
       length_m: validItems.length === 1 ? itemResults.find(r => r.valid)!.profile!.sheet_length_m : null,
       rental_weeks: rentalWeeks,
       display_unit: displayUnit,
@@ -274,7 +276,7 @@ export default function EditRoadPlateOfferModal({ offer, profiles, prices, clien
         profile_name: r.profile.name,
         profile_type: 'PLATE',
         steel_grade: item.steelGrade,
-        quantity: item.quantity,
+        quantity: Number(item.quantity) || 0,
         length_m: r.profile.sheet_length_m,
         total_length_m: r.totalLengthM,
         mass_t: r.massT,
@@ -400,9 +402,9 @@ export default function EditRoadPlateOfferModal({ offer, profiles, prices, clien
                     </div>
                     <div className="col-span-2">
                       {idx === 0 && <p className="text-xs text-gray-400 mb-1">Ilość</p>}
-                      <input type="number" min={1} value={item.quantity}
-                        onChange={e => updateItem(item.uid, { quantity: Math.max(1, parseInt(e.target.value) || 0) })}
-                        className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <input type="number" min={1} placeholder="np. 10" value={item.quantity}
+                        onChange={e => updateItem(item.uid, { quantity: e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0) })}
+                        className={`w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 ${!(Number(item.quantity) > 0) ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`} />
                     </div>
                     <div className="col-span-1">
                       {idx === 0 && <p className="text-xs text-gray-400 mb-1">Masa</p>}

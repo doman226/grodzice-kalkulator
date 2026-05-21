@@ -25,7 +25,7 @@ interface EditableItem {
   sheetLengthM: number;
   sheetWidthM: number;
   weightKgPerM2: number;
-  quantitySzt: number;
+  quantitySzt: number | '';
   costPricePerTon: number;
   sellPricePerTon: number;
 }
@@ -170,7 +170,7 @@ export default function RoadPlateEditOfferModal({
       sheetLengthM: p.sheet_length_m,
       sheetWidthM: p.sheet_width_m,
       weightKgPerM2: p.weight_kg_per_m2,
-      quantitySzt: 10,
+      quantitySzt: '',
       costPricePerTon: 0,
       sellPricePerTon: 0,
     }]);
@@ -215,11 +215,12 @@ export default function RoadPlateEditOfferModal({
   // ── Obliczenia per pozycja ──
   const itemResults = useMemo(() =>
     editItems.map(it => {
-      if (it.quantitySzt <= 0 || it.sheetLengthM <= 0 || it.sheetWidthM <= 0 || it.weightKgPerM2 <= 0) {
+      const qty = Number(it.quantitySzt) || 0;
+      if (qty <= 0 || it.sheetLengthM <= 0 || it.sheetWidthM <= 0 || it.weightKgPerM2 <= 0) {
         return null;
       }
       const areaPerPlateM2 = it.sheetLengthM * it.sheetWidthM;
-      const totalAreaM2    = it.quantitySzt * areaPerPlateM2;
+      const totalAreaM2    = qty * areaPerPlateM2;
       const massT          = Math.round(totalAreaM2 * it.weightKgPerM2 / 1000 * 1000) / 1000;
       const costTotal      = massT * (it.costPricePerTon || 0);
       const sellTotal      = massT * (it.sellPricePerTon || 0);
@@ -314,9 +315,13 @@ export default function RoadPlateEditOfferModal({
     if (deliveryTerms === 'FCA' && !fcaLocation.trim())
       return setError('Podaj lokalizację magazynu odbioru (FCA).');
 
-    // Walidacja pozycji
+    // Walidacja pozycji — pusta/zerowa ilość blokuje zapis
+    const emptyQtyIdx = editItems.findIndex(it => !(Number(it.quantitySzt) > 0));
+    if (emptyQtyIdx >= 0) {
+      return setError('Uzupełnij ilość we wszystkich pozycjach — pozycje bez wartości nie mogą zostać zapisane.');
+    }
     const invalidIdx = editItems.findIndex(it =>
-      it.quantitySzt <= 0 || it.sheetLengthM <= 0 || it.sheetWidthM <= 0
+      !(Number(it.quantitySzt) > 0) || it.sheetLengthM <= 0 || it.sheetWidthM <= 0
       || it.weightKgPerM2 <= 0 || (it.sellPricePerTon || 0) <= 0
     );
     if (invalidIdx >= 0) {
@@ -371,7 +376,7 @@ export default function RoadPlateEditOfferModal({
         sheet_length_m:     it.sheetLengthM,
         sheet_width_m:      it.sheetWidthM,
         weight_kg_per_m2:   it.weightKgPerM2,
-        quantity_szt:       it.quantitySzt,
+        quantity_szt:       Number(it.quantitySzt) || 0,
         total_area_m2:      r.totalAreaM2,
         mass_t:             r.massT,
         cost_price_per_ton: it.costPricePerTon || null,
@@ -636,9 +641,9 @@ export default function RoadPlateEditOfferModal({
                       {/* Ilość */}
                       <div className="lg:col-span-1">
                         {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Ilość</label>}
-                        <input type="number" min={1} step={1} value={item.quantitySzt}
-                          onChange={e => updateItem(item.uid, { quantitySzt: parseInt(e.target.value) || 0 })}
-                          className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-right" />
+                        <input type="number" min={1} step={1} placeholder="np. 10" value={item.quantitySzt}
+                          onChange={e => updateItem(item.uid, { quantitySzt: e.target.value === '' ? '' : (parseInt(e.target.value) || 0) })}
+                          className={`w-full border rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 ${!(Number(item.quantitySzt) > 0) ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`} />
                       </div>
 
                       {/* Cena kosztu */}

@@ -14,8 +14,8 @@ interface CalcItem {
   uid: string;
   profileId: string;
   steelGrade: string;
-  quantity: number;
-  lengthM: number;
+  quantity: number | '';
+  lengthM: number | '';
   // oryginalne ID z bazy (dla istniejących pozycji)
   originalProfileName?: string;
 }
@@ -162,7 +162,7 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
 
   // --- Zarządzanie pozycjami ---
   function addItem() {
-    setItems(prev => [...prev, { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: STEEL_GRADES[0], quantity: 10, lengthM: 12 }]);
+    setItems(prev => [...prev, { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: STEEL_GRADES[0], quantity: '', lengthM: '' }]);
   }
   function removeItem(uid: string) {
     setItems(prev => prev.filter(i => i.uid !== uid));
@@ -175,10 +175,12 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
   const itemResults = useMemo(() =>
     items.map(item => {
       const profile = profiles.find(p => p.id === item.profileId) ?? null;
-      if (!profile || item.quantity <= 0 || item.lengthM <= 0) {
+      const qty = Number(item.quantity) || 0;
+      const lengthM = Number(item.lengthM) || 0;
+      if (!profile || qty <= 0 || lengthM <= 0) {
         return { profile, totalLengthM: 0, massT: 0, wallAreaM2: 0, valid: false };
       }
-      const totalLengthM = item.quantity * item.lengthM;
+      const totalLengthM = qty * lengthM;
       const massT = (totalLengthM * profile.weight_kg_per_m) / 1000;
       const wallAreaM2 = totalLengthM * (profile.width_mm / 1000);
       return { profile, totalLengthM, massT, wallAreaM2, valid: true };
@@ -218,6 +220,7 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
   async function handleSave() {
     if (!clientId) return setError('Wybierz klienta.');
     if (validItems.length === 0) return setError('Dodaj przynajmniej jedną pozycję.');
+    if (validItems.length !== items.length) return setError('Uzupełnij ilość i długość we wszystkich pozycjach — pozycje bez wartości nie mogą zostać zapisane.');
     setSaving(true);
     setError('');
 
@@ -242,8 +245,8 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
       task_name: taskName.trim() || null,
       profile_name: mainProfileName,
       profile_type: mainProfileType,
-      quantity: items.reduce((s, i) => s + i.quantity, 0),
-      length_m: validItems.length === 1 ? items.find(i => itemResults[items.indexOf(i)]?.valid)?.lengthM ?? null : null,
+      quantity: items.reduce((s, i) => s + (Number(i.quantity) || 0), 0),
+      length_m: validItems.length === 1 ? (Number(items.find(i => itemResults[items.indexOf(i)]?.valid)?.lengthM) || null) : null,
       rental_weeks: rentalWeeks,
       display_unit: displayUnit,
       total_length_m: totals.totalLengthM,
@@ -287,8 +290,8 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
         profile_name: r.profile.name,
         profile_type: r.profile.type,
         steel_grade: item.steelGrade,
-        quantity: item.quantity,
-        length_m: item.lengthM,
+        quantity: Number(item.quantity) || 0,
+        length_m: Number(item.lengthM) || 0,
         total_length_m: r.totalLengthM,
         mass_t: r.massT,
         wall_area_m2: r.wallAreaM2,
@@ -402,15 +405,15 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
                     </div>
                     <div className="col-span-2">
                       {idx === 0 && <p className="text-xs text-gray-400 mb-1">Ilość</p>}
-                      <input type="number" min={1} value={item.quantity}
-                        onChange={e => updateItem(item.uid, { quantity: Math.max(1, parseInt(e.target.value) || 0) })}
-                        className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <input type="number" min={1} placeholder="np. 10" value={item.quantity}
+                        onChange={e => updateItem(item.uid, { quantity: e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0) })}
+                        className={`w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 ${!(Number(item.quantity) > 0) ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`} />
                     </div>
                     <div className="col-span-2">
                       {idx === 0 && <p className="text-xs text-gray-400 mb-1">Dług. [m]</p>}
-                      <input type="number" min={0.1} step={0.5} value={item.lengthM}
-                        onChange={e => updateItem(item.uid, { lengthM: Math.max(0.1, parseFloat(e.target.value) || 0) })}
-                        className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <input type="number" min={0.1} step={0.5} placeholder="np. 12" value={item.lengthM}
+                        onChange={e => updateItem(item.uid, { lengthM: e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0) })}
+                        className={`w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 ${!(Number(item.lengthM) > 0) ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`} />
                     </div>
                     <div className="col-span-2">
                       {idx === 0 && <p className="text-xs text-gray-400 mb-1">Masa</p>}

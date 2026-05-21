@@ -37,8 +37,8 @@ interface EditablePipeItem {
   surface: PipeSurface;
   diameterMm: number;
   wallThicknessMm: number;
-  quantitySzt: number;
-  lengthM: number;
+  quantitySzt: number | '';
+  lengthM: number | '';
   costPricePerTon: number;   // w walucie oferty (snapshot)
   sellPricePerTon: number;
 }
@@ -76,8 +76,8 @@ function itemsFromOffer(offer: PipeSaleOffer): EditablePipeItem[] {
       surface: PIPE_SURFACES[0],
       diameterMm: 168.3,
       wallThicknessMm: 6.3,
-      quantitySzt: 10,
-      lengthM: 12,
+      quantitySzt: '',
+      lengthM: '',
       costPricePerTon: 0,
       sellPricePerTon: 0,
     }];
@@ -188,8 +188,8 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose, m
       surface: PIPE_SURFACES[0],
       diameterMm: 168.3,
       wallThicknessMm: 6.3,
-      quantitySzt: 10,
-      lengthM: 12,
+      quantitySzt: '',
+      lengthM: '',
       costPricePerTon: 0,
       sellPricePerTon: 0,
     }]);
@@ -246,10 +246,12 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose, m
   const itemResults = useMemo(() =>
     editItems.map(it => {
       const kgPerM = pipeKgPerM(it.diameterMm, it.wallThicknessMm);
-      if (kgPerM <= 0 || it.quantitySzt <= 0 || it.lengthM <= 0) {
+      const qty = Number(it.quantitySzt) || 0;
+      const lengthM = Number(it.lengthM) || 0;
+      if (kgPerM <= 0 || qty <= 0 || lengthM <= 0) {
         return null;
       }
-      const totalLengthM = it.quantitySzt * it.lengthM;
+      const totalLengthM = qty * lengthM;
       const massT        = Math.round(totalLengthM * kgPerM / 1000 * 1000) / 1000;
       const costTotal    = massT * (it.costPricePerTon || 0);
       const sellTotal    = massT * (it.sellPricePerTon || 0);
@@ -303,7 +305,7 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose, m
     // Sprawdź czy wszystkie pozycje mają sellPrice > 0 i poprawną geometrię
     const invalidItem = editItems.findIndex(it => {
       const kgPerM = pipeKgPerM(it.diameterMm, it.wallThicknessMm);
-      return kgPerM <= 0 || it.quantitySzt <= 0 || it.lengthM <= 0 || (it.sellPricePerTon || 0) <= 0;
+      return kgPerM <= 0 || !(Number(it.quantitySzt) > 0) || !(Number(it.lengthM) > 0) || (it.sellPricePerTon || 0) <= 0;
     });
     if (invalidItem >= 0) {
       return setError(`Pozycja #${invalidItem + 1}: cena sprzedaży > 0 i poprawne wymiary są wymagane.`);
@@ -359,8 +361,8 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose, m
         surface:            it.surface,
         diameter_mm:        it.diameterMm,
         wall_thickness_mm:  it.wallThicknessMm,
-        quantity_szt:       it.quantitySzt,
-        length_m:           it.lengthM,
+        quantity_szt:       Number(it.quantitySzt) || 0,
+        length_m:           Number(it.lengthM) || 0,
         kg_per_m:           r.kgPerM,
         total_length_m:     r.totalLengthM,
         mass_t:             r.massT,
@@ -634,14 +636,14 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose, m
                           className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
                       </Field>
                       <Field label="Ilość [szt]">
-                        <input type="number" step={1} min={0} value={item.quantitySzt}
-                          onChange={e => updateItem(item.uid, { quantitySzt: parseInt(e.target.value, 10) || 0 })}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                        <input type="number" step={1} min={0} placeholder="np. 10" value={item.quantitySzt}
+                          onChange={e => updateItem(item.uid, { quantitySzt: e.target.value === '' ? '' : (parseInt(e.target.value, 10) || 0) })}
+                          className={`w-full px-2 py-1.5 border rounded text-sm ${!(Number(item.quantitySzt) > 0) ? 'border-red-400 bg-red-50' : 'border-gray-300'}`} />
                       </Field>
                       <Field label="Długość [m]">
-                        <input type="number" step="0.01" min={0} value={item.lengthM}
-                          onChange={e => updateItem(item.uid, { lengthM: parseFloat(e.target.value) || 0 })}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                        <input type="number" step="0.01" min={0} placeholder="np. 12" value={item.lengthM}
+                          onChange={e => updateItem(item.uid, { lengthM: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0) })}
+                          className={`w-full px-2 py-1.5 border rounded text-sm ${!(Number(item.lengthM) > 0) ? 'border-red-400 bg-red-50' : 'border-gray-300'}`} />
                       </Field>
                       <Field label={`Cena zakupu [${currency}/t]`}>
                         <input type="number" step="0.01" min={0} value={item.costPricePerTon || ''}

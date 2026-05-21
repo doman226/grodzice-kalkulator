@@ -20,7 +20,7 @@ interface CalcItem {
   uid: string;
   profileId: string;
   steelGrade: RoadPlateSaleSteelGrade;
-  quantity: number;
+  quantity: number | '';
   costPriceEurT: number;   // cena w bieżącej walucie (mimo nazwy "EurT" — konwencja z SaleCalculator)
   sellPriceEurT: number;   // cena w bieżącej walucie
 }
@@ -127,7 +127,7 @@ export default function RoadPlateSaleCalculator({
         uid: crypto.randomUUID(),
         profileId: prof.id,
         steelGrade: grade,
-        quantity: 10,
+        quantity: '',
         costPriceEurT: lookupCostInCurrency(prof.id, grade),
         sellPriceEurT: 0,
       }]);
@@ -187,7 +187,7 @@ export default function RoadPlateSaleCalculator({
       uid: crypto.randomUUID(),
       profileId: prof.id,
       steelGrade: grade,
-      quantity: 10,
+      quantity: '',
       costPriceEurT: lookupCostInCurrency(prof.id, grade),
       sellPriceEurT: 0,
     }]);
@@ -215,12 +215,13 @@ export default function RoadPlateSaleCalculator({
   const results: ItemResult[] = useMemo(() =>
     items.map(item => {
       const profile = profiles.find(p => p.id === item.profileId) ?? null;
-      if (!profile || item.quantity <= 0) {
+      const qty = Number(item.quantity) || 0;
+      if (!profile || qty <= 0) {
         return { valid: false, profile: null, areaPerPlateM2: 0, totalAreaM2: 0, massT: 0,
           costInCurrency: 0, sellInCurrency: 0, costEUR: 0, sellEUR: 0, marginPct: null };
       }
       const areaPerPlateM2 = profile.sheet_length_m * profile.sheet_width_m;
-      const totalAreaM2    = item.quantity * areaPerPlateM2;
+      const totalAreaM2    = qty * areaPerPlateM2;
       // Zaokrąglenie 3dp zgodnie z CLAUDE.md (wyświetlana masa × cena = wyświetlana wartość)
       const massT          = Math.round(totalAreaM2 * profile.weight_kg_per_m2 / 1000 * 1000) / 1000;
       // Ceny stanu są w bieżącej walucie — totale w tej samej walucie:
@@ -290,7 +291,7 @@ export default function RoadPlateSaleCalculator({
         sheetLengthM:      r.profile.sheet_length_m,
         sheetWidthM:       r.profile.sheet_width_m,
         weightKgPerM2:     r.profile.weight_kg_per_m2,
-        quantitySzt:       item.quantity,
+        quantitySzt:       Number(item.quantity) || 0,
         totalAreaM2:       r.totalAreaM2,
         massT:             r.massT,
         costPricePerTon:   item.costPriceEurT,    // w walucie oferty
@@ -306,6 +307,8 @@ export default function RoadPlateSaleCalculator({
   );
 
   const canSave = isValid && snapshots.length === items.length && items.every(i => i.sellPriceEurT > 0);
+  // Pozycja z pustą/zerową ilością blokuje zapis — pokaż komunikat
+  const hasEmptyItems = items.length > 0 && !results.every(r => r.valid);
 
   function moneyLabel(v: number): string {
     return currency === 'EUR' ? `${formatEUR(v)} EUR` : `${formatPLN(v)} PLN`;
@@ -483,9 +486,10 @@ export default function RoadPlateSaleCalculator({
                       type="number"
                       min={1}
                       step={1}
+                      placeholder="np. 10"
                       value={item.quantity}
-                      onChange={e => updateItem(item.uid, { quantity: parseInt(e.target.value) || 0 })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={e => updateItem(item.uid, { quantity: e.target.value === '' ? '' : (parseInt(e.target.value) || 0) })}
+                      className={`w-full border rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 ${!(Number(item.quantity) > 0) ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`}
                     />
                   </div>
 
@@ -655,6 +659,12 @@ export default function RoadPlateSaleCalculator({
       </div>
 
       {/* ─── Podsumowanie ──────────────────────────────────────────────────── */}
+      {hasEmptyItems && (
+        <div className="bg-red-50 border border-red-300 rounded-xl p-4 text-red-700 text-sm text-center font-medium">
+          Uzupełnij ilość we wszystkich pozycjach — pozycje bez wartości nie mogą zostać zapisane.
+        </div>
+      )}
+
       {isValid && (
         <div className="bg-blue-900 text-white rounded-xl shadow-sm p-6">
           <h2 className="text-lg font-semibold mb-3">Podsumowanie</h2>
@@ -698,9 +708,9 @@ export default function RoadPlateSaleCalculator({
               onClick={() => setShowSaveModal(true)}
               disabled={!canSave}
               className="bg-white text-blue-900 hover:bg-blue-50 disabled:bg-blue-200 disabled:text-blue-400 disabled:cursor-not-allowed text-sm font-semibold px-6 py-2.5 rounded-lg transition-colors"
-              title={!canSave ? 'Uzupełnij ceny sprzedaży we wszystkich pozycjach' : 'Zapisz ofertę SPP'}
+              title={!canSave ? 'Uzupełnij ilość i ceny sprzedaży we wszystkich pozycjach' : 'Zapisz ofertę SPP'}
             >
-              {canSave ? '💾 Zapisz ofertę SPP' : 'Uzupełnij ceny sprzedaży'}
+              {canSave ? '💾 Zapisz ofertę SPP' : 'Uzupełnij dane pozycji'}
             </button>
           </div>
         </div>
