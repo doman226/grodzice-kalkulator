@@ -16,6 +16,7 @@ export interface PdfStrings {
   phone:           string;
   exchangeRate:    string;
   customerLabel:   string;
+  taskLabel:   string;
   vatLabel:        (country: string) => string;
 
   // Greeting & intro
@@ -120,6 +121,7 @@ const pl: PdfStrings = {
   phone:        'Telefon:',
   exchangeRate: 'Kurs EUR/PLN:',
   customerLabel:'Dane klienta:',
+  taskLabel:'Zadanie:',
   vatLabel:     country => country === 'PL' ? 'NIP:' : 'VAT:',
 
   greeting: 'Dzień dobry,',
@@ -221,6 +223,7 @@ const en: PdfStrings = {
   phone:        'Phone:',
   exchangeRate: 'EUR/PLN rate:',
   customerLabel:'Customer:',
+  taskLabel:'Project:',
   vatLabel:     _country => 'VAT No.:',
 
   greeting: 'Dear Sir or Madam,',
@@ -323,6 +326,7 @@ export interface RentalPdfStrings {
   salesRep:      string;
   phone:         string;
   customerLabel: string;
+  taskLabel: string;
   vatLabel:      (country: string) => string;
 
   // Greeting & intro
@@ -438,6 +442,7 @@ const rental_pl: RentalPdfStrings = {
   salesRep:      'Opiekun handlowy:',
   phone:         'Telefon:',
   customerLabel: 'Dane klienta:',
+  taskLabel: 'Zadanie:',
   vatLabel:      country => country === 'PL' ? 'NIP:' : 'VAT:',
 
   greeting: 'Dzień dobry,',
@@ -541,6 +546,7 @@ const rental_en: RentalPdfStrings = {
   salesRep:      'Account Manager:',
   phone:         'Phone:',
   customerLabel: 'Customer:',
+  taskLabel: 'Project:',
   vatLabel:      country => country === 'PL' ? 'Tax No.:' : 'VAT No.:',
 
   greeting: 'Dear Sir or Madam,',
@@ -656,6 +662,7 @@ export interface RoadPlateRentalPdfStrings {
   salesRep:      string;
   phone:         string;
   customerLabel: string;
+  taskLabel: string;
   vatLabel:      (country: string) => string;
 
   // Greeting & intro
@@ -761,6 +768,7 @@ const roadPlate_pl: RoadPlateRentalPdfStrings = {
   salesRep:      'Opiekun handlowy:',
   phone:         'Telefon:',
   customerLabel: 'Dane klienta:',
+  taskLabel: 'Zadanie:',
   vatLabel:      country => country === 'PL' ? 'NIP:' : 'VAT:',
 
   greeting: 'Dzień dobry,',
@@ -855,6 +863,7 @@ const roadPlate_en: RoadPlateRentalPdfStrings = {
   salesRep:      'Account Manager:',
   phone:         'Phone:',
   customerLabel: 'Customer:',
+  taskLabel: 'Project:',
   vatLabel:      country => country === 'PL' ? 'Tax No.:' : 'VAT No.:',
 
   greeting: 'Dear Sir or Madam,',
@@ -961,6 +970,7 @@ export interface PipeSalePdfStrings {
   phone:           string;
   exchangeRate:    string;
   customerLabel:   string;
+  taskLabel:   string;
   vatLabel:        (country: string) => string;
 
   // Greeting & intro
@@ -1056,6 +1066,7 @@ const pipeSale_pl: PipeSalePdfStrings = {
   phone:        'Telefon:',
   exchangeRate: 'Kurs:',
   customerLabel:'Klient:',
+  taskLabel:'Zadanie:',
   vatLabel:     country => country === 'PL' ? 'NIP:' : 'VAT:',
 
   greeting: 'Dzień dobry,',
@@ -1144,6 +1155,7 @@ const pipeSale_en: PipeSalePdfStrings = {
   phone:        'Phone:',
   exchangeRate: 'Exchange rate:',
   customerLabel:'Customer:',
+  taskLabel:'Project:',
   vatLabel:     country => country === 'PL' ? 'NIP:' : 'VAT:',
 
   greeting: 'Dear Sir or Madam,',
@@ -1251,6 +1263,7 @@ export interface RoadPlateSalePdfStrings {
   phone:           string;
   exchangeRate:    string;
   customerLabel:   string;
+  taskLabel:   string;
   vatLabel:        (country: string) => string;
 
   // Greeting & intro
@@ -1343,6 +1356,7 @@ const roadPlateSale_pl: RoadPlateSalePdfStrings = {
   phone:        'Telefon:',
   exchangeRate: 'Kurs:',
   customerLabel:'Klient:',
+  taskLabel:'Zadanie:',
   vatLabel:     country => country === 'PL' ? 'NIP:' : 'VAT:',
 
   greeting: 'Dzień dobry,',
@@ -1427,6 +1441,7 @@ const roadPlateSale_en: RoadPlateSalePdfStrings = {
   phone:        'Phone:',
   exchangeRate: 'Exchange rate:',
   customerLabel:'Customer:',
+  taskLabel:'Project:',
   vatLabel:     country => country === 'PL' ? 'NIP:' : 'VAT:',
 
   greeting: 'Dear Sir or Madam,',
