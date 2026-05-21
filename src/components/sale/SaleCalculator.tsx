@@ -106,6 +106,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
   const [deliveryPaidBy, setDeliveryPaidBy]             = useState<'dap_included' | 'dap_extra' | 'fca'>('dap_included');
   const [deliveryFrom, setDeliveryFrom]                 = useState('Magazyn Intra B.V.');
   const [deliveryTo, setDeliveryTo]                     = useState('');
+  const [taskName, setTaskName]                         = useState('');
 
   const exchangeRate = nbpRate.rate;
 
@@ -1155,6 +1156,15 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
               </div>
             )}
 
+            {/* Nazwa zadania (opcjonalnie) */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nazwa zadania (opcjonalnie)</label>
+              <input type="text" value={taskName} maxLength={35}
+                onChange={e => setTaskName(e.target.value)}
+                placeholder="np. Budowa S5 odcinek Korzeńsko"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+
             {/* Trasa */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
@@ -1301,6 +1311,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
             currency={currency}
             exchangeRate={exchangeRate}
             nbpDate={nbpRate.date}
+            taskName={taskName}
             delivery={deliveryCalc ? {
               trucks:       deliveryCalc.trucks,
               costPerTruck: deliveryCalc.costPerTruck,

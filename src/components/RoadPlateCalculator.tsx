@@ -82,6 +82,7 @@ export default function RoadPlateCalculator({ profiles, prices, clients, onClien
   const WAREHOUSE_PRESET = 'Cieśle 42, 56400, PL';
   const WAREHOUSE_PRESET_CZ = 'Pohraniční 3272/130, 703 00 Ostrava, CZ';
   const [transportFrom, setTransportFrom] = useState(WAREHOUSE_PRESET);
+  const [taskName, setTaskName] = useState('');
   const [transportTo, setTransportTo] = useState('');
 
   // --- Zarządzanie pozycjami ---
@@ -564,6 +565,15 @@ export default function RoadPlateCalculator({ profiles, prices, clients, onClien
               </div>
             )}
 
+            {/* Nazwa zadania (opcjonalnie) */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nazwa zadania (opcjonalnie)</label>
+              <input type="text" value={taskName} maxLength={35}
+                onChange={e => setTaskName(e.target.value)}
+                placeholder="np. Budowa S5 odcinek Korzeńsko"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -672,6 +682,7 @@ export default function RoadPlateCalculator({ profiles, prices, clients, onClien
           nbpDate={nbpRate?.date ?? ''}
           transport={{ trucks: transportCalc.trucks, costPerTruck: transportCalc.costPerTruck, totalCost: transportCalc.totalCost, paidBy: transportPaidBy, from: transportFrom, to: transportTo }}
           prices={effectivePricesForOffer}
+          taskName={taskName}
           onClientAdded={onClientAdded}
           onSaved={(offer) => { onOfferSaved(offer); setShowSaveModal(false); }}
           onClose={() => setShowSaveModal(false)}
