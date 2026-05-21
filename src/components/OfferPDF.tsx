@@ -455,6 +455,11 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
             ) : (
               <Text style={[s.metaLine, { color: C.gray400, textAlign: 'right' }]}>—</Text>
             )}
+            {offer.task_name && (
+              <Text style={[s.metaLine, { textAlign: 'right', color: C.navy }]}>
+                <Text style={s.metaBold}>{t.taskLabel} </Text>{offer.task_name}
+              </Text>
+            )}
           </View>
         </View>
 
