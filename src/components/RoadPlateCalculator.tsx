@@ -14,7 +14,7 @@ interface Props {
   onOfferSaved: (offer: Offer) => void;
 }
 
-const STEEL_GRADES = ['min. S270GP', 'S270GP', 'min. S355GP', 'S355GP'];
+const STEEL_GRADES = ['min. S270GP', 'S270GP', 'min. S355GP', 'S355GP', 'min. S235', 'S235'];
 
 interface CalcItem {
   uid: string;

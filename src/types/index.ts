@@ -310,7 +310,7 @@ export interface PipeSaleOfferItem {
 // (katalog wspólny z modułem wynajmu). Atrybuty profilu (wymiary, kg/m²)
 // duplikowane jako snapshoty — chroni historię ofert przy zmianach katalogu.
 
-/** Lista 4 gatunków stali dla płyt drogowych (sprzedaż + wynajem).
+/** Lista 6 gatunków stali dla płyt drogowych (sprzedaż + wynajem).
  *  Wartości MUSZĄ odpowiadać CHECK constraint w road_plate_sale_offer_items
  *  i road_plate_sale_prices (patrz migracja 2026-05-16-road-plate-sale.sql).
  *  `as const` daje typu literal-union (RoadPlateSaleSteelGrade). */
@@ -319,6 +319,8 @@ export const ROAD_PLATE_SALE_STEEL_GRADES = [
   'S270GP',
   'min. S355GP',
   'S355GP',
+  'min. S235',
+  'S235',
 ] as const;
 export type RoadPlateSaleSteelGrade = typeof ROAD_PLATE_SALE_STEEL_GRADES[number];
 
