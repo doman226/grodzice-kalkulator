@@ -1,7 +1,7 @@
 import { Document, Page, View, Text, Image, StyleSheet, Font, Link } from '@react-pdf/renderer';
 import type { SaleOffer } from '../../types';
 import { formatEUR, formatPLN, formatRound, formatNumber } from '../../lib/calculations';
-import { PDF_STRINGS, type PdfLang } from '../../lib/pdfStrings';
+import { PDF_STRINGS, translateWarehouseLocation, type PdfLang } from '../../lib/pdfStrings';
 import { SALES_REPS as SALES_REPS_LIST } from '../../lib/constants';
 
 // ─── Fonty (identyczne z OfferPDF) ───────────────────────────────────────────
@@ -573,7 +573,7 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
                       <Text style={s.transportLabel}>{t.labelRoute}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
                       <Text style={s.transportValue}>
-                        {offer.delivery_from}{offer.delivery_to ? ` — ${offer.delivery_to}` : ''}
+                        {translateWarehouseLocation(offer.delivery_from, lang)}{offer.delivery_to ? ` — ${offer.delivery_to}` : ''}
                       </Text>
                     </View>
                   )}
@@ -590,7 +590,7 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
                       <Text style={s.transportLabel}>{t.labelRoute}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
                       <Text style={s.transportValue}>
-                        {offer.delivery_from}{offer.delivery_to ? ` — ${offer.delivery_to}` : ''}
+                        {translateWarehouseLocation(offer.delivery_from, lang)}{offer.delivery_to ? ` — ${offer.delivery_to}` : ''}
                       </Text>
                     </View>
                   )}
@@ -636,7 +636,7 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
                     <View style={[s.transportRow, { alignItems: 'flex-end' }]}>
                       <Text style={s.transportLabel}>{lang === 'en' ? 'Pick-up from:' : 'Odbiór z:'}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
-                      <Text style={s.transportValue}>{offer.delivery_from}</Text>
+                      <Text style={s.transportValue}>{translateWarehouseLocation(offer.delivery_from, lang)}</Text>
                     </View>
                   )}
                 </>

@@ -1,7 +1,7 @@
 import { Document, Page, View, Text, Image, StyleSheet, Font, Link } from '@react-pdf/renderer';
 import type { RoadPlateSaleOffer } from '../../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../../lib/calculations';
-import { ROAD_PLATE_SALE_PDF_STRINGS, type PdfLang } from '../../../lib/pdfStrings';
+import { ROAD_PLATE_SALE_PDF_STRINGS, translateWarehouseLocation, type PdfLang } from '../../../lib/pdfStrings';
 import { SALES_REPS as SALES_REPS_LIST } from '../../../lib/constants';
 
 // ─── Fonty (identyczne z PipeOfferPDF i SaleOfferPDF) ────────────────────────
@@ -426,7 +426,7 @@ export default function RoadPlateSaleOfferPDF({ offer, lang = 'pl' }: Props) {
                       <Text style={s.transportLabel}>{t.labelRoute}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
                       <Text style={s.transportValue}>
-                        {offer.delivery_from ?? ''}{offer.delivery_to ? ` — ${offer.delivery_to}` : ''}
+                        {translateWarehouseLocation(offer.delivery_from, lang)}{offer.delivery_to ? ` — ${offer.delivery_to}` : ''}
                       </Text>
                     </View>
                   )}
@@ -443,7 +443,7 @@ export default function RoadPlateSaleOfferPDF({ offer, lang = 'pl' }: Props) {
                       <Text style={s.transportLabel}>{t.labelRoute}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
                       <Text style={s.transportValue}>
-                        {offer.delivery_from ?? ''}{offer.delivery_to ? ` — ${offer.delivery_to}` : ''}
+                        {translateWarehouseLocation(offer.delivery_from, lang)}{offer.delivery_to ? ` — ${offer.delivery_to}` : ''}
                       </Text>
                     </View>
                   )}
@@ -489,7 +489,7 @@ export default function RoadPlateSaleOfferPDF({ offer, lang = 'pl' }: Props) {
                     <View style={[s.transportRow, { alignItems: 'flex-end' }]}>
                       <Text style={s.transportLabel}>{t.labelPickupFrom}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
-                      <Text style={s.transportValue}>{offer.delivery_from}</Text>
+                      <Text style={s.transportValue}>{translateWarehouseLocation(offer.delivery_from, lang)}</Text>
                     </View>
                   )}
                 </>

@@ -3,6 +3,28 @@
 
 export type PdfLang = 'pl' | 'en';
 
+// ─── Tłumaczenie lokalizacji magazynu (delivery_from / transport_from) ─────────
+// Wartość jest free-textem z bazy (domyślnie PL, np. "Magazyn Intra B.V.").
+// Etykieta w PDF jest tłumaczona, ale sama wartość była renderowana surowo —
+// stąd polskie "Magazyn" wyciekało do angielskiego PDF (linia "Pick-up from:").
+// Adresy (np. "Cieśle 42, 56400, PL") przechodzą bez zmian — tłumaczone są tylko
+// znane polskie etykiety oraz samodzielne słowo "Magazyn".
+const WAREHOUSE_LOCATION_EN: Record<string, string> = {
+  'Magazyn Intra B.V.': 'Intra B.V. warehouse',
+};
+
+export function translateWarehouseLocation(
+  value: string | null | undefined,
+  lang: PdfLang,
+): string {
+  if (!value) return '';
+  if (lang !== 'en') return value;
+  const exact = WAREHOUSE_LOCATION_EN[value.trim()];
+  if (exact) return exact;
+  // Fallback: zamień samodzielne polskie słowo "Magazyn" na "Warehouse"
+  return value.replace(/\bMagazyn\b/g, 'Warehouse');
+}
+
 export interface PdfStrings {
   // Document
   docTitle:        (offerNo: string) => string;

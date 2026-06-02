@@ -1,7 +1,7 @@
 import { Document, Page, View, Text, Image, StyleSheet, Font, Link } from '@react-pdf/renderer';
 import type { Offer } from '../types';
 import { formatPLN, formatEUR, formatRound, formatNumber } from '../lib/calculations';
-import { RENTAL_PDF_STRINGS } from '../lib/pdfStrings';
+import { RENTAL_PDF_STRINGS, translateWarehouseLocation } from '../lib/pdfStrings';
 import type { PdfLang } from '../lib/pdfStrings';
 import { SALES_REPS as SALES_REPS_LIST } from '../lib/constants';
 
@@ -598,7 +598,7 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
                     <View style={[s.transportRow, { marginTop: 3, paddingTop: 5, borderTop: `1 solid ${C.gray200}`, alignItems: 'flex-end' }]}>
                       <Text style={s.transportLabel}>{t.labelRoute}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
-                      <Text style={s.transportValue}>{offer.transport_from}{offer.transport_to ? ` — ${offer.transport_to}` : ''}</Text>
+                      <Text style={s.transportValue}>{translateWarehouseLocation(offer.transport_from, lang)}{offer.transport_to ? ` — ${offer.transport_to}` : ''}</Text>
                     </View>
                   )}
                 </>
@@ -613,7 +613,7 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
                     <View style={[s.transportRow, { alignItems: 'flex-end' }]}>
                       <Text style={s.transportLabel}>{t.labelRoute}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
-                      <Text style={s.transportValue}>{offer.transport_from}{offer.transport_to ? ` — ${offer.transport_to}` : ''}</Text>
+                      <Text style={s.transportValue}>{translateWarehouseLocation(offer.transport_from, lang)}{offer.transport_to ? ` — ${offer.transport_to}` : ''}</Text>
                     </View>
                   )}
                   {offer.transport_trucks != null && (
@@ -652,7 +652,7 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
                     <View style={[s.transportRow, { alignItems: 'flex-end' }]}>
                       <Text style={s.transportLabel}>{t.labelPickupFrom}</Text>
                       <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
-                      <Text style={s.transportValue}>{offer.transport_from}</Text>
+                      <Text style={s.transportValue}>{translateWarehouseLocation(offer.transport_from, lang)}</Text>
                     </View>
                   )}
                 </>
