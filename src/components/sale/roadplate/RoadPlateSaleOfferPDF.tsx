@@ -1,7 +1,7 @@
 import { Document, Page, View, Text, Image, StyleSheet, Font, Link } from '@react-pdf/renderer';
 import type { RoadPlateSaleOffer } from '../../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../../lib/calculations';
-import { ROAD_PLATE_SALE_PDF_STRINGS, translateWarehouseLocation, type PdfLang } from '../../../lib/pdfStrings';
+import { ROAD_PLATE_SALE_PDF_STRINGS, translateWarehouseLocation, translateWarehouseDeliveryTime, type PdfLang } from '../../../lib/pdfStrings';
 import { SALES_REPS as SALES_REPS_LIST } from '../../../lib/constants';
 
 // ─── Fonty (identyczne z PipeOfferPDF i SaleOfferPDF) ────────────────────────
@@ -202,10 +202,9 @@ export default function RoadPlateSaleOfferPDF({ offer, lang = 'pl' }: Props) {
       const dostawa  = offer.campaign_delivery_weeks;
       return t.deliveryFromMill(String(kampania), dostawa ? String(dostawa) : undefined);
     }
-    // Płyty drogowe — czas dostawy z magazynu jest snapshotem PL.
-    // Dla EN PDF pozostawiamy oryginalny string (lista WAREHOUSE_DELIVERY_OPTIONS
-    // identyczna jak w pipe — w przyszłości można dodać `translatePipeAttr`).
-    return t.deliveryFromStock(offer.warehouse_delivery_time ?? undefined);
+    // Czas dostawy z magazynu to snapshot PL — tłumaczony na EN przez wspólny helper
+    // (mapa identyczna jak w pipe; custom wartości przechodzą bez zmian).
+    return t.deliveryFromStock(translateWarehouseDeliveryTime(offer.warehouse_delivery_time, lang));
   }
 
   function deliveryTermsText(): string {

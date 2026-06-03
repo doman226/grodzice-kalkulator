@@ -25,6 +25,29 @@ export function translateWarehouseLocation(
   return value.replace(/\bMagazyn\b/g, 'Warehouse');
 }
 
+// ─── Tłumaczenie czasu dostawy z magazynu (warehouse_delivery_time) ───────────
+// Free-text z bazy (domyślnie PL, np. "5–7 dni roboczych"). Zdanie "Delivery time"
+// na EN PDF renderowało wartość 1:1 → polski snapshot wyciekał do angielskiego PDF.
+// Mapa 1:1 z PIPE_WAREHOUSE_DELIVERY_OPTIONS_EN (pipeConstants.ts) — listy opcji
+// w pipe / sale / road_plate są identyczne. Custom wartości przechodzą bez zmian.
+const WAREHOUSE_DELIVERY_TIME_EN: Record<string, string> = {
+  'do 3 dni roboczych':  'up to 3 working days',
+  '3–5 dni roboczych':   '3–5 working days',
+  '5–7 dni roboczych':   '5–7 working days',
+  '7–10 dni roboczych':  '7–10 working days',
+  'do 2 tygodni':        'up to 2 weeks',
+  'do ustalenia':        'to be agreed',
+};
+
+export function translateWarehouseDeliveryTime(
+  value: string | null | undefined,
+  lang: PdfLang,
+): string | undefined {
+  if (!value) return undefined;
+  if (lang !== 'en') return value;
+  return WAREHOUSE_DELIVERY_TIME_EN[value.trim()] ?? value;
+}
+
 export interface PdfStrings {
   // Document
   docTitle:        (offerNo: string) => string;

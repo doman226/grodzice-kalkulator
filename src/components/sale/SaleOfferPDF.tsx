@@ -1,7 +1,7 @@
 import { Document, Page, View, Text, Image, StyleSheet, Font, Link } from '@react-pdf/renderer';
 import type { SaleOffer } from '../../types';
 import { formatEUR, formatPLN, formatRound, formatNumber } from '../../lib/calculations';
-import { PDF_STRINGS, translateWarehouseLocation, type PdfLang } from '../../lib/pdfStrings';
+import { PDF_STRINGS, translateWarehouseLocation, translateWarehouseDeliveryTime, type PdfLang } from '../../lib/pdfStrings';
 import { SALES_REPS as SALES_REPS_LIST } from '../../lib/constants';
 
 // ─── Fonty (identyczne z OfferPDF) ───────────────────────────────────────────
@@ -239,7 +239,7 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
       const dostawa  = offer.campaign_delivery_weeks;
       return t.deliveryFromMill(String(kampania), dostawa ? String(dostawa) : undefined);
     }
-    return t.deliveryFromStock(offer.warehouse_delivery_time ?? undefined);
+    return t.deliveryFromStock(translateWarehouseDeliveryTime(offer.warehouse_delivery_time, lang));
   }
 
   function deliveryTermsText(): string {
