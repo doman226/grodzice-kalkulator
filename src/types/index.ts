@@ -270,6 +270,7 @@ export interface PipeSaleOffer {
   updated_at: string;
   deleted_at?: string | null;
   items?: PipeSaleOfferItem[];
+  lock_items?: PipeSaleOfferLockItem[];
 }
 
 export interface PipeSaleOfferItem {
@@ -303,6 +304,26 @@ export interface PipeSaleOfferItem {
   // Sortowanie
   sort_order: number;
   created_at: string;
+}
+
+// ─── Zamki w ofertach rur (sprzedaż) ─────────────────────────────────────────
+// Lustro SaleOfferLockItem. Katalog źródłowy: sale_locks (współdzielony z grodzicami).
+export interface PipeSaleOfferLockItem {
+  id: string;
+  offer_id: string;
+  lock_name: string;
+  steel_grade?: string | null;   // gatunek stali (informacyjnie)
+  quantity_szt?: number | null;  // liczba sztuk
+  length_m?: number | null;      // długość jednej sztuki [m]
+  quantity_mb: number;           // szt × długość [mb]
+  price_eur_mb: number;          // cena EUR/mb (snapshot)
+  total_eur: number;             // quantity_mb × price_eur_mb
+  total_pln: number;             // total_eur × exchange_rate
+  sell_price_eur_mb?: number | null;
+  sell_eur_total?: number | null;
+  sell_pln_total?: number | null;
+  mass_t: number;                // quantity_mb × weight_kg_m / 1000
+  sort_order: number;
 }
 
 // ─── Sprzedaż płyt drogowych (faza 3) ────────────────────────────────────────
