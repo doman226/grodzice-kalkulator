@@ -124,8 +124,8 @@ export default function RoadPlateEditOfferModal({
     }
     return '';
   });
-  const [deliveryPaidBy, setDeliveryPaidBy] = useState<'dap_included' | 'dap_extra' | 'fca'>(
-    (offer.delivery_paid_by as 'dap_included' | 'dap_extra' | 'fca') ?? 'dap_included'
+  const [deliveryPaidBy, setDeliveryPaidBy] = useState<'dap_included' | 'dap_extra' | 'fca' | 'cif'>(
+    (offer.delivery_paid_by as 'dap_included' | 'dap_extra' | 'fca' | 'cif') ?? 'dap_included'
   );
   const [deliveryFrom, setDeliveryFrom] = useState(offer.delivery_from ?? 'Cieśle 42, 56400, PL');
   const [deliveryTo, setDeliveryTo]     = useState(offer.delivery_to ?? '');
@@ -137,8 +137,8 @@ export default function RoadPlateEditOfferModal({
   const [campaignWeeks, setCampaignWeeks]                 = useState(offer.campaign_weeks ?? '');
   const [campaignDeliveryWeeks, setCampaignDeliveryWeeks] = useState(offer.campaign_delivery_weeks ?? '');
   const [warehouseDeliveryTime, setWarehouseDeliveryTime] = useState(offer.warehouse_delivery_time ?? '5–7 dni roboczych');
-  const [deliveryTerms, setDeliveryTerms]                 = useState<'DAP' | 'DAP_EXTRA' | 'FCA'>(
-    (offer.delivery_terms as 'DAP' | 'DAP_EXTRA' | 'FCA') ?? 'DAP'
+  const [deliveryTerms, setDeliveryTerms]                 = useState<'DAP' | 'DAP_EXTRA' | 'FCA' | 'CIF'>(
+    (offer.delivery_terms as 'DAP' | 'DAP_EXTRA' | 'FCA' | 'CIF') ?? 'DAP'
   );
   const [fcaLocation, setFcaLocation] = useState(offer.fca_location ?? '');
 
@@ -331,7 +331,7 @@ export default function RoadPlateEditOfferModal({
     setSaving(true);
     setError('');
 
-    const hasTransport = deliveryPaidBy !== 'fca' && deliveryCalc !== null && deliveryCalc.costPerTruck > 0;
+    const hasTransport = deliveryPaidBy !== 'fca' && deliveryPaidBy !== 'cif' && deliveryCalc !== null && deliveryCalc.costPerTruck > 0;
 
     // Wspólny payload oferty (bez offer_number/id — różnią się tryby edit vs copy)
     const offerPayload = {
@@ -700,14 +700,15 @@ export default function RoadPlateEditOfferModal({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Sposób</label>
-                <select value={deliveryPaidBy} onChange={e => setDeliveryPaidBy(e.target.value as 'dap_included' | 'dap_extra' | 'fca')}
+                <select value={deliveryPaidBy} onChange={e => setDeliveryPaidBy(e.target.value as 'dap_included' | 'dap_extra' | 'fca' | 'cif')}
                   className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
                   <option value="dap_included">DAP – w cenie</option>
                   <option value="dap_extra">DAP – refaktura</option>
                   <option value="fca">FCA – odbiór</option>
+                  <option value="cif">CIF – z portu</option>
                 </select>
               </div>
-              {deliveryPaidBy !== 'fca' && (
+              {deliveryPaidBy !== 'fca' && deliveryPaidBy !== 'cif' && (
                 <>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">Aut</label>
@@ -736,15 +737,17 @@ export default function RoadPlateEditOfferModal({
             {deliveryPaidBy !== 'fca' && (
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Skąd</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{deliveryPaidBy === 'cif' ? 'Odbiór z (port)' : 'Skąd'}</label>
                   <input type="text" value={deliveryFrom} onChange={e => setDeliveryFrom(e.target.value)}
                     className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                 </div>
+                {deliveryPaidBy !== 'cif' && (
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Dokąd</label>
                   <input type="text" value={deliveryTo} onChange={e => setDeliveryTo(e.target.value)}
                     className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                 </div>
+                )}
               </div>
             )}
           </div>
@@ -783,12 +786,12 @@ export default function RoadPlateEditOfferModal({
           <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 space-y-2">
             <p className="text-sm font-semibold text-gray-800 mb-1">Incoterms</p>
             <div className="flex gap-2">
-              {(['DAP', 'DAP_EXTRA', 'FCA'] as const).map(t => (
+              {(['DAP', 'DAP_EXTRA', 'FCA', 'CIF'] as const).map(t => (
                 <button key={t} onClick={() => setDeliveryTerms(t)}
                   className={`flex-1 px-2 py-1.5 text-xs rounded border ${deliveryTerms === t
                     ? 'bg-blue-900 text-white border-blue-900'
                     : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'}`}>
-                  {t === 'DAP' ? 'DAP – w cenie' : t === 'DAP_EXTRA' ? 'DAP – refaktura' : 'FCA – odbiór'}
+                  {t === 'DAP' ? 'DAP – w cenie' : t === 'DAP_EXTRA' ? 'DAP – refaktura' : t === 'FCA' ? 'FCA – odbiór' : 'CIF – z portu'}
                 </button>
               ))}
             </div>

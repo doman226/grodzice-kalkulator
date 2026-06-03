@@ -48,7 +48,7 @@ interface DeliveryData {
   costPerTruckCurr: number;
   totalCostCurr: number;
   totalCostEUR: number;
-  paidBy: 'dap_included' | 'dap_extra' | 'fca';
+  paidBy: 'dap_included' | 'dap_extra' | 'fca' | 'cif';
   from: string;
   to: string;
 }
@@ -98,8 +98,8 @@ export default function RoadPlateSaveOfferModal({
   const [warehouseDeliveryTime, setWarehouseDeliveryTime] = useState('5–7 dni roboczych');
 
   // ── Warunki dostawy (Incoterms) ──
-  const [deliveryTerms, setDeliveryTerms] = useState<'DAP' | 'DAP_EXTRA' | 'FCA'>(
-    delivery?.paidBy === 'fca' ? 'FCA' : delivery?.paidBy === 'dap_extra' ? 'DAP_EXTRA' : 'DAP'
+  const [deliveryTerms, setDeliveryTerms] = useState<'DAP' | 'DAP_EXTRA' | 'FCA' | 'CIF'>(
+    delivery?.paidBy === 'fca' ? 'FCA' : delivery?.paidBy === 'cif' ? 'CIF' : delivery?.paidBy === 'dap_extra' ? 'DAP_EXTRA' : 'DAP'
   );
   const [fcaLocation, setFcaLocation] = useState('');
 
@@ -508,7 +508,7 @@ export default function RoadPlateSaveOfferModal({
           <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 space-y-2">
             <label className="block text-xs font-medium text-gray-600 mb-1">Warunki dostawy (Incoterms)</label>
             <div className="flex gap-2">
-              {(['DAP', 'DAP_EXTRA', 'FCA'] as const).map(t => (
+              {(['DAP', 'DAP_EXTRA', 'FCA', 'CIF'] as const).map(t => (
                 <button
                   key={t}
                   onClick={() => setDeliveryTerms(t)}
@@ -516,7 +516,7 @@ export default function RoadPlateSaveOfferModal({
                     ? 'bg-blue-900 text-white border-blue-900'
                     : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'}`}
                 >
-                  {t === 'DAP' ? 'DAP – w cenie' : t === 'DAP_EXTRA' ? 'DAP – refaktura' : 'FCA – odbiór'}
+                  {t === 'DAP' ? 'DAP – w cenie' : t === 'DAP_EXTRA' ? 'DAP – refaktura' : t === 'FCA' ? 'FCA – odbiór' : 'CIF – z portu'}
                 </button>
               ))}
             </div>

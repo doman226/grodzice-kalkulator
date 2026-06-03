@@ -150,8 +150,8 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose, m
     }
     return '';
   });
-  const [deliveryPaidBy, setDeliveryPaidBy] = useState<'dap_included' | 'dap_extra' | 'fca'>(
-    (offer.delivery_paid_by as 'dap_included' | 'dap_extra' | 'fca') ?? 'dap_included'
+  const [deliveryPaidBy, setDeliveryPaidBy] = useState<'dap_included' | 'dap_extra' | 'fca' | 'cif'>(
+    (offer.delivery_paid_by as 'dap_included' | 'dap_extra' | 'fca' | 'cif') ?? 'dap_included'
   );
   // Magazyn wysyłki — wartość spoza listy (np. stara oferta "Magazyn dostawcy")
   // automatycznie trafia do trybu własnego (pole tekstowe).
@@ -165,8 +165,8 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose, m
   const [campaignWeeks, setCampaignWeeks]                 = useState(offer.campaign_weeks ?? '');
   const [campaignDeliveryWeeks, setCampaignDeliveryWeeks] = useState(offer.campaign_delivery_weeks ?? '');
   const [warehouseDeliveryTime, setWarehouseDeliveryTime] = useState(offer.warehouse_delivery_time ?? '5–7 dni roboczych');
-  const [deliveryTerms, setDeliveryTerms]                 = useState<'DAP' | 'DAP_EXTRA' | 'FCA'>(
-    (offer.delivery_terms as 'DAP' | 'DAP_EXTRA' | 'FCA') ?? 'DAP'
+  const [deliveryTerms, setDeliveryTerms]                 = useState<'DAP' | 'DAP_EXTRA' | 'FCA' | 'CIF'>(
+    (offer.delivery_terms as 'DAP' | 'DAP_EXTRA' | 'FCA' | 'CIF') ?? 'DAP'
   );
   const [fcaLocation, setFcaLocation] = useState(offer.fca_location ?? '');
 
@@ -314,7 +314,7 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose, m
     setSaving(true);
     setError('');
 
-    const hasTransport = deliveryPaidBy !== 'fca' && deliveryCalc !== null && deliveryCalc.costPerTruck > 0;
+    const hasTransport = deliveryPaidBy !== 'fca' && deliveryPaidBy !== 'cif' && deliveryCalc !== null && deliveryCalc.costPerTruck > 0;
 
     // Wspólny payload oferty (bez offer_number/id — różnią się tryby edit vs copy)
     const offerPayload = {
@@ -702,6 +702,7 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose, m
                 { val: 'dap_included', label: 'DAP – dostawa w cenie' },
                 { val: 'dap_extra',    label: 'DAP – refaktura na klienta' },
                 { val: 'fca',          label: 'FCA – odbiór własny' },
+                { val: 'cif',          label: 'CIF – odbiór z portu' },
               ] as const).map(({ val, label }) => (
                 <label key={val} className={`flex-1 flex items-center gap-2 p-2 rounded-lg border-2 cursor-pointer text-sm ${
                   deliveryPaidBy === val ? 'border-blue-700 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
@@ -714,7 +715,7 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose, m
                 </label>
               ))}
             </div>
-            {deliveryPaidBy !== 'fca' && (
+            {deliveryPaidBy !== 'fca' && deliveryPaidBy !== 'cif' && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
                 <Field label="Liczba aut">
                   <input type="number" min={1} step={1}
@@ -749,8 +750,8 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose, m
                 </Field>
               </div>
             )}
-            {deliveryPaidBy === 'fca' && (
-              <Field label="Magazyn odbioru (FCA)">
+            {(deliveryPaidBy === 'fca' || deliveryPaidBy === 'cif') && (
+              <Field label={deliveryPaidBy === 'cif' ? 'Odbiór z portu (CIF)' : 'Magazyn odbioru (FCA)'}>
                 <select
                   value={isCustomWarehouse ? PIPE_WAREHOUSE_CUSTOM : deliveryFrom}
                   onChange={e => setDeliveryFrom(e.target.value === PIPE_WAREHOUSE_CUSTOM ? '' : e.target.value)}
@@ -766,7 +767,7 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose, m
                 )}
               </Field>
             )}
-            {deliveryCalc && deliveryCalc.costPerTruck > 0 && deliveryPaidBy !== 'fca' && (
+            {deliveryCalc && deliveryCalc.costPerTruck > 0 && deliveryPaidBy !== 'fca' && deliveryPaidBy !== 'cif' && (
               <p className="text-xs text-gray-600 mt-2">
                 Razem transport: <strong>
                   {deliveryCalc.trucks} {deliveryCalc.trucks === 1 ? 'auto' : deliveryCalc.trucks <= 4 ? 'auta' : 'aut'} ×{' '}
@@ -817,14 +818,15 @@ export default function PipeEditOfferModal({ offer, clients, onSaved, onClose, m
           <section>
             <h4 className="text-sm font-semibold text-gray-700 mb-2">Warunki dostawy (incoterm)</h4>
             <div className="flex gap-2 mb-2 flex-wrap">
-              {(['DAP', 'DAP_EXTRA', 'FCA'] as const).map(t => (
+              {(['DAP', 'DAP_EXTRA', 'FCA', 'CIF'] as const).map(t => (
                 <button key={t} onClick={() => setDeliveryTerms(t)}
                   className={`px-3 py-1.5 text-xs rounded border ${
                     deliveryTerms === t ? 'bg-blue-900 text-white border-blue-900' : 'bg-white text-gray-700 border-gray-300'
                   }`}>
                   {t === 'DAP' ? 'DAP (transport w cenie)'
                     : t === 'DAP_EXTRA' ? 'DAP + transport extra'
-                    : 'FCA (odbiór własny)'}
+                    : t === 'FCA' ? 'FCA (odbiór własny)'
+                    : 'CIF (odbiór z portu)'}
                 </button>
               ))}
             </div>

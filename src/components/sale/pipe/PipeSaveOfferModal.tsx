@@ -40,7 +40,7 @@ export interface PipeOfferTotals {
 
 // Snapshot dostawy z PipeSaleCalculator. paidBy='fca' → klient sam, brak kosztów.
 export interface PipeDeliverySnapshot {
-  paidBy: 'dap_included' | 'dap_extra' | 'fca';
+  paidBy: 'dap_included' | 'dap_extra' | 'fca' | 'cif';
   trucks: number;
   costPerTruck: number;
   totalCostPLN: number;
@@ -85,8 +85,8 @@ export default function PipeSaveOfferModal({
 
   // ── Warunki dostawy — initial wartość derived z paidBy z kalkulatora ──
   // (user może zmienić w modalu jak w grodzicach, np. DAP w paidBy ale terms 'DAP_EXTRA' na ofercie)
-  const [deliveryTerms, setDeliveryTerms] = useState<'DAP' | 'DAP_EXTRA' | 'FCA'>(
-    delivery.paidBy === 'fca' ? 'FCA' : delivery.paidBy === 'dap_extra' ? 'DAP_EXTRA' : 'DAP'
+  const [deliveryTerms, setDeliveryTerms] = useState<'DAP' | 'DAP_EXTRA' | 'FCA' | 'CIF'>(
+    delivery.paidBy === 'fca' ? 'FCA' : delivery.paidBy === 'cif' ? 'CIF' : delivery.paidBy === 'dap_extra' ? 'DAP_EXTRA' : 'DAP'
   );
   const [fcaLocation, setFcaLocation]     = useState('');
 
@@ -437,7 +437,7 @@ export default function PipeSaveOfferModal({
           <section>
             <h3 className="text-sm font-semibold text-gray-800 mb-2">Warunki dostawy</h3>
             <div className="flex gap-2 mb-2 flex-wrap">
-              {(['DAP', 'DAP_EXTRA', 'FCA'] as const).map(t => (
+              {(['DAP', 'DAP_EXTRA', 'FCA', 'CIF'] as const).map(t => (
                 <button key={t}
                   onClick={() => setDeliveryTerms(t)}
                   className={`px-3 py-1.5 text-sm rounded-lg border ${
@@ -448,7 +448,8 @@ export default function PipeSaveOfferModal({
                 >
                   {t === 'DAP'       ? 'DAP (transport w cenie)'
                    : t === 'DAP_EXTRA' ? 'DAP + transport extra'
-                                       : 'FCA (odbiór własny)'}
+                   : t === 'FCA'       ? 'FCA (odbiór własny)'
+                                       : 'CIF (odbiór z portu)'}
                 </button>
               ))}
             </div>

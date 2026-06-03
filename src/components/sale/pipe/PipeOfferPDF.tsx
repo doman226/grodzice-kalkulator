@@ -263,6 +263,9 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
     if (offer.delivery_terms === 'FCA') {
       return t.deliveryFca(offer.fca_location ?? (lang === 'en' ? 'collection warehouse' : 'magazyn odbioru'));
     }
+    if (offer.delivery_terms === 'CIF') {
+      return t.deliveryCif(offer.delivery_from ?? (lang === 'en' ? 'destination port' : 'port docelowy'));
+    }
     if (offer.delivery_terms === 'DAP_EXTRA') {
       return t.deliveryDapExtra(destination);
     }
@@ -512,7 +515,7 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
         })()}
 
         {/* ── TRANSPORT (warunkowy) ── */}
-        {(dPaidBy === 'dap_extra' || dPaidBy === 'fca' ||
+        {(dPaidBy === 'dap_extra' || dPaidBy === 'fca' || dPaidBy === 'cif' ||
           (dPaidBy === 'dap_included' && offer.delivery_cost_total != null && offer.delivery_cost_total > 0)) && (
           <View wrap={false}>
             <Text style={s.sectionTitle}>{t.sectionTransport}</Text>
@@ -586,6 +589,21 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
                   <View style={s.transportRow}>
                     <Text style={s.transportLabel}>{t.labelDelivery}</Text>
                     <Text style={[s.transportValue, { color: C.navy }]}>{t.valueFca}</Text>
+                  </View>
+                  {offer.delivery_from && (
+                    <View style={[s.transportRow, { alignItems: 'flex-end' }]}>
+                      <Text style={s.transportLabel}>{t.labelPickupFrom}</Text>
+                      <View style={{ flex: 1, borderBottom: `0.5 solid ${C.gray200}`, marginHorizontal: 5, marginBottom: 1.5 }} />
+                      <Text style={s.transportValue}>{deliveryFromT}</Text>
+                    </View>
+                  )}
+                </>
+              )}
+              {dPaidBy === 'cif' && (
+                <>
+                  <View style={s.transportRow}>
+                    <Text style={s.transportLabel}>{t.labelDelivery}</Text>
+                    <Text style={[s.transportValue, { color: C.navy }]}>{t.valueCif}</Text>
                   </View>
                   {offer.delivery_from && (
                     <View style={[s.transportRow, { alignItems: 'flex-end' }]}>

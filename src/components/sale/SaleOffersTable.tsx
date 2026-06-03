@@ -335,7 +335,7 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                             <span className="text-gray-500">Kurs EUR:</span>{' '}
                             <strong>{offer.exchange_rate?.toFixed(4) ?? '—'} PLN</strong>
                           </div>
-                          {(offer.delivery_cost_total != null && offer.delivery_cost_total > 0 || offer.delivery_paid_by === 'fca') && (
+                          {(offer.delivery_cost_total != null && offer.delivery_cost_total > 0 || offer.delivery_paid_by === 'fca' || offer.delivery_paid_by === 'cif') && (
                             <div>
                               <span className="text-gray-500">Dostawa:</span>{' '}
                               <strong className={
@@ -345,6 +345,8 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                               }>
                                 {offer.delivery_paid_by === 'fca'
                                   ? 'FCA – odbiór własny'
+                                  : offer.delivery_paid_by === 'cif'
+                                  ? 'CIF – odbiór z portu'
                                   : (offer.currency ?? 'EUR') === 'EUR' && offer.exchange_rate
                                     ? `${formatEUR((offer.delivery_cost_total ?? 0) / offer.exchange_rate)} EUR`
                                     : `${formatPLN(offer.delivery_cost_total ?? 0)} PLN`}
@@ -352,6 +354,7 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                                 <span className="font-normal text-xs">(
                                   {(offer.delivery_paid_by as string) === 'dap_included' || (offer.delivery_paid_by as string) === 'intra' ? 'DAP – w cenie'
                                   : (offer.delivery_paid_by as string) === 'dap_extra' || (offer.delivery_paid_by as string) === 'klient' ? 'DAP – refaktura'
+                                  : (offer.delivery_paid_by as string) === 'cif' ? 'CIF'
                                   : 'FCA'}
                                 )</span>
                               </strong>
@@ -369,6 +372,7 @@ export default function SaleOffersTable({ offers, onOffersChange, clients, saleP
                               <strong>
                                 {offer.delivery_terms === 'DAP_EXTRA' ? 'DAP – refaktura' : offer.delivery_terms}
                                 {offer.delivery_terms === 'FCA' && offer.fca_location ? ` (${offer.fca_location})` : ''}
+                                {offer.delivery_terms === 'CIF' && offer.delivery_from ? ` (${offer.delivery_from})` : ''}
                                 {(offer.delivery_terms === 'DAP' || offer.delivery_terms === 'DAP_EXTRA') && offer.delivery_to ? ` (${offer.delivery_to})` : ''}
                               </strong>
                             </div>

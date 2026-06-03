@@ -55,7 +55,7 @@ interface DeliveryData {
   trucks: number;
   costPerTruck: number;
   totalCostPLN: number;
-  paidBy: 'dap_included' | 'dap_extra' | 'fca';
+  paidBy: 'dap_included' | 'dap_extra' | 'fca' | 'cif';
   from: string;
   to: string;
 }
@@ -108,8 +108,8 @@ export default function SaveSaleOfferModal({
 
   // ── Warunki dostawy ──
   // domyślnie FCA gdy opcja fca, DAP_EXTRA gdy dap_extra, DAP w pozostałych przypadkach
-  const [deliveryTerms, setDeliveryTerms] = useState<'DAP' | 'DAP_EXTRA' | 'FCA'>(
-    delivery?.paidBy === 'fca' ? 'FCA' : delivery?.paidBy === 'dap_extra' ? 'DAP_EXTRA' : 'DAP'
+  const [deliveryTerms, setDeliveryTerms] = useState<'DAP' | 'DAP_EXTRA' | 'FCA' | 'CIF'>(
+    delivery?.paidBy === 'fca' ? 'FCA' : delivery?.paidBy === 'cif' ? 'CIF' : delivery?.paidBy === 'dap_extra' ? 'DAP_EXTRA' : 'DAP'
   );
   const [fcaLocation, setFcaLocation] = useState('');
 
@@ -599,6 +599,7 @@ export default function SaveSaleOfferModal({
                     { val: 'DAP',       label: 'DAP – dostawa w cenie' },
                     { val: 'DAP_EXTRA', label: 'DAP – refaktura' },
                     { val: 'FCA',       label: 'FCA – odbiór własny' },
+                    { val: 'CIF',       label: 'CIF – odbiór z portu' },
                   ] as const).map(opt => (
                     <label key={opt.val} className="flex items-center gap-1.5 cursor-pointer text-sm">
                       <input type="radio" name="deliveryTerms" value={opt.val}
@@ -613,6 +614,11 @@ export default function SaveSaleOfferModal({
                 {(deliveryTerms === 'DAP' || deliveryTerms === 'DAP_EXTRA') && (
                   <p className="text-xs text-gray-500">
                     Na PDF: „DAP ({delivery?.to ? delivery.to : 'adres dostawy do uzupełnienia w sekcji dostawy'})"
+                  </p>
+                )}
+                {deliveryTerms === 'CIF' && (
+                  <p className="text-xs text-gray-500">
+                    Na PDF: „odbiór z portu wg. CIF ({delivery?.from ? delivery.from : 'port — uzupełnij w sekcji dostawy „Odbiór z”'})"
                   </p>
                 )}
                 {deliveryTerms === 'FCA' && (

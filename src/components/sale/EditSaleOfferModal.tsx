@@ -190,7 +190,7 @@ export default function EditSaleOfferModal({
     }
     return '';
   });
-  const [deliveryPaidBy, setDeliveryPaidBy] = useState<'dap_included' | 'dap_extra' | 'fca'>(() => {
+  const [deliveryPaidBy, setDeliveryPaidBy] = useState<'dap_included' | 'dap_extra' | 'fca' | 'cif'>(() => {
     const v = offer.delivery_paid_by as string | undefined;
     if (v === 'intra')  return 'dap_included';
     if (v === 'klient') return 'dap_extra';
@@ -204,7 +204,7 @@ export default function EditSaleOfferModal({
   const [campaignWeeks,         setCampaignWeeks]         = useState(offer.campaign_weeks         ?? '');
   const [campaignDeliveryWeeks, setCampaignDeliveryWeeks] = useState(offer.campaign_delivery_weeks ?? '');
   const [warehouseDeliveryTime, setWarehouseDeliveryTime] = useState(offer.warehouse_delivery_time ?? '5–7 dni roboczych');
-  const [deliveryTerms,         setDeliveryTerms]         = useState<'DAP' | 'DAP_EXTRA' | 'FCA'>(offer.delivery_terms ?? 'DAP');
+  const [deliveryTerms,         setDeliveryTerms]         = useState<'DAP' | 'DAP_EXTRA' | 'FCA' | 'CIF'>(offer.delivery_terms ?? 'DAP');
   const [fcaLocation,           setFcaLocation]           = useState(offer.fca_location ?? '');
 
   const [saving, setSaving] = useState(false);
@@ -394,7 +394,7 @@ export default function EditSaleOfferModal({
     setSaving(true);
     setError('');
 
-    const hasTransport = deliveryPaidBy !== 'fca' && deliveryCalc !== null && deliveryCalc.costPerTruck > 0;
+    const hasTransport = deliveryPaidBy !== 'fca' && deliveryPaidBy !== 'cif' && deliveryCalc !== null && deliveryCalc.costPerTruck > 0;
 
     // Wspólny payload oferty (bez offer_number/id/updated_at — różnią się tryby)
     const offerPayload = {
@@ -953,7 +953,7 @@ export default function EditSaleOfferModal({
                     {combinedMarginPct.toFixed(1)}%
                   </strong>
                 </div>
-                {deliveryCalc && deliveryCalc.costPerTruck > 0 && deliveryPaidBy !== 'fca' && (
+                {deliveryCalc && deliveryCalc.costPerTruck > 0 && deliveryPaidBy !== 'fca' && deliveryPaidBy !== 'cif' && (
                   <div className="flex justify-between text-sm pt-1 border-t border-blue-200">
                     <span className={deliveryPaidBy === 'dap_extra' ? 'text-orange-600' : 'text-gray-500'}>
                       Dostawa ({deliveryCalc.trucks} aut{deliveryCalc.trucks > 1 ? 'a' : ''})
@@ -966,10 +966,10 @@ export default function EditSaleOfferModal({
                     </strong>
                   </div>
                 )}
-                {deliveryPaidBy === 'fca' && (
+                {(deliveryPaidBy === 'fca' || deliveryPaidBy === 'cif') && (
                   <div className="flex justify-between text-sm pt-1 border-t border-blue-200">
                     <span className="text-gray-500">Dostawa:</span>
-                    <strong className="text-green-700">FCA – odbiór własny</strong>
+                    <strong className="text-green-700">{deliveryPaidBy === 'cif' ? 'CIF – odbiór z portu' : 'FCA – odbiór własny'}</strong>
                   </div>
                 )}
                 {deliveryPaidBy === 'dap_included' && deliveryCalc && deliveryCalc.costPerTruck > 0 && (
@@ -978,10 +978,10 @@ export default function EditSaleOfferModal({
                     <span>{isEUR ? `${formatEUR(totalForClientInCurrency)} EUR` : `${formatPLN(totalForClientInCurrency)} PLN`}</span>
                   </div>
                 )}
-                {(deliveryFrom || deliveryTo) && deliveryPaidBy !== 'fca' && (
+                {(deliveryFrom || deliveryTo) && deliveryPaidBy !== 'fca' && deliveryPaidBy !== 'cif' && (
                   <p className="text-xs text-gray-500 mt-1">🚛 {deliveryFrom}{deliveryTo ? ` → ${deliveryTo}` : ''}</p>
                 )}
-                {deliveryPaidBy === 'fca' && deliveryFrom && (
+                {(deliveryPaidBy === 'fca' || deliveryPaidBy === 'cif') && deliveryFrom && (
                   <p className="text-xs text-gray-500 mt-1">📦 Odbiór z: {deliveryFrom}</p>
                 )}
               </div>
@@ -1055,6 +1055,7 @@ export default function EditSaleOfferModal({
                   { val: 'dap_included', label: 'DAP – w cenie',      desc: 'Transport wliczony w cenę' },
                   { val: 'dap_extra',    label: 'DAP – refaktura',     desc: 'Transport na klienta' },
                   { val: 'fca',          label: 'FCA – odbiór własny', desc: 'Klient odbiera własnym transportem' },
+                  { val: 'cif',          label: 'CIF – odbiór z portu', desc: 'Klient odbiera z portu docelowego' },
                 ] as const).map(({ val, label, desc }) => (
                   <label key={val} className={`flex-1 flex flex-col p-3 rounded-xl border-2 cursor-pointer transition-colors ${
                     deliveryPaidBy === val
@@ -1079,7 +1080,7 @@ export default function EditSaleOfferModal({
               </div>
 
               {/* Pola kosztów – widoczne gdy nie FCA */}
-              {deliveryPaidBy !== 'fca' && (
+              {deliveryPaidBy !== 'fca' && deliveryPaidBy !== 'cif' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Liczba aut</label>
@@ -1129,14 +1130,14 @@ export default function EditSaleOfferModal({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">
-                    {deliveryPaidBy === 'fca' ? 'Odbiór z (FCA)' : 'Załadunek z'}
+                    {deliveryPaidBy === 'fca' ? 'Odbiór z (FCA)' : deliveryPaidBy === 'cif' ? 'Odbiór z (port)' : 'Załadunek z'}
                   </label>
                   <input type="text" value={deliveryFrom} onChange={e => setDeliveryFrom(e.target.value)}
                     placeholder="np. Oleśnica"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-                {deliveryPaidBy !== 'fca' && (
+                {deliveryPaidBy !== 'fca' && deliveryPaidBy !== 'cif' && (
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Dostawa do</label>
                     <input type="text" value={deliveryTo} onChange={e => setDeliveryTo(e.target.value)}
@@ -1244,6 +1245,7 @@ export default function EditSaleOfferModal({
                     { val: 'DAP',       label: 'DAP – dostawa w cenie' },
                     { val: 'DAP_EXTRA', label: 'DAP – refaktura' },
                     { val: 'FCA',       label: 'FCA – odbiór własny' },
+                    { val: 'CIF',       label: 'CIF – odbiór z portu' },
                   ] as const).map(opt => (
                     <label key={opt.val} className="flex items-center gap-1.5 cursor-pointer text-sm">
                       <input type="radio" name="editDeliveryTerms" value={opt.val}
@@ -1257,6 +1259,11 @@ export default function EditSaleOfferModal({
                 {(deliveryTerms === 'DAP' || deliveryTerms === 'DAP_EXTRA') && (
                   <p className="text-xs text-gray-500">
                     Na PDF: „DAP ({deliveryTo || 'adres dostawy'})"
+                  </p>
+                )}
+                {deliveryTerms === 'CIF' && (
+                  <p className="text-xs text-gray-500">
+                    Na PDF: „odbiór z portu wg. CIF ({deliveryFrom || 'port — uzupełnij „Załadunek z” w sekcji transport'})"
                   </p>
                 )}
                 {deliveryTerms === 'FCA' && (

@@ -340,7 +340,7 @@ export default function RoadPlateSaleOffersTable({
                               <span className="text-gray-500">Kurs EUR:</span>{' '}
                               <strong>{offer.exchange_rate?.toFixed(4) ?? '—'} PLN</strong>
                             </div>
-                            {((offer.delivery_cost_total != null && offer.delivery_cost_total > 0) || offer.delivery_paid_by === 'fca') && (
+                            {((offer.delivery_cost_total != null && offer.delivery_cost_total > 0) || offer.delivery_paid_by === 'fca' || offer.delivery_paid_by === 'cif') && (
                               <div>
                                 <span className="text-gray-500">Dostawa:</span>{' '}
                                 <strong className={
@@ -350,6 +350,8 @@ export default function RoadPlateSaleOffersTable({
                                 }>
                                   {offer.delivery_paid_by === 'fca'
                                     ? 'FCA – odbiór własny'
+                                    : offer.delivery_paid_by === 'cif'
+                                    ? 'CIF – odbiór z portu'
                                     : currency === 'EUR' && offer.exchange_rate
                                       ? `${formatEUR((offer.delivery_cost_total ?? 0) / offer.exchange_rate)} EUR`
                                       : `${formatPLN(offer.delivery_cost_total ?? 0)} PLN`}
@@ -357,6 +359,7 @@ export default function RoadPlateSaleOffersTable({
                                   <span className="font-normal text-xs">(
                                     {offer.delivery_paid_by === 'dap_included' ? 'DAP – w cenie'
                                     : offer.delivery_paid_by === 'dap_extra' ? 'DAP – refaktura'
+                                    : offer.delivery_paid_by === 'cif' ? 'CIF'
                                     : 'FCA'}
                                   )</span>
                                 </strong>
@@ -374,6 +377,7 @@ export default function RoadPlateSaleOffersTable({
                                 <strong>
                                   {offer.delivery_terms === 'DAP_EXTRA' ? 'DAP – refaktura' : offer.delivery_terms}
                                   {offer.delivery_terms === 'FCA' && offer.fca_location ? ` (${offer.fca_location})` : ''}
+                                  {offer.delivery_terms === 'CIF' && offer.delivery_from ? ` (${offer.delivery_from})` : ''}
                                   {(offer.delivery_terms === 'DAP' || offer.delivery_terms === 'DAP_EXTRA') && offer.delivery_to ? ` (${offer.delivery_to})` : ''}
                                 </strong>
                               </div>

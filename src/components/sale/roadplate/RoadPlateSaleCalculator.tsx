@@ -89,7 +89,7 @@ export default function RoadPlateSaleCalculator({
   const TRUCK_CAPACITY_T = 24.5;
   const [deliveryCostPerTruck, setDeliveryCostPerTruck] = useState<number | ''>('');
   const [customDeliveryTrucks, setCustomDeliveryTrucks] = useState<number | ''>('');
-  const [deliveryPaidBy, setDeliveryPaidBy]             = useState<'dap_included' | 'dap_extra' | 'fca'>('dap_included');
+  const [deliveryPaidBy, setDeliveryPaidBy]             = useState<'dap_included' | 'dap_extra' | 'fca' | 'cif'>('dap_included');
   const [deliveryFrom, setDeliveryFrom]                 = useState(WAREHOUSE_PRESET);
   const [deliveryTo, setDeliveryTo]                     = useState('');
   const [taskName, setTaskName]                         = useState('');
@@ -570,16 +570,17 @@ export default function RoadPlateSaleCalculator({
             <label className="block text-xs font-medium text-gray-500 mb-1">Sposób rozliczenia</label>
             <select
               value={deliveryPaidBy}
-              onChange={e => setDeliveryPaidBy(e.target.value as 'dap_included' | 'dap_extra' | 'fca')}
+              onChange={e => setDeliveryPaidBy(e.target.value as 'dap_included' | 'dap_extra' | 'fca' | 'cif')}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
               <option value="dap_included">DAP – w cenie</option>
               <option value="dap_extra">DAP – refaktura</option>
               <option value="fca">FCA – odbiór własny</option>
+              <option value="cif">CIF – odbiór z portu</option>
             </select>
           </div>
 
-          {deliveryPaidBy !== 'fca' && (
+          {deliveryPaidBy !== 'fca' && deliveryPaidBy !== 'cif' && (
             <>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Liczba aut</label>
@@ -620,7 +621,7 @@ export default function RoadPlateSaleCalculator({
         {deliveryPaidBy !== 'fca' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Załadunek (skąd)</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{deliveryPaidBy === 'cif' ? 'Odbiór z (port)' : 'Załadunek (skąd)'}</label>
               <div className="flex gap-1 items-stretch">
                 <input
                   type="text"
@@ -644,6 +645,7 @@ export default function RoadPlateSaleCalculator({
                 </button>
               </div>
             </div>
+            {deliveryPaidBy !== 'cif' && (
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Rozładunek (dokąd)</label>
               <input
@@ -654,6 +656,7 @@ export default function RoadPlateSaleCalculator({
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+            )}
           </div>
         )}
       </div>

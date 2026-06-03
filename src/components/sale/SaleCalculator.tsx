@@ -103,7 +103,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
   const TRUCK_CAPACITY_T = 24.5;
   const [deliveryCostPerTruck, setDeliveryCostPerTruck] = useState<number | ''>('');
   const [customDeliveryTrucks, setCustomDeliveryTrucks] = useState<number | ''>('');
-  const [deliveryPaidBy, setDeliveryPaidBy]             = useState<'dap_included' | 'dap_extra' | 'fca'>('dap_included');
+  const [deliveryPaidBy, setDeliveryPaidBy]             = useState<'dap_included' | 'dap_extra' | 'fca' | 'cif'>('dap_included');
   const [deliveryFrom, setDeliveryFrom]                 = useState('Magazyn Intra B.V.');
   const [deliveryTo, setDeliveryTo]                     = useState('');
   const [taskName, setTaskName]                         = useState('');
@@ -1116,6 +1116,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                   { val: 'dap_included', label: 'DAP – dostawa w cenie',      desc: 'Intra organizuje i pokrywa koszt' },
                   { val: 'dap_extra',    label: 'DAP – refaktura na klienta',  desc: 'Intra organizuje, klient płaci osobno' },
                   { val: 'fca',          label: 'FCA – odbiór własny',         desc: 'Klient podstawia własne auto' },
+                  { val: 'cif',          label: 'CIF – odbiór z portu',        desc: 'Klient odbiera z portu docelowego' },
                 ] as const).map(({ val, label, desc }) => (
                   <label key={val} className={`flex-1 flex items-start gap-2.5 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
                     deliveryPaidBy === val ? 'border-blue-700 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
@@ -1134,7 +1135,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
             </div>
 
             {/* Pola kosztów – ukryte tylko dla FCA */}
-            {deliveryPaidBy !== 'fca' && (
+            {deliveryPaidBy !== 'fca' && deliveryPaidBy !== 'cif' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Liczba aut</label>
@@ -1179,7 +1180,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {deliveryPaidBy === 'fca' ? 'Odbiór z (magazyn)' : 'Skąd'}
+                  {deliveryPaidBy === 'fca' ? 'Odbiór z (magazyn)' : deliveryPaidBy === 'cif' ? 'Odbiór z (port)' : 'Skąd'}
                 </label>
                 <input
                   type="text" value={deliveryFrom}
@@ -1187,7 +1188,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              {deliveryPaidBy !== 'fca' && (
+              {deliveryPaidBy !== 'fca' && deliveryPaidBy !== 'cif' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Dokąd</label>
                   <input
@@ -1201,7 +1202,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
             </div>
 
             {/* Podsumowanie kosztów – dla DAP (obu opcji) gdy wpisano koszt */}
-            {deliveryCalc && deliveryCalc.costPerTruck > 0 && deliveryPaidBy !== 'fca' && (
+            {deliveryCalc && deliveryCalc.costPerTruck > 0 && deliveryPaidBy !== 'fca' && deliveryPaidBy !== 'cif' && (
               <div className="mt-2 pt-4 border-t border-gray-100 flex flex-wrap gap-4">
                 <div className={`rounded-lg px-5 py-3 text-right ${deliveryPaidBy === 'dap_extra' ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-200'}`}>
                   <p className="text-xs text-gray-500 mb-0.5">

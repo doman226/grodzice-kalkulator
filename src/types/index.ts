@@ -115,7 +115,7 @@ export interface SaleOffer {
   delivery_trucks?: number;
   delivery_cost_per_truck?: number;
   delivery_cost_total?: number;
-  delivery_paid_by?: 'dap_included' | 'dap_extra' | 'fca';
+  delivery_paid_by?: 'dap_included' | 'dap_extra' | 'fca' | 'cif';
   delivery_from?: string;
   delivery_to?: string;
   // Warunki oferty
@@ -123,7 +123,7 @@ export interface SaleOffer {
   campaign_weeks?: string;
   campaign_delivery_weeks?: string;
   warehouse_delivery_time?: string;
-  delivery_terms?: 'DAP' | 'DAP_EXTRA' | 'FCA';
+  delivery_terms?: 'DAP' | 'DAP_EXTRA' | 'FCA' | 'CIF';
   fca_location?: string;
   created_at: string;
   updated_at: string;
@@ -255,7 +255,7 @@ export interface PipeSaleOffer {
   delivery_trucks?: number;
   delivery_cost_per_truck?: number;
   delivery_cost_total?: number;
-  delivery_paid_by?: 'dap_included' | 'dap_extra' | 'fca';
+  delivery_paid_by?: 'dap_included' | 'dap_extra' | 'fca' | 'cif';
   delivery_from?: string;
   delivery_to?: string;
   // Warunki oferty
@@ -263,7 +263,7 @@ export interface PipeSaleOffer {
   campaign_weeks?: string;
   campaign_delivery_weeks?: string;
   warehouse_delivery_time?: string;
-  delivery_terms?: 'DAP' | 'DAP_EXTRA' | 'FCA';
+  delivery_terms?: 'DAP' | 'DAP_EXTRA' | 'FCA' | 'CIF';
   fca_location?: string;
   // Audit / soft-delete
   created_at: string;
@@ -348,7 +348,7 @@ export interface RoadPlateSaleOffer {
   delivery_trucks?: number;
   delivery_cost_per_truck?: number;
   delivery_cost_total?: number;
-  delivery_paid_by?: 'dap_included' | 'dap_extra' | 'fca';
+  delivery_paid_by?: 'dap_included' | 'dap_extra' | 'fca' | 'cif';
   delivery_from?: string;
   delivery_to?: string;
   // Warunki oferty
@@ -356,7 +356,7 @@ export interface RoadPlateSaleOffer {
   campaign_weeks?: string;
   campaign_delivery_weeks?: string;
   warehouse_delivery_time?: string;
-  delivery_terms?: 'DAP' | 'DAP_EXTRA' | 'FCA';
+  delivery_terms?: 'DAP' | 'DAP_EXTRA' | 'FCA' | 'CIF';
   fca_location?: string;
   // Audit / soft-delete
   created_at: string;

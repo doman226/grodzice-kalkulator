@@ -106,6 +106,9 @@ export interface PdfStrings {
   deliveryFca:      (location: string) => string;
   deliveryDap:      (address: string) => string;
   deliveryDapExtra: (address: string) => string;
+  // CIF — etykieta boxu transportu + zdanie warunków (nazwany port docelowy)
+  valueCif:         string;
+  deliveryCif:      (port: string) => string;
 
   // Payment text
   paymentPrepaid: string;
@@ -206,6 +209,8 @@ const pl: PdfStrings = {
   deliveryFca:      location => `odbiór własny wg. FCA (${location}).`,
   deliveryDap:      address  => `dostawa w cenie wg. DAP (${address}).`,
   deliveryDapExtra: address  => `dostawa wg. DAP (${address}), transport refakturowany na klienta.`,
+  valueCif:         'CIF – odbiór z portu',
+  deliveryCif:      port => `odbiór z portu wg. CIF (${port}).`,
 
   paymentPrepaid: 'przedpłata 100%.',
   paymentCredit:  days =>
@@ -308,6 +313,8 @@ const en: PdfStrings = {
   deliveryFca:      location => `customer\'s own collection, FCA (${location}).`,
   deliveryDap:      address  => `delivery included, DAP (${address}).`,
   deliveryDapExtra: address  => `delivery DAP (${address}), freight re-invoiced to customer.`,
+  valueCif:         'CIF – collection from port',
+  deliveryCif:      port => `collection from port, CIF (${port}).`,
 
   paymentPrepaid: '100% prepayment.',
   paymentCredit:  days =>
@@ -1050,6 +1057,9 @@ export interface PipeSalePdfStrings {
   deliveryFca:      (location: string) => string;
   deliveryDap:      (address: string) => string;
   deliveryDapExtra: (address: string) => string;
+  // CIF — etykieta boxu transportu + zdanie warunków (nazwany port docelowy)
+  valueCif:         string;
+  deliveryCif:      (port: string) => string;
 
   // Warunki techniczne (DYNAMICZNE dla rur)
   techNormSingle:     (norm: string, description: string) => string;
@@ -1142,6 +1152,8 @@ const pipeSale_pl: PipeSalePdfStrings = {
   deliveryFca:      location => `Dostawa zgodnie z FCA. Odbiór własny z: ${location}.`,
   deliveryDap:      address  => `Dostawa zgodnie z DAP do: ${address}.`,
   deliveryDapExtra: address  => `Dostawa zgodnie z DAP do: ${address}. Koszt transportu refakturowany na klienta.`,
+  valueCif:         'CIF – odbiór z portu',
+  deliveryCif:      port => `Dostawa zgodnie z CIF. Odbiór z portu: ${port}.`,
 
   techNormSingle:     (norm, description) => `Norma produkcyjna: ${norm} — ${description}.`,
   techNormMultiple:   normsList => `Normy produkcyjne: ${normsList} (wg specyfikacji w tabeli).`,
@@ -1231,6 +1243,8 @@ const pipeSale_en: PipeSalePdfStrings = {
   deliveryFca:      location => `Delivery according to FCA. Collection from: ${location}.`,
   deliveryDap:      address  => `Delivery according to DAP to: ${address}.`,
   deliveryDapExtra: address  => `Delivery according to DAP to: ${address}. Transport cost recharged to customer.`,
+  valueCif:         'CIF – collection from port',
+  deliveryCif:      port => `Delivery according to CIF. Collection from port: ${port}.`,
 
   techNormSingle:     (norm, description) => `Production standard: ${norm} — ${description}.`,
   techNormMultiple:   normsList => `Production standards: ${normsList} (according to specification in the table).`,
@@ -1344,6 +1358,9 @@ export interface RoadPlateSalePdfStrings {
   deliveryFca:      (location: string) => string;
   deliveryDap:      (address: string) => string;
   deliveryDapExtra: (address: string) => string;
+  // CIF — etykieta boxu transportu + zdanie warunków (nazwany port docelowy)
+  valueCif:         string;
+  deliveryCif:      (port: string) => string;
 
   // Warunki techniczne — 4 linie statyczne, identyczne z PDF wynajmu płyt
   // (decyzja biznesowa: spójność warunków między ofertą wynajmu a sprzedaży).
@@ -1433,6 +1450,8 @@ const roadPlateSale_pl: RoadPlateSalePdfStrings = {
   deliveryFca:      location => `Dostawa zgodnie z FCA. Odbiór własny z: ${location}.`,
   deliveryDap:      address  => `Dostawa zgodnie z DAP do: ${address}.`,
   deliveryDapExtra: address  => `Dostawa zgodnie z DAP do: ${address}. Koszt transportu refakturowany na klienta.`,
+  valueCif:         'CIF – odbiór z portu',
+  deliveryCif:      port => `Dostawa zgodnie z CIF. Odbiór z portu: ${port}.`,
 
   techGrade:           'gatunek stali zgodny z ofertą.',
   techToleranceWidth:  'tolerancja szerokości −0/+100 mm (mill edges).',
@@ -1518,6 +1537,8 @@ const roadPlateSale_en: RoadPlateSalePdfStrings = {
   deliveryFca:      location => `Delivery according to FCA. Collection from: ${location}.`,
   deliveryDap:      address  => `Delivery according to DAP to: ${address}.`,
   deliveryDapExtra: address  => `Delivery according to DAP to: ${address}. Transport cost recharged to customer.`,
+  valueCif:         'CIF – collection from port',
+  deliveryCif:      port => `Delivery according to CIF. Collection from port: ${port}.`,
 
   techGrade:           'steel grade as stated in this offer.',
   techToleranceWidth:  'width tolerance −0/+100 mm (mill edges).',
