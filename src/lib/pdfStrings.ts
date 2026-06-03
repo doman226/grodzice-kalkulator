@@ -1040,6 +1040,15 @@ export interface PipeSalePdfStrings {
   thPricePerT:     string;   // Cena [waluta/t]
   thValue:         string;   // Wartość
 
+  // Locks table (zamki)
+  thLock:           string;   // "Zamek" / "Interlock"
+  thLockQtySzt:     string;   // "Szt." / "Pcs."
+  thLockMassT:      string;   // "Masa [t]" / "Mass [t]"
+  thMb:             string;   // "mb łącznie" / "Total [lm]"
+  lockSectionTitle: string;   // "Zamki" / "Interlocks"
+  lockTotalRow:     string;   // "Łącznie" / "Total interlocks"
+  lockMassRow:      string;   // "Masa zamków" / "Interlock mass"
+
   // Table body
   unitPcs:         string;
   totalRow:        string;
@@ -1137,6 +1146,14 @@ const pipeSale_pl: PipeSalePdfStrings = {
   thPricePerT:  'Cena [waluta/t]',
   thValue:      'Wartość',
 
+  thLock:           'Zamek',
+  thLockQtySzt:     'Szt.',
+  thLockMassT:      'Masa [t]',
+  thMb:             'mb łącznie',
+  lockSectionTitle: 'Zamki',
+  lockTotalRow:     'Łącznie',
+  lockMassRow:      'Masa zamków',
+
   unitPcs:      'szt.',
   totalRow:     'RAZEM',
 
@@ -1227,6 +1244,14 @@ const pipeSale_en: PipeSalePdfStrings = {
   thMass:       'Mass [t]',
   thPricePerT:  'Price [currency/t]',
   thValue:      'Value',
+
+  thLock:           'Interlock',
+  thLockQtySzt:     'Pcs.',
+  thLockMassT:      'Mass [t]',
+  thMb:             'Total [lm]',
+  lockSectionTitle: 'Interlocks',
+  lockTotalRow:     'Total interlocks',
+  lockMassRow:      'Interlock mass',
 
   unitPcs:      'pcs',
   totalRow:     'TOTAL',
