@@ -226,6 +226,19 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
   const sortedItems = [...(offer.items ?? [])].sort((a, b) => a.sort_order - b.sort_order);
   const hasItems    = sortedItems.length > 0;
 
+  // Zamki (katalog współdzielony sale_locks; ceny w EUR, przeliczane na PLN w display)
+  const sortedLocks = [...(offer.lock_items ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+  const hasLocks    = sortedLocks.length > 0;
+  const locksTotalEUR   = sortedLocks.reduce((s, l) => s + (l.sell_eur_total ?? l.total_eur ?? 0), 0);
+  const locksTotalPLN   = sortedLocks.reduce((s, l) => s + (l.sell_pln_total ?? l.total_pln ?? 0), 0);
+  const locksTotalMassT = sortedLocks.reduce((s, l) => s + (l.mass_t ?? 0), 0);
+
+  // Nagłówki kolumn zamków zależne od waluty oferty
+  const thPriceMb = isEUR ? (lang === 'pl' ? 'Cena EUR/mb' : 'Price EUR/lm')
+                          : (lang === 'pl' ? 'Cena PLN/mb' : 'Price PLN/lm');
+  const thValueC  = isEUR ? (lang === 'pl' ? 'Wartość [EUR]' : 'Value [EUR]')
+                          : (lang === 'pl' ? 'Wartość [PLN]' : 'Value [PLN]');
+
   // Sumy
   const totalMassT   = sortedItems.reduce((sum, i) => sum + (i.mass_t ?? 0), 0);
   const totalSellEUR = sortedItems.reduce((sum, i) => sum + (i.sell_eur_total ?? 0), 0);
@@ -235,9 +248,9 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
   const deliveryCostPLN = (offer.delivery_paid_by === 'dap_included' && (offer.delivery_cost_total ?? 0) > 0)
     ? (offer.delivery_cost_total ?? 0) : 0;
   const deliveryCostEUR = exchRate > 0 ? deliveryCostPLN / exchRate : 0;
-  // Cena dla klienta = rury + transport (gdy DAP w cenie)
-  const totalForClientEUR = totalSellEUR + deliveryCostEUR;
-  const totalForClientPLN = totalSellPLN + deliveryCostPLN;
+  // Cena dla klienta = rury + transport (gdy DAP w cenie) + zamki
+  const totalForClientEUR = totalSellEUR + deliveryCostEUR + locksTotalEUR;
+  const totalForClientPLN = totalSellPLN + deliveryCostPLN + locksTotalPLN;
 
   // Backward compat: stare oferty mogą mieć 'intra'/'klient' zamiast nowych wartości
   const dPaidByRaw = offer.delivery_paid_by as string | undefined;
@@ -475,21 +488,87 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
           </View>
         )}
 
+        {/* ── TABELA ZAMKÓW ── (katalog współdzielony z grodzicami) */}
+        {hasLocks && (
+          <View style={[s.table, { marginTop: hasItems ? 6 : 0 }]}>
+            <View style={s.tableHeaderRow}>
+              <Text style={[s.thCell, { flex: 1.5 }]}>{t.thLock}</Text>
+              <Text style={[s.thCell, { flex: 1.2 }]}>{t.thSteelGrade}</Text>
+              <Text style={[s.thCell, { flex: 0.7, textAlign: 'center' }]}>{t.thLockQtySzt}</Text>
+              <Text style={[s.thCell, { flex: 0.7, textAlign: 'right' }]}>{t.thLengthM}</Text>
+              <Text style={[s.thCell, { flex: 0.85, textAlign: 'right' }]}>{t.thKgPerM}</Text>
+              <Text style={[s.thCell, { flex: 0.85, textAlign: 'right' }]}>{t.thLockMassT}</Text>
+              <Text style={[s.thCell, { flex: 1.0, textAlign: 'right' }]}>{t.thMb}</Text>
+              <Text style={[s.thCell, { flex: 1.0, textAlign: 'right' }]}>{thPriceMb}</Text>
+              <Text style={[s.thCell, { flex: 1.3, textAlign: 'right' }]}>{thValueC}</Text>
+            </View>
+
+            {sortedLocks.map((lock, idx) => {
+              const qMb    = lock.quantity_mb ?? 0;
+              const massT  = lock.mass_t ?? 0;
+              const kgPerM = qMb > 0 ? (massT * 1000) / qMb : 0;
+              const qtySzt = lock.quantity_szt ?? null;
+              const lenM   = lock.length_m   ?? null;
+              return (
+                <View key={lock.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
+                  <Text style={[s.tdLabel, { flex: 1.5, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{lock.lock_name}</Text>
+                  <Text style={[s.tdLabel, { flex: 1.2, color: C.gray700 }]}>{lock.steel_grade?.toUpperCase() ?? '—'}</Text>
+                  <Text style={[s.tdLabel, { flex: 0.7, textAlign: 'center' }]}>{qtySzt != null ? `${qtySzt} ${t.unitPcs}` : '—'}</Text>
+                  <Text style={[s.tdLabel, { flex: 0.7, textAlign: 'right' }]}>{lenM != null ? `${lenM} m` : '—'}</Text>
+                  <Text style={[s.tdLabel, { flex: 0.85, textAlign: 'right', color: C.gray700 }]}>{formatNumber(kgPerM, 1)}</Text>
+                  <Text style={[s.tdLabel, { flex: 0.85, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{formatNumber(massT, 3)} t</Text>
+                  <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{formatNumber(qMb, 1)}</Text>
+                  <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right', color: C.gray700 }]}>
+                    {isEUR
+                      ? `${formatEUR(lock.sell_price_eur_mb ?? lock.price_eur_mb)} EUR/mb`
+                      : `${formatPLN((lock.sell_price_eur_mb ?? lock.price_eur_mb) * exchRate)} PLN/mb`}
+                  </Text>
+                  <Text style={[s.tdLabel, { flex: 1.3, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>
+                    {isEUR
+                      ? `${formatEUR(lock.sell_eur_total ?? lock.total_eur)} EUR`
+                      : `${formatPLN(lock.sell_pln_total ?? lock.total_pln ?? 0)} PLN`}
+                  </Text>
+                </View>
+              );
+            })}
+
+            {/* Wiersz sumy zamków */}
+            <View style={[s.tableBodyRow, { backgroundColor: C.gray100 }]}>
+              <Text style={[s.tdLabel, { flex: 1.5, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{t.lockTotalRow}</Text>
+              <Text style={[s.tdLabel, { flex: 1.2 }]} />
+              <Text style={[s.tdLabel, { flex: 0.7 }]} />
+              <Text style={[s.tdLabel, { flex: 0.7 }]} />
+              <Text style={[s.tdLabel, { flex: 0.85 }]} />
+              <Text style={[s.tdLabel, { flex: 0.85, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{formatNumber(locksTotalMassT, 3)} t</Text>
+              <Text style={[s.tdLabel, { flex: 1.0, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+                {formatNumber(sortedLocks.reduce((acc, l) => acc + (l.quantity_mb ?? 0), 0), 1)}
+              </Text>
+              <Text style={[s.tdLabel, { flex: 1.0 }]} />
+              <Text style={[s.tdLabel, { flex: 1.3, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>
+                {isEUR ? `${formatEUR(locksTotalEUR)} EUR` : `${formatPLN(locksTotalPLN)} PLN`}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* ── CENA BOX (navy) — cena sprzedaży + cena/t ── */}
         {/* Reguła: DAP w cenie → transport "schowany" w cenie (klient nie zna jego kosztu).
             DAP_EXTRA → cena rur bez transportu, transport pokazany jako refaktura.
             FCA → cena rur bez transportu (klient odbiera sam).               */}
-        {hasItems && (() => {
+        {(hasItems || hasLocks) && (() => {
           // Czy DAP "schowany" w cenie ma rzeczywisty koszt transportu?
           const dapIncludedHasCost = dPaidBy === 'dap_included' && deliveryCostPLN > 0;
 
-          // Suma do wyświetlenia: w DAP w cenie z transportem, inaczej bez
+          // Suma do wyświetlenia: rury (+transport gdy DAP w cenie) + zamki
           const totalToShow = dapIncludedHasCost
             ? (isEUR ? totalForClientEUR : totalForClientPLN)
-            : (isEUR ? totalSellEUR : totalSellPLN);
+            : (isEUR ? totalSellEUR + locksTotalEUR : totalSellPLN + locksTotalPLN);
 
-          // Effective price per ton (z transportem gdy DAP w cenie — bo klient widzi "cenę z dostawą")
-          const effectivePerT = totalMassT > 0 ? totalToShow / totalMassT : 0;
+          // Baza ceny za tonę = wartość rur (+transport przy DAP), BEZ zamków — jak w grodzicach
+          const pipeBase = dapIncludedHasCost
+            ? (isEUR ? totalSellEUR + deliveryCostEUR : totalSellPLN + deliveryCostPLN)
+            : (isEUR ? totalSellEUR : totalSellPLN);
+          const effectivePerT = totalMassT > 0 ? pipeBase / totalMassT : 0;
 
           return (
             <View style={s.priceBox} wrap={false}>
@@ -499,11 +578,15 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
                 <Text style={s.priceSuffix}>{currency} {t.netSuffix}</Text>
               </Text>
               <View style={s.priceRow}>
-                {/* Cena za tonę — efektywna (z transportem przy DAP w cenie) */}
+                {/* Cena za tonę rur — efektywna (z transportem przy DAP w cenie) */}
                 {effectivePerT > 0 && (
                   <Text>
                     {isEUR ? formatEUR(effectivePerT) : formatPLN(effectivePerT)} {currency}/t {t.netSuffix}
                   </Text>
+                )}
+                {/* Zamki — osobna linia rozbicia ceny */}
+                {hasLocks && (
+                  <Text>{t.lockSectionTitle}: {isEUR ? `${formatEUR(locksTotalEUR)} EUR` : `${formatPLN(locksTotalPLN)} PLN`}</Text>
                 )}
                 {/* DAP_EXTRA: klient wie, że transport jest refakturowany osobno */}
                 {dPaidBy === 'dap_extra' && deliveryCostPLN > 0 && (
