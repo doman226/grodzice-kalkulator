@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
-import type { Client, PipeSaleOffer } from '../../../types';
+import type { Client, PipeSaleOffer, SaleLock } from '../../../types';
 import PipeSaleCalculator from './PipeSaleCalculator';
 import PipeOffersTable from './PipeOffersTable';
 import ClientsTable from '../../ClientsTable';
@@ -24,6 +24,7 @@ export default function PipeSaleSection({
   activeTab, onTabChange, onOffersCountChange,
 }: Props) {
   const [offers, setOffers]   = useState<PipeSaleOffer[]>([]);
+  const [locks, setLocks]     = useState<SaleLock[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
 
@@ -32,12 +33,17 @@ export default function PipeSaleSection({
   async function loadData() {
     setLoading(true);
     setError('');
+
+    // Katalog zamków (współdzielony z grodzicami) — tylko do odczytu z perspektywy rur.
+    supabase.from('sale_locks').select('*').eq('active', true).order('sort_order')
+      .then(({ data }) => { if (data) setLocks(data as SaleLock[]); });
+
     // Tabele pipe_sale_* mogą jeszcze nie istnieć (przed wykonaniem migracji SQL).
     // W takim przypadku wyświetlamy info zamiast błędu — kalkulator i klienci pozostają dostępne.
     try {
       const { data, error: err } = await supabase
         .from('pipe_sale_offers')
-        .select('*, client:clients(*), items:pipe_sale_offer_items(*)')
+        .select('*, client:clients(*), items:pipe_sale_offer_items(*), lock_items:pipe_sale_offer_lock_items(*)')
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
@@ -92,6 +98,7 @@ export default function PipeSaleSection({
       {activeTab === 'calculator' && (
         <PipeSaleCalculator
           clients={clients}
+          locks={locks}
           onClientAdded={onClientAdded}
           onOfferSaved={handleOfferSaved}
         />
@@ -107,7 +114,7 @@ export default function PipeSaleSection({
             <button onClick={loadData} className="ml-3 underline text-blue-700">Spróbuj ponownie</button>
           </div>
         ) : (
-          <PipeOffersTable offers={offers} onOffersChange={handleOffersChange} clients={clients} />
+          <PipeOffersTable offers={offers} onOffersChange={handleOffersChange} clients={clients} locks={locks} />
         )
       )}
       {activeTab === 'clients' && (
