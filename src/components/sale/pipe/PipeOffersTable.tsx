@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { supabase } from '../../../lib/supabase';
-import type { Client, PipeSaleOffer, OfferStatus } from '../../../types';
+import type { Client, PipeSaleOffer, OfferStatus, SaleLock } from '../../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../../lib/calculations';
 import { buildPdfFilenameBase } from '../../../lib/pdfFilename';
 import PipeEditOfferModal from './PipeEditOfferModal';
@@ -12,6 +12,7 @@ interface Props {
   offers: PipeSaleOffer[];
   onOffersChange: (offers: PipeSaleOffer[]) => void;
   clients: Client[];
+  locks?: SaleLock[];
 }
 
 const STATUS_LABELS: Record<OfferStatus, string> = {
@@ -45,7 +46,7 @@ function computeMargin(offer: PipeSaleOffer): { pct: number; amountEUR: number }
   return { pct: ((sellEUR - costEUR) / sellEUR) * 100, amountEUR: sellEUR - costEUR };
 }
 
-export default function PipeOffersTable({ offers, onOffersChange, clients }: Props) {
+export default function PipeOffersTable({ offers, onOffersChange, clients, locks = [] }: Props) {
   const [search, setSearch]             = useState('');
   const [expanded, setExpanded]         = useState<string | null>(null);
   const [statusSaving, setStatusSaving] = useState<string | null>(null);
@@ -133,6 +134,7 @@ export default function PipeOffersTable({ offers, onOffersChange, clients }: Pro
         <PipeEditOfferModal
           offer={editOffer}
           clients={clients}
+          locks={locks}
           onSaved={handleOfferUpdated}
           onClose={() => setEditOffer(null)}
         />
@@ -143,6 +145,7 @@ export default function PipeOffersTable({ offers, onOffersChange, clients }: Pro
         <PipeEditOfferModal
           offer={copyOffer}
           clients={clients}
+          locks={locks}
           mode="copy"
           onSaved={handleOfferCopied}
           onClose={() => setCopyOffer(null)}
@@ -446,7 +449,53 @@ export default function PipeOffersTable({ offers, onOffersChange, clients }: Pro
                             </div>
                           ) : null}
 
-                          {!offer.items?.length && (
+                          {/* Tabela pozycji zamków (katalog współdzielony sale_locks) */}
+                          {offer.lock_items && offer.lock_items.length > 0 && (
+                            <div className="rounded-lg overflow-hidden border border-blue-200">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="bg-blue-800 text-white">
+                                    <th className="text-left px-3 py-2 font-semibold">🔗 Zamek</th>
+                                    <th className="text-left px-3 py-2 font-semibold">Gatunek</th>
+                                    <th className="text-right px-3 py-2 font-semibold">Ilość × dł.</th>
+                                    <th className="text-right px-3 py-2 font-semibold">mb</th>
+                                    <th className="text-right px-3 py-2 font-semibold">Masa [t]</th>
+                                    <th className="text-right px-3 py-2 font-semibold">Cena {currency}/mb</th>
+                                    <th className="text-right px-3 py-2 font-semibold">Wartość</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {offer.lock_items
+                                    .slice()
+                                    .sort((a, b) => a.sort_order - b.sort_order)
+                                    .map((lock, i) => {
+                                      const priceMb = lock.sell_price_eur_mb ?? lock.price_eur_mb;
+                                      const valEUR  = lock.sell_eur_total ?? lock.total_eur;
+                                      const valPLN  = lock.sell_pln_total ?? lock.total_pln ?? 0;
+                                      return (
+                                        <tr key={lock.id} className={i % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
+                                          <td className="px-3 py-2 font-semibold text-gray-800">{lock.lock_name}</td>
+                                          <td className="px-3 py-2 text-gray-600">{lock.steel_grade?.toUpperCase() ?? '—'}</td>
+                                          <td className="px-3 py-2 text-right text-gray-600 tabular-nums">
+                                            {lock.quantity_szt != null ? `${lock.quantity_szt} × ${lock.length_m ?? '—'} m` : '—'}
+                                          </td>
+                                          <td className="px-3 py-2 text-right text-gray-600 tabular-nums">{formatNumber(lock.quantity_mb, 1)}</td>
+                                          <td className="px-3 py-2 text-right text-gray-600 tabular-nums">{formatNumber(lock.mass_t, 3)}</td>
+                                          <td className="px-3 py-2 text-right font-semibold text-gray-800 tabular-nums">
+                                            {formatNumber(currency === 'PLN' ? priceMb * (offer.exchange_rate ?? 4.25) : priceMb, 2)}
+                                          </td>
+                                          <td className="px-3 py-2 text-right font-bold text-gray-900 tabular-nums">
+                                            {currency === 'PLN' ? `${formatPLN(valPLN)} PLN` : `${formatEUR(valEUR)} EUR`}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+
+                          {!offer.items?.length && !offer.lock_items?.length && (
                             <p className="text-xs text-gray-400">Brak pozycji.</p>
                           )}
 
