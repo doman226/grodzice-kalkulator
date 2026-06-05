@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase, fetchNipData } from '../../../lib/supabase';
-import type { Client, PipeSaleOffer, PipeSaleOfferItem, OfferStatus } from '../../../types';
+import type { Client, PipeSaleOffer, PipeSaleOfferItem, PipeSaleOfferLockItem, OfferStatus } from '../../../types';
 import { formatEUR, formatPLN, formatNumber } from '../../../lib/calculations';
 import ClientSearchInput from '../../ClientSearchInput';
 import { SALES_REPS, CountryOptions } from '../../../lib/constants';
@@ -48,9 +48,26 @@ export interface PipeDeliverySnapshot {
   to: string;
 }
 
+/** Snapshot jednej pozycji zamka — z PipeSaleCalculator. Ceny zawsze w EUR. */
+export interface LockSnapshot {
+  lockName: string;
+  steelGrade: string;
+  quantitySzt: number;
+  lengthM: number;
+  quantityMb: number;   // = quantitySzt × lengthM
+  priceEurMb: number;
+  sellPriceEurMb?: number;
+  totalEUR: number;
+  totalPLN: number;
+  totalSellEUR?: number;
+  totalSellPLN?: number;
+  massT: number;
+}
+
 interface Props {
   clients: Client[];
   items: PipeItemSnapshot[];
+  lockItems?: LockSnapshot[];
   totals: PipeOfferTotals;
   currency: 'EUR' | 'PLN';
   exchangeRate: number;
@@ -64,7 +81,7 @@ interface Props {
 // ─── Komponent ────────────────────────────────────────────────────────────────
 
 export default function PipeSaveOfferModal({
-  clients, items, totals, currency, exchangeRate, delivery,
+  clients, items, lockItems = [], totals, currency, exchangeRate, delivery,
   onSaved, onClose, onClientAdded, taskName: initialTaskName,
 }: Props) {
   // ── Podstawowe pola ──
@@ -101,6 +118,12 @@ export default function PipeSaveOfferModal({
   const totalSellEUR = currency === 'EUR' ? totals.totalSell : totals.totalSell / exchangeRate;
   const totalSellPLN = currency === 'PLN' ? totals.totalSell : totals.totalSell * exchangeRate;
   const totalCostEUR = currency === 'EUR' ? totals.totalCost : totals.totalCost / exchangeRate;
+
+  // Sumy zamków (ceny zawsze w EUR; PLN = EUR × kurs)
+  const lockTotalSellEUR = lockItems.reduce((s, i) => s + (i.totalSellEUR ?? 0), 0);
+  const lockTotalSellPLN = lockItems.reduce((s, i) => s + (i.totalSellPLN ?? 0), 0);
+  const lockTotalCostEUR = lockItems.reduce((s, i) => s + (i.totalEUR ?? 0), 0);
+  const lockTotalMassT   = lockItems.reduce((s, i) => s + (i.massT ?? 0), 0);
 
   async function lookupNip() {
     const nip = newClient.nip.replace(/[-\s]/g, '');
@@ -152,7 +175,7 @@ export default function PipeSaveOfferModal({
 
   async function handleSave() {
     if (!clientId) return setError('Wybierz klienta.');
-    if (items.length === 0) return setError('Dodaj przynajmniej jedną pozycję rury.');
+    if (items.length === 0 && lockItems.length === 0) return setError('Dodaj przynajmniej jedną pozycję (rura lub zamek).');
     if (deliveryTimeline === 'huta' && !campaignWeeks.trim())
       return setError('Wpisz numer tygodnia kampanii produkcyjnej.');
     if (deliveryTerms === 'FCA' && !fcaLocation.trim())
@@ -175,9 +198,9 @@ export default function PipeSaveOfferModal({
         prepared_by:               preparedBy,
         currency,
         exchange_rate:             exchangeRate,
-        total_cost_eur:            totalCostEUR  || null,
-        total_sell_eur:            totalSellEUR  || null,
-        total_sell_pln:            totalSellPLN  || null,
+        total_cost_eur:            (totalCostEUR + lockTotalCostEUR)  || null,
+        total_sell_eur:            (totalSellEUR + lockTotalSellEUR)  || null,
+        total_sell_pln:            (totalSellPLN + lockTotalSellPLN)  || null,
         margin_pct:                totals.totalMarginPct,
         delivery_trucks:           delivery.trucks       || null,
         delivery_cost_per_truck:   delivery.costPerTruck || null,
@@ -202,50 +225,86 @@ export default function PipeSaveOfferModal({
 
     const savedOffer = insertedOffer as PipeSaleOffer;
 
-    // KROK 2: INSERT pozycji rur
-    const { data: insertedItems, error: itemsErr } = await supabase
-      .from('pipe_sale_offer_items')
-      .insert(
-        items.map((it, idx) => {
-          const sellEurTotal = currency === 'EUR' ? it.sellTotal : it.sellTotal / exchangeRate;
-          const sellPlnTotal = currency === 'PLN' ? it.sellTotal : it.sellTotal * exchangeRate;
-          return {
-            offer_id:           savedOffer.id,
-            product_type:       it.productType,
-            condition:          it.condition,
-            norm:               it.norm.trim() || null,
-            norm_description:   it.normDescription || null,
-            steel_grade:        it.steelGrade,
-            surface:            it.surface,
-            diameter_mm:        it.diameterMm,
-            wall_thickness_mm:  it.wallThicknessMm,
-            quantity_szt:       it.quantitySzt,
-            length_m:           it.lengthM,
-            kg_per_m:           it.kgPerM,
-            total_length_m:     it.totalLengthM,
-            mass_t:             it.massT,
-            cost_price_per_ton: it.costPricePerTon || null,
-            sell_price_per_ton: it.sellPricePerTon,
-            cost_total:         it.costTotal || null,
-            sell_total:         it.sellTotal,
-            sell_eur_total:     sellEurTotal,
-            sell_pln_total:     sellPlnTotal,
-            margin_pct:         it.marginPct,
-            sort_order:         idx,
-          };
-        }),
-      )
-      .select();
+    // KROK 2: INSERT pozycji rur (pomiń gdy oferta zawiera tylko zamki)
+    let insertedItems: PipeSaleOfferItem[] = [];
+    if (items.length > 0) {
+      const { data, error: itemsErr } = await supabase
+        .from('pipe_sale_offer_items')
+        .insert(
+          items.map((it, idx) => {
+            const sellEurTotal = currency === 'EUR' ? it.sellTotal : it.sellTotal / exchangeRate;
+            const sellPlnTotal = currency === 'PLN' ? it.sellTotal : it.sellTotal * exchangeRate;
+            return {
+              offer_id:           savedOffer.id,
+              product_type:       it.productType,
+              condition:          it.condition,
+              norm:               it.norm.trim() || null,
+              norm_description:   it.normDescription || null,
+              steel_grade:        it.steelGrade,
+              surface:            it.surface,
+              diameter_mm:        it.diameterMm,
+              wall_thickness_mm:  it.wallThicknessMm,
+              quantity_szt:       it.quantitySzt,
+              length_m:           it.lengthM,
+              kg_per_m:           it.kgPerM,
+              total_length_m:     it.totalLengthM,
+              mass_t:             it.massT,
+              cost_price_per_ton: it.costPricePerTon || null,
+              sell_price_per_ton: it.sellPricePerTon,
+              cost_total:         it.costTotal || null,
+              sell_total:         it.sellTotal,
+              sell_eur_total:     sellEurTotal,
+              sell_pln_total:     sellPlnTotal,
+              margin_pct:         it.marginPct,
+              sort_order:         idx,
+            };
+          }),
+        )
+        .select();
 
-    if (itemsErr) {
-      // Saga rollback: usuń ofertę aby uniknąć osieroconej oferty bez pozycji
-      await supabase.from('pipe_sale_offers').delete().eq('id', savedOffer.id);
-      setSaving(false);
-      return setError('Błąd zapisu pozycji – oferta anulowana: ' + itemsErr.message);
+      if (itemsErr) {
+        // Saga rollback: usuń ofertę aby uniknąć osieroconej oferty bez pozycji
+        await supabase.from('pipe_sale_offers').delete().eq('id', savedOffer.id);
+        setSaving(false);
+        return setError('Błąd zapisu pozycji – oferta anulowana: ' + itemsErr.message);
+      }
+      insertedItems = (data ?? []) as PipeSaleOfferItem[];
+    }
+
+    // KROK 3: INSERT pozycji zamków (jeśli są) — rollback usuwa świeżą ofertę
+    // (ON DELETE CASCADE skasuje też zapisane wyżej pozycje rur).
+    let savedLockItems: PipeSaleOfferLockItem[] = [];
+    if (lockItems.length > 0) {
+      const { data: insertedLocks, error: locksErr } = await supabase
+        .from('pipe_sale_offer_lock_items')
+        .insert(lockItems.map((item, idx) => ({
+          offer_id:          savedOffer.id,
+          lock_name:         item.lockName,
+          steel_grade:       item.steelGrade || null,
+          quantity_szt:      item.quantitySzt,
+          length_m:          item.lengthM,
+          quantity_mb:       item.quantityMb,
+          price_eur_mb:      item.priceEurMb,
+          sell_price_eur_mb: item.sellPriceEurMb,
+          total_eur:         item.totalEUR,
+          total_pln:         item.totalPLN,
+          sell_eur_total:    item.totalSellEUR,
+          sell_pln_total:    item.totalSellPLN,
+          mass_t:            item.massT,
+          sort_order:        idx,
+        })))
+        .select();
+      if (locksErr) {
+        await supabase.from('pipe_sale_offers').delete().eq('id', savedOffer.id);
+        setSaving(false);
+        return setError('Błąd zapisu zamków – oferta anulowana: ' + locksErr.message);
+      }
+      savedLockItems = (insertedLocks ?? []) as PipeSaleOfferLockItem[];
     }
 
     setSaving(false);
-    savedOffer.items = (insertedItems ?? []) as PipeSaleOfferItem[];
+    savedOffer.items      = insertedItems;
+    savedOffer.lock_items = savedLockItems;
     onSaved(savedOffer);
   }
 
@@ -477,16 +536,18 @@ export default function PipeSaveOfferModal({
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
               <div>
                 <span className="text-gray-600">Pozycji:</span>{' '}
-                <strong>{items.length}</strong>
+                <strong>{items.length}{lockItems.length > 0 ? ` + ${lockItems.length} zamk.` : ''}</strong>
               </div>
               <div>
                 <span className="text-gray-600">Masa:</span>{' '}
-                <strong>{formatNumber(totals.totalMassT, 3)} t</strong>
+                <strong>{formatNumber(totals.totalMassT + lockTotalMassT, 3)} t</strong>
               </div>
               <div>
                 <span className="text-gray-600">Suma oferty:</span>{' '}
                 <strong>
-                  {currency === 'EUR' ? formatEUR(totals.totalSell) : formatPLN(totals.totalSell)} {currency}
+                  {currency === 'EUR'
+                    ? formatEUR(totals.totalSell + lockTotalSellEUR)
+                    : formatPLN(totals.totalSell + lockTotalSellPLN)} {currency}
                 </strong>
               </div>
             </div>
