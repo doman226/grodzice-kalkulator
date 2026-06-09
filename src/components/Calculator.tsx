@@ -107,14 +107,21 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
     // Helper z src/lib/currency.ts — single source of truth dla konwersji walut.
     // Wynajem używa precision='cents' (symetryczne 2dp w obie strony).
     const conv = (v: number) => convertCurrencyValue(v, currency, newCur, exchangeRate, 'cents');
+    // Ceny szkód i napraw: zaokrąglone do pełnych EUR (czysta kwota na ofercie).
+    // Dotyczy WYŁĄCZNIE tego cennika — główne stawki wynajmu zostają na 2dp.
+    // Math.round (nie ceil) chroni przed pełzaniem w górę przy round-tripie (szum float64).
+    const convDmg = (v: number) => {
+      const out = conv(v);
+      return newCur === 'EUR' ? Math.round(out) : out;
+    };
     setPricePerTon(prev => conv(prev));
     setPricePerWeek1(prev => conv(prev));
-    setLossPrice(prev => conv(prev));
-    setSortingPrice(prev => conv(prev));
-    setGrindingPrice(prev => conv(prev));
-    setWeldingPrice(prev => conv(prev));
-    setCuttingPrice(prev => conv(prev));
-    setRepairPrice(prev => conv(prev));
+    setLossPrice(prev => convDmg(prev));
+    setSortingPrice(prev => convDmg(prev));
+    setGrindingPrice(prev => convDmg(prev));
+    setWeldingPrice(prev => convDmg(prev));
+    setCuttingPrice(prev => convDmg(prev));
+    setRepairPrice(prev => convDmg(prev));
     // Transport "w walucie oferty" — toggle musi go przeliczyć
     // (patrz docs/CURRENCY-CONVERSION-PATTERN.md).
     if (typeof transportCostPerTruck === 'number' && transportCostPerTruck > 0) {

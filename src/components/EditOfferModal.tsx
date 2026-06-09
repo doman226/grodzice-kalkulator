@@ -135,14 +135,20 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
     // Helper z src/lib/currency.ts — single source of truth.
     // Wynajem używa precision='cents' (symetryczne 2dp w obie strony).
     const conv = (v: number) => convertCurrencyValue(v, currency, newCur, exchangeRate, 'cents');
+    // Ceny szkód i napraw: zaokrąglone do pełnych EUR (tylko ten cennik;
+    // główne stawki wynajmu zostają na 2dp). Math.round — stabilny przy round-tripie.
+    const convDmg = (v: number) => {
+      const out = conv(v);
+      return newCur === 'EUR' ? Math.round(out) : out;
+    };
     setCustomBasePricePln(prev => conv(prev));
     setCustomPricePerWeek1(prev => conv(prev));
-    setLossPrice(prev     => conv(prev));
-    setSortingPrice(prev  => conv(prev));
-    setGrindingPrice(prev => conv(prev));
-    setWeldingPrice(prev  => conv(prev));
-    setCuttingPrice(prev  => conv(prev));
-    setRepairPrice(prev   => conv(prev));
+    setLossPrice(prev     => convDmg(prev));
+    setSortingPrice(prev  => convDmg(prev));
+    setGrindingPrice(prev => convDmg(prev));
+    setWeldingPrice(prev  => convDmg(prev));
+    setCuttingPrice(prev  => convDmg(prev));
+    setRepairPrice(prev   => convDmg(prev));
     // Transport "w walucie oferty" — toggle musi go przeliczyć
     // (patrz docs/CURRENCY-CONVERSION-PATTERN.md).
     if (typeof transportCostPerTruck === 'number' && transportCostPerTruck > 0) {
