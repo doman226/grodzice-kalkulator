@@ -3,10 +3,11 @@
 // w PipeSaleCalculator. Zmiana listy w jednym miejscu automatycznie aktualizuje
 // typy literałowe (PipeProductType, PipeCondition, PipeNorm, PipeSurface).
 
+// Kolejność = kolejność w dropdownie; [0] to DOMYŚLNY typ w kalkulatorze i edycji.
 export const PIPE_PRODUCT_TYPES = [
+  'Rury stalowe ze szwem',
   'Rury stalowe ze szwem spiralnym',
   'Rury stalowe ze szwem wzdłużnym',
-  'Rury stalowe ze szwem',
   'Rury stalowe bezszwowe',
 ] as const;
 export type PipeProductType = typeof PIPE_PRODUCT_TYPES[number];
