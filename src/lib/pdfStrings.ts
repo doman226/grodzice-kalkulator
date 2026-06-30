@@ -1102,7 +1102,7 @@ export interface PipeSalePdfStrings {
   techConditionMixed: string;                            // mieszane stany — wg tabeli
   techGrades:         (gradesList: string) => string;    // "S235JRH, S275JR"
   techSurfaceSingle:  (surface: string) => string;
-  techSurfaceMixed:   string;                            // mieszane powierzchnie — wg tabeli
+  techSurfaceMultiple: (surfacesList: string) => string; // kilka powierzchni — wypisz wszystkie (jak gatunek/norma)
 
   // Płatność
   paymentPrepaid: string;
@@ -1203,7 +1203,7 @@ const pipeSale_pl: PipeSalePdfStrings = {
   techConditionMixed: 'Stan materiału: wg specyfikacji w tabeli (część pozycji bez atestu — patrz kolumna "Specyfikacja").',
   techGrades:         gradesList => `Gatunek stali: ${gradesList}.`,
   techSurfaceSingle:  surface => `Powierzchnia: ${surface}.`,
-  techSurfaceMixed:   'Powierzchnia: wg specyfikacji w tabeli.',
+  techSurfaceMultiple: list   => `Powierzchnia: ${list}.`,
 
   paymentPrepaid: 'przedpłata 100%.',
   paymentCredit:  days =>
@@ -1302,7 +1302,7 @@ const pipeSale_en: PipeSalePdfStrings = {
   techConditionMixed: 'Material condition: according to specification in the table (some items without certificate — see "Specification" column).',
   techGrades:         gradesList => `Steel grade: ${gradesList}.`,
   techSurfaceSingle:  surface => `Surface: ${surface}.`,
-  techSurfaceMixed:   'Surface: according to specification in the table.',
+  techSurfaceMultiple: list   => `Surface: ${list}.`,
 
   paymentPrepaid: '100% prepayment.',
   paymentCredit:  days =>

@@ -323,10 +323,12 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
     ? t.techConditionSingle(translatePipeAttr(conditions[0], PIPE_CONDITIONS_EN, lang))
     : t.techConditionMixed;
 
-  // Powierzchnia — 2 warianty
+  // Powierzchnia — jak gatunek/norma: wypisz WSZYSTKIE wybrane wartości
+  // (NIE odsyłaj do tabeli — powierzchnia nie ma kolumny w tabeli pozycji).
+  // Pusta lista (oferta samych zamków) = linia ukryta w renderze (surfaces.length > 0).
   const surfaceLine = surfaces.length === 1
     ? t.techSurfaceSingle(translatePipeAttr(surfaces[0], PIPE_SURFACES_EN, lang))
-    : t.techSurfaceMixed;
+    : t.techSurfaceMultiple(surfaces.map(srf => translatePipeAttr(srf, PIPE_SURFACES_EN, lang)).join(', '));
 
   return (
     <Document title={t.docTitle(offer.offer_number)} author="Intra B.V." language={t.docLanguage}>
@@ -722,7 +724,9 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
           {grades.length > 0 && (
             <Text style={s.conditionItem}>- {t.techGrades(grades.join(', '))}</Text>
           )}
-          <Text style={[s.conditionItem, { marginBottom: 0 }]}>- {surfaceLine}</Text>
+          {surfaces.length > 0 && (
+            <Text style={[s.conditionItem, { marginBottom: 0 }]}>- {surfaceLine}</Text>
+          )}
         </View>
 
         {/* ── WARUNKI HANDLOWE ── */}
