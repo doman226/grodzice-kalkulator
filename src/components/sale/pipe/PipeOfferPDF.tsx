@@ -429,15 +429,21 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
               // Tłumaczenie atrybutów PL→EN (w bazie zapisane po polsku)
               const productTypeT = translatePipeAttr(item.product_type, PIPE_PRODUCT_TYPES_EN, lang);
               const conditionT   = translatePipeAttr(item.condition, PIPE_CONDITIONS_EN, lang);
+              const surfaceT     = translatePipeAttr(item.surface, PIPE_SURFACES_EN, lang);
 
               return (
                 <View key={item.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
-                  {/* Specyfikacja: 2 linie (produkt + stan) */}
+                  {/* Specyfikacja: produkt + stan (+ powierzchnia per-pozycja gdy pozycje mają różne powłoki) */}
                   <View style={[s.tdLabel, { flex: 2.4 }]}>
                     <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.gray800, fontSize: 8 }}>
                       {productTypeT} Ø{formatNumber(item.diameter_mm, 1)} × {formatNumber(item.wall_thickness_mm, 1)} mm
                     </Text>
                     <Text style={s.specSubLine}>{conditionT}</Text>
+                    {surfaces.length > 1 && (
+                      <Text style={[s.specSubLine, { color: C.navyLight, fontFamily: 'Roboto', fontWeight: 700 }]}>
+                        {t.thSurfacePrefix} {surfaceT}
+                      </Text>
+                    )}
                   </View>
                   <Text style={[s.tdLabel, { flex: 1.1, color: C.gray700, fontFamily: 'Roboto', fontWeight: 700 }]}>
                     {item.norm ?? '—'}

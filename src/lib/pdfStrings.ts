@@ -1050,6 +1050,7 @@ export interface PipeSalePdfStrings {
   lockMassRow:      string;   // "Masa zamków" / "Interlock mass"
 
   // Table body
+  thSurfacePrefix: string;    // prefiks podlinii powierzchni per-pozycja ("Powierzchnia:" / "Surface:")
   unitPcs:         string;
   totalRow:        string;
 
@@ -1154,6 +1155,7 @@ const pipeSale_pl: PipeSalePdfStrings = {
   lockTotalRow:     'Łącznie',
   lockMassRow:      'Masa zamków',
 
+  thSurfacePrefix: 'Powierzchnia:',
   unitPcs:      'szt.',
   totalRow:     'RAZEM',
 
@@ -1253,6 +1255,7 @@ const pipeSale_en: PipeSalePdfStrings = {
   lockTotalRow:     'Total interlocks',
   lockMassRow:      'Interlock mass',
 
+  thSurfacePrefix: 'Surface:',
   unitPcs:      'pcs',
   totalRow:     'TOTAL',
 
