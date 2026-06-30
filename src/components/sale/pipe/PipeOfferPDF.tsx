@@ -323,12 +323,13 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
     ? t.techConditionSingle(translatePipeAttr(conditions[0], PIPE_CONDITIONS_EN, lang))
     : t.techConditionMixed;
 
-  // Powierzchnia — jak gatunek/norma: wypisz WSZYSTKIE wybrane wartości
-  // (NIE odsyłaj do tabeli — powierzchnia nie ma kolumny w tabeli pozycji).
+  // Powierzchnia w warunkach technicznych: jedna powłoka → konkretna wartość;
+  // wiele powłok → "wg specyfikacji w tabeli" (szczegół jest per-pozycja w kolumnie
+  // Specyfikacja — podlinia "Powierzchnia: X" przy każdej pozycji).
   // Pusta lista (oferta samych zamków) = linia ukryta w renderze (surfaces.length > 0).
   const surfaceLine = surfaces.length === 1
     ? t.techSurfaceSingle(translatePipeAttr(surfaces[0], PIPE_SURFACES_EN, lang))
-    : t.techSurfaceMultiple(surfaces.map(srf => translatePipeAttr(srf, PIPE_SURFACES_EN, lang)).join(', '));
+    : t.techSurfaceMixed;
 
   return (
     <Document title={t.docTitle(offer.offer_number)} author="Intra B.V." language={t.docLanguage}>
