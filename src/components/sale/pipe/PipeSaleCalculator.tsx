@@ -551,22 +551,12 @@ export default function PipeSaleCalculator({ clients, locks = [], onClientAdded,
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-gray-800">Pozycje oferty</h3>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={addItem}
-              className="px-3 py-1.5 text-sm font-medium text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
-            >
-              + Dodaj pozycję
-            </button>
-            <button
-              onClick={() => setShowSaveModal(true)}
-              disabled={!canSave}
-              title={!canSave ? 'Uzupełnij ilość/długość i cenę sprzedaży > 0 w każdej pozycji' : 'Zapisz ofertę do bazy z numerem SR/YYYY/NNN'}
-              className="px-3 py-1.5 text-sm font-medium bg-blue-900 text-white rounded-lg hover:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              Zapisz ofertę
-            </button>
-          </div>
+          <button
+            onClick={addItem}
+            className="px-3 py-1.5 text-sm font-medium text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            + Dodaj pozycję
+          </button>
         </div>
 
         {hasEmptyItems && (
@@ -1150,6 +1140,16 @@ export default function PipeSaleCalculator({ clients, locks = [], onClientAdded,
           </div>
         )}
       </div>
+
+      {/* Zapis oferty — na dole, identycznie jak w sprzedaży grodzic */}
+      <button
+        onClick={() => setShowSaveModal(true)}
+        disabled={!canSave}
+        title={!canSave ? 'Uzupełnij ilość/długość i cenę sprzedaży > 0 w każdej pozycji' : 'Zapisz ofertę do bazy z numerem SR/YYYY/NNN'}
+        className="w-full py-3 bg-green-700 hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl shadow-sm transition-colors"
+      >
+        💾 Zapisz jako ofertę SR
+      </button>
 
       {/* Modal zapisu oferty */}
       {showSaveModal && (
