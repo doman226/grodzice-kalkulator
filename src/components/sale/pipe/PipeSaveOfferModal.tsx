@@ -105,7 +105,11 @@ export default function PipeSaveOfferModal({
   const [deliveryTerms, setDeliveryTerms] = useState<'DAP' | 'DAP_EXTRA' | 'FCA' | 'CIF'>(
     delivery.paidBy === 'fca' ? 'FCA' : delivery.paidBy === 'cif' ? 'CIF' : delivery.paidBy === 'dap_extra' ? 'DAP_EXTRA' : 'DAP'
   );
-  const [fcaLocation, setFcaLocation]     = useState('');
+  // FCA: pre-fill lokalizacji odbioru z "Magazyn wysyłki" ustawionego w kalkulatorze
+  // (bez tego trzeba było wpisywać ją ponownie).
+  const [fcaLocation, setFcaLocation]     = useState(
+    delivery.paidBy === 'fca' && delivery.from ? delivery.from : '',
+  );
 
   // ── Nowy klient inline ──
   const [addingClient, setAddingClient] = useState(false);
@@ -124,6 +128,13 @@ export default function PipeSaveOfferModal({
   const lockTotalSellPLN = lockItems.reduce((s, i) => s + (i.totalSellPLN ?? 0), 0);
   const lockTotalCostEUR = lockItems.reduce((s, i) => s + (i.totalEUR ?? 0), 0);
   const lockTotalMassT   = lockItems.reduce((s, i) => s + (i.massT ?? 0), 0);
+
+  // Etykieta opcji dostawy z kalkulatora — do podsumowania transportu w modalu
+  const deliveryOptLabel = delivery.paidBy === 'dap_included' ? 'DAP – transport w cenie'
+    : delivery.paidBy === 'dap_extra' ? 'DAP – refaktura na klienta'
+    : delivery.paidBy === 'fca'       ? 'FCA – odbiór własny'
+    :                                   'CIF – odbiór z portu';
+  const isPickup = delivery.paidBy === 'fca' || delivery.paidBy === 'cif';
 
   async function lookupNip() {
     const nip = newClient.nip.replace(/[-\s]/g, '');
@@ -495,6 +506,25 @@ export default function PipeSaveOfferModal({
           {/* ── Warunki dostawy ── */}
           <section>
             <h3 className="text-sm font-semibold text-gray-800 mb-2">Warunki dostawy</h3>
+
+            {/* Podsumowanie transportu przeniesionego z kalkulatora (read-only) */}
+            <div className="mb-3 rounded-lg bg-blue-50 border border-blue-200 p-3 text-xs space-y-1">
+              <p className="font-semibold text-blue-900">Transport (przeniesiony z kalkulatora):</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-gray-700">
+                <span>Opcja: <strong className="text-gray-900">{deliveryOptLabel}</strong></span>
+                {isPickup
+                  ? (delivery.from && <span>📦 Odbiór z: <strong>{delivery.from}</strong></span>)
+                  : ((delivery.from || delivery.to) && <span>🚛 {delivery.from}{delivery.to ? ` → ${delivery.to}` : ''}</span>)}
+                {delivery.trucks > 0 && delivery.costPerTruck > 0 && (
+                  <span>
+                    {delivery.trucks} {delivery.trucks === 1 ? 'auto' : 'aut'} × {currency === 'EUR' ? formatEUR(delivery.costPerTruck) : formatPLN(delivery.costPerTruck)} {currency}
+                    {' = '}<strong className="text-gray-900">{currency === 'EUR' ? formatEUR(delivery.trucks * delivery.costPerTruck) : formatPLN(delivery.trucks * delivery.costPerTruck)} {currency}</strong>
+                  </span>
+                )}
+              </div>
+              <p className="text-gray-400">Trasę / liczbę aut / koszt zmienisz w kalkulatorze. Poniżej ustawiasz etykietę Incoterms na ofercie i PDF.</p>
+            </div>
+
             <div className="flex gap-2 mb-2 flex-wrap">
               {(['DAP', 'DAP_EXTRA', 'FCA', 'CIF'] as const).map(t => (
                 <button key={t}
