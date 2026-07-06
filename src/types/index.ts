@@ -100,6 +100,7 @@ export interface SaleOffer {
   client_id?: string;
   client?: Client;
   task_name?: string;
+  is_used?: boolean;   // true = oferta na grodzice używane (bez normy/certyfikatu + dopisek w PDF)
   status: OfferStatus;
   notes?: string;
   valid_days: number;

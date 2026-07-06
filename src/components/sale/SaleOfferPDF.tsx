@@ -190,6 +190,7 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
   const currency    = offer.currency ?? 'EUR';
   const exchRate    = offer.exchange_rate ?? 4.25;
   const isEUR       = currency === 'EUR';
+  const isUsed      = offer.is_used === true;   // grodzice używane → skrócona sekcja techniczna
 
   // Nagłówki kolumn zależne od waluty oferty
   const thPriceT  = isEUR ? t.thPricePerT  : (lang === 'pl' ? 'Cena [PLN/t]'   : 'Price [PLN/t]');
@@ -686,11 +687,23 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
         {/* ── WARUNKI TECHNICZNE ── */}
         <Text style={s.sectionTitle}>{t.sectionTechnical}</Text>
         <View style={s.conditionsBox}>
-          <Text style={s.conditionItem}>{t.techStandard}</Text>
-          <Text style={s.conditionItem}>{t.techGrade}</Text>
-          <Text style={s.conditionItem}>{t.techTolerance}</Text>
-          <Text style={s.conditionItem}>{t.techCert}</Text>
-          <Text style={s.conditionItem}>{t.techWeighing}</Text>
+          {isUsed ? (
+            <>
+              <Text style={[s.conditionItem, { fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{t.techUsedLabel}</Text>
+              <Text style={s.conditionItem}>{t.techNoStandard}</Text>
+              <Text style={s.conditionItem}>{t.techNoCert}</Text>
+              <Text style={s.conditionItem}>{t.techWeighing}</Text>
+              <Text style={s.conditionItem}>{t.techUsedNote}</Text>
+            </>
+          ) : (
+            <>
+              <Text style={s.conditionItem}>{t.techStandard}</Text>
+              <Text style={s.conditionItem}>{t.techGrade}</Text>
+              <Text style={s.conditionItem}>{t.techTolerance}</Text>
+              <Text style={s.conditionItem}>{t.techCert}</Text>
+              <Text style={s.conditionItem}>{t.techWeighing}</Text>
+            </>
+          )}
           {!isEUR && (
             <Text style={[s.conditionItem, { marginBottom: 0 }]}>
               {t.techCurrencyPLN(exchRate)}

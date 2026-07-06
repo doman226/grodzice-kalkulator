@@ -118,6 +118,11 @@ export interface PdfStrings {
   techTolerance:    string;
   techCert:         string;
   techWeighing:     string;
+  // Grodzice używane – wariant skrócony sekcji technicznej
+  techUsedLabel:    string;
+  techNoStandard:   string;
+  techNoCert:       string;
+  techUsedNote:     string;
   techCurrencyEUR:  string;
   techCurrencyPLN:  (rate: number) => string;
 
@@ -219,6 +224,10 @@ const pl: PdfStrings = {
   techTolerance:   '- tolerancja długości +-200mm.',
   techCert:        '- certyfikat 3.1/EN10204.',
   techWeighing:    '- fakturowanie wg. wagi teoretycznej.',
+  techUsedLabel:   'Grodzice używane:',
+  techNoStandard:  '- bez normy',
+  techNoCert:      '- bez certyfikatu',
+  techUsedNote:    'Grodzice używane mogą posiadać ślady użytkowania, w tym zabrudzenia, przylegającą ziemię, rdzę, pozostałości powłok ochronnych, otwory technologiczne, ślady spawania i cięcia oraz uszkodzenia mechaniczne i odchyłki wymiarowe wynikające z eksploatacji.',
   techCurrencyEUR: '- ceny podane w EUR netto.',
   techCurrencyPLN: _rate => `- oferta kalkulowana po kursie €/zł z dnia przesłania oferty.`,
 
@@ -323,6 +332,10 @@ const en: PdfStrings = {
   techTolerance:   '- length tolerance ±200 mm.',
   techCert:        '- mill certificate 3.1 / EN 10204.',
   techWeighing:    '- invoicing based on theoretical weight.',
+  techUsedLabel:   'Used sheet piles:',
+  techNoStandard:  '- no standard',
+  techNoCert:      '- no certificate',
+  techUsedNote:    'Used sheet piles may show signs of use, including dirt, adhering soil, rust, residues of protective coatings, technological holes, welding and cutting marks, as well as mechanical damage and dimensional deviations resulting from operation.',
   techCurrencyEUR: '- prices quoted in EUR net.',
   techCurrencyPLN: _rate => `- quotation calculated at the EUR/PLN exchange rate on the date of issue.`,
 
