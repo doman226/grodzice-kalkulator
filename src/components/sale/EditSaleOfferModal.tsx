@@ -167,6 +167,7 @@ export default function EditSaleOfferModal({
   // ── Podstawowe pola ──
   const [clientId,    setClientId]    = useState(offer.client_id ?? '');
   const [taskName,    setTaskName]    = useState(offer.task_name ?? '');
+  const [isUsed,      setIsUsed]      = useState(offer.is_used ?? false);
   const [preparedBy,  setPreparedBy]  = useState(offer.prepared_by ?? SALES_REPS[0].name);
   const [notes,       setNotes]       = useState(offer.notes ?? '');
   const [validDays,   setValidDays]   = useState(offer.valid_days);
@@ -400,6 +401,7 @@ export default function EditSaleOfferModal({
     const offerPayload = {
       client_id:                 clientId,
       task_name:                 taskName.trim() || null,
+      is_used:                   isUsed,
       notes:                     notes.trim() || null,
       valid_days:                validDays,
       payment_days:              paymentDays,
@@ -1029,6 +1031,20 @@ export default function EditSaleOfferModal({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nazwa zadania (opcjonalnie)</label>
             <input type="text" value={taskName} maxLength={35} onChange={e => setTaskName(e.target.value)} placeholder="np. Budowa S5 odcinek Korzeńsko" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+
+          {/* ── Grodzice używane ── */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+              <input type="checkbox" checked={isUsed} onChange={e => setIsUsed(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+              Grodzice używane
+            </label>
+            {isUsed && (
+              <p className="mt-1 text-xs text-amber-700">
+                Sekcja techniczna PDF: bez normy, bez certyfikatu + dopisek o śladach użytkowania.
+              </p>
+            )}
           </div>
 
           {/* ── Opiekun handlowy ── */}
