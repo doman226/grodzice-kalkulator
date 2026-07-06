@@ -107,6 +107,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
   const [deliveryFrom, setDeliveryFrom]                 = useState('Magazyn Intra B.V.');
   const [deliveryTo, setDeliveryTo]                     = useState('');
   const [taskName, setTaskName]                         = useState('');
+  const [isUsed, setIsUsed]                             = useState(false);
 
   const exchangeRate = nbpRate.rate;
 
@@ -1176,6 +1177,20 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
 
+            {/* Grodzice używane */}
+            <div className="mb-4">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                <input type="checkbox" checked={isUsed} onChange={e => setIsUsed(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                Grodzice używane
+              </label>
+              {isUsed && (
+                <p className="mt-1 text-xs text-amber-700">
+                  W PDF: bez normy, bez certyfikatu + dopisek o śladach użytkowania (zamiast standardowych warunków technicznych).
+                </p>
+              )}
+            </div>
+
             {/* Trasa */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
@@ -1328,6 +1343,7 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
             exchangeRate={exchangeRate}
             nbpDate={nbpRate.date}
             taskName={taskName}
+            isUsed={isUsed}
             delivery={deliveryCalc ? {
               trucks:       deliveryCalc.trucks,
               costPerTruck: deliveryCalc.costPerTruck,
