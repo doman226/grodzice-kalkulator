@@ -1035,16 +1035,22 @@ export default function EditSaleOfferModal({
 
           {/* ── Grodzice używane ── */}
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+            <label className={`flex items-start gap-2.5 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+              isUsed ? 'border-amber-400 bg-amber-50' : 'border-gray-200 hover:border-gray-300'
+            }`}>
               <input type="checkbox" checked={isUsed} onChange={e => setIsUsed(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-              Grodzice używane
+                className="accent-amber-600 mt-0.5 w-4 h-4" />
+              <span>
+                <span className={`block text-sm font-semibold ${isUsed ? 'text-amber-800' : 'text-gray-800'}`}>
+                  {isUsed ? '⚠️ ' : ''}Grodzice używane
+                </span>
+                <span className={`block text-xs mt-0.5 ${isUsed ? 'text-amber-700' : 'text-gray-400'}`}>
+                  {isUsed
+                    ? 'Sekcja techniczna PDF: bez normy, bez certyfikatu + dopisek o śladach użytkowania.'
+                    : 'Zaznacz dla oferty na grodzice używane.'}
+                </span>
+              </span>
             </label>
-            {isUsed && (
-              <p className="mt-1 text-xs text-amber-700">
-                Sekcja techniczna PDF: bez normy, bez certyfikatu + dopisek o śladach użytkowania.
-              </p>
-            )}
           </div>
 
           {/* ── Opiekun handlowy ── */}
