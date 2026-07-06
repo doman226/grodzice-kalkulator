@@ -1177,26 +1177,6 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
 
-            {/* Grodzice używane */}
-            <div className="mb-4">
-              <label className={`flex items-start gap-2.5 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
-                isUsed ? 'border-amber-400 bg-amber-50' : 'border-gray-200 hover:border-gray-300'
-              }`}>
-                <input type="checkbox" checked={isUsed} onChange={e => setIsUsed(e.target.checked)}
-                  className="accent-amber-600 mt-0.5 w-4 h-4" />
-                <span>
-                  <span className={`block text-sm font-semibold ${isUsed ? 'text-amber-800' : 'text-gray-800'}`}>
-                    {isUsed ? '⚠️ ' : ''}Grodzice używane
-                  </span>
-                  <span className={`block text-xs mt-0.5 ${isUsed ? 'text-amber-700' : 'text-gray-400'}`}>
-                    {isUsed
-                      ? 'W PDF: bez normy, bez certyfikatu + dopisek o śladach użytkowania (zamiast standardowych warunków technicznych).'
-                      : 'Zaznacz dla oferty na grodzice używane.'}
-                  </span>
-                </span>
-              </label>
-            </div>
-
             {/* Trasa */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
@@ -1272,6 +1252,26 @@ export default function SaleCalculator({ clients, locks, onClientAdded, onOfferS
                 )}
               </div>
             )}
+          </div>
+
+          {/* Grodzice używane – atrybut produktu/oferty, poza sekcją transportu */}
+          <div className="mb-3">
+            <label className={`flex items-start gap-2.5 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+              isUsed ? 'border-amber-400 bg-amber-50' : 'border-gray-200 bg-white hover:border-gray-300'
+            }`}>
+              <input type="checkbox" checked={isUsed} onChange={e => setIsUsed(e.target.checked)}
+                className="accent-amber-600 mt-0.5 w-4 h-4" />
+              <span>
+                <span className={`block text-sm font-semibold ${isUsed ? 'text-amber-800' : 'text-gray-800'}`}>
+                  {isUsed ? '⚠️ ' : ''}Grodzice używane
+                </span>
+                <span className={`block text-xs mt-0.5 ${isUsed ? 'text-amber-700' : 'text-gray-400'}`}>
+                  {isUsed
+                    ? 'W PDF: bez normy, bez certyfikatu + dopisek o śladach użytkowania (zamiast standardowych warunków technicznych).'
+                    : 'Zaznacz dla oferty na grodzice używane.'}
+                </span>
+              </span>
+            </label>
           </div>
 
           {/* Przycisk zapisu oferty */}
