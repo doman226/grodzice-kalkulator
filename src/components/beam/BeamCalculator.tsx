@@ -1,0 +1,677 @@
+import { useState, useMemo, useEffect } from 'react';
+import type { BeamProfile, BeamRentalPrices, Client, BeamRentalOffer } from '../../types';
+import { BEAM_STEEL_GRADES } from '../../types';
+import { calculateRentalCost, formatPLN, formatEUR, formatRound, formatNumber } from '../../lib/calculations';
+import { convertCurrencyValue } from '../../lib/currency';
+import BeamSaveOfferModal, { type BeamOfferItemInput } from './BeamSaveOfferModal';
+
+interface NBPRate { rate: number; date: string; }
+
+interface Props {
+  profiles: BeamProfile[];
+  prices: BeamRentalPrices;
+  clients: Client[];
+  onClientAdded: (client: Client) => void;
+  onOfferSaved: (offer: BeamRentalOffer) => void;
+}
+
+interface CalcItem {
+  uid: string;
+  profileId: string;
+  steelGrade: string;
+  quantityPcs: number | '';
+  lengthM: number | '';
+}
+
+export default function BeamCalculator({ profiles, prices, clients, onClientAdded, onOfferSaved }: Props) {
+  const [items, setItems] = useState<CalcItem[]>([
+    { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: BEAM_STEEL_GRADES[0], quantityPcs: '', lengthM: '' },
+  ]);
+  const [basePeriodMonths, setBasePeriodMonths] = useState<number>(prices.base_period_months ?? 3);
+
+  // Cena PLN/t wpisywana ręcznie (domyślnie z globalnych ustawień)
+  const [pricePerTon, setPricePerTon] = useState<number>(prices.rent_price_per_ton_pln);
+  const [extraWeekPrice, setExtraWeekPrice] = useState<number>(prices.extra_week_price_per_ton_pln);
+  // Cennik szkód (override globalnych ustawień dla tej oferty)
+  const [lossPrice, setLossPrice] = useState<number>(prices.loss_price_pln ?? 0);
+  const [sortingPrice, setSortingPrice] = useState<number>(prices.sorting_price_pln ?? 0);
+  const [weldingPrice, setWeldingPrice] = useState<number>(prices.welding_price_pln ?? 0);
+  const [cuttingPrice, setCuttingPrice] = useState<number>(prices.cutting_price_pln ?? 0);
+  const [repairPrice, setRepairPrice] = useState<number>(prices.repair_price_pln ?? 0);
+  const [liftingHolePrice, setLiftingHolePrice] = useState<number>(prices.lifting_hole_price_pln ?? 0);
+
+  // Waluta i kurs
+  const [currency, setCurrency]     = useState<'EUR' | 'PLN'>('PLN');
+  const [manualRate, setManualRate] = useState(4.25);
+  const [nbpRate, setNbpRate]       = useState<NBPRate | null>(null);
+  const [nbpLoading, setNbpLoading] = useState(false);
+  const exchangeRate = nbpRate?.rate ?? manualRate;
+
+  // Reset lokalnych cen gdy globalne ustawienia się zmienią
+  useEffect(() => {
+    setPricePerTon(prices.rent_price_per_ton_pln);
+    setExtraWeekPrice(prices.extra_week_price_per_ton_pln);
+    setBasePeriodMonths(prices.base_period_months ?? 3);
+    setLossPrice(prices.loss_price_pln ?? 0);
+    setSortingPrice(prices.sorting_price_pln ?? 0);
+    setWeldingPrice(prices.welding_price_pln ?? 0);
+    setCuttingPrice(prices.cutting_price_pln ?? 0);
+    setRepairPrice(prices.repair_price_pln ?? 0);
+    setLiftingHolePrice(prices.lifting_hole_price_pln ?? 0);
+  }, [prices.updated_at]);
+
+  useEffect(() => {
+    setNbpLoading(true);
+    fetch('https://api.nbp.pl/api/exchangerates/rates/A/EUR/last/1/?format=json')
+      .then(r => r.json())
+      .then(d => { setNbpRate({ rate: d.rates[0].mid, date: d.rates[0].effectiveDate }); setManualRate(d.rates[0].mid); })
+      .catch(() => {})
+      .finally(() => setNbpLoading(false));
+  }, []);
+
+  const [showSaveModal, setShowSaveModal] = useState(false);
+
+  // Transport
+  const TRUCK_CAPACITY_T = 24.5;
+  const [transportCostPerTruck, setTransportCostPerTruck] = useState<number | ''>('');
+  const [customTrucks, setCustomTrucks] = useState<number | ''>('');
+  const [transportPaidBy, setTransportPaidBy] = useState<'dap_included' | 'dap_extra' | 'fca'>('dap_included');
+  const WAREHOUSE_PRESET = 'Cieśle 42, 56400, PL';
+  const WAREHOUSE_PRESET_CZ = 'Pohraniční 3272/130, 703 00 Ostrava, CZ';
+  const [transportFrom, setTransportFrom] = useState(WAREHOUSE_PRESET);
+  const [taskName, setTaskName] = useState('');
+  const [transportTo, setTransportTo] = useState('');
+
+  // --- Zarządzanie pozycjami ---
+  function addItem() {
+    setItems(prev => [
+      ...prev,
+      { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: BEAM_STEEL_GRADES[0], quantityPcs: '', lengthM: '' },
+    ]);
+  }
+
+  function removeItem(uid: string) {
+    setItems(prev => prev.filter(i => i.uid !== uid));
+  }
+
+  function updateItem(uid: string, patch: Partial<CalcItem>) {
+    setItems(prev => prev.map(i => i.uid === uid ? { ...i, ...patch } : i));
+  }
+
+  function handleCurrencyChange(newCur: 'EUR' | 'PLN') {
+    if (newCur === currency) return;
+    // Helper z src/lib/currency.ts — single source of truth. Wynajem: precision='cents'.
+    const conv = (v: number) => convertCurrencyValue(v, currency, newCur, exchangeRate, 'cents');
+    // Ceny szkód: pełne kwoty EUR zaokrąglone (Math.round, nie ceil — bez pełzania).
+    const convDmg = (v: number) => {
+      const out = conv(v);
+      return newCur === 'EUR' ? Math.round(out) : out;
+    };
+    setPricePerTon(prev => conv(prev));
+    setExtraWeekPrice(prev => conv(prev));
+    setLossPrice(prev => convDmg(prev));
+    setSortingPrice(prev => convDmg(prev));
+    setWeldingPrice(prev => convDmg(prev));
+    setCuttingPrice(prev => convDmg(prev));
+    setRepairPrice(prev => convDmg(prev));
+    setLiftingHolePrice(prev => convDmg(prev));
+    if (typeof transportCostPerTruck === 'number' && transportCostPerTruck > 0) {
+      setTransportCostPerTruck(conv(transportCostPerTruck));
+    }
+    setCurrency(newCur);
+  }
+
+  // --- Wyliczenia per pozycja (mass = szt × L × kg/m / 1000; bez pow. ścianki) ---
+  const itemResults = useMemo(() =>
+    items.map(item => {
+      const profile = profiles.find(p => p.id === item.profileId) ?? null;
+      const qty = Number(item.quantityPcs) || 0;
+      const lengthM = Number(item.lengthM) || 0;
+      if (!profile || qty <= 0 || lengthM <= 0) {
+        return { profile, totalLengthM: 0, massT: 0, valid: false };
+      }
+      const totalLengthM = qty * lengthM;
+      const massT = (totalLengthM * profile.weight_kg_per_m) / 1000;
+      return { profile, totalLengthM, massT, valid: true };
+    }),
+    [items, profiles]
+  );
+
+  const totals = useMemo(() => {
+    let totalLengthM = 0, totalMassT = 0;
+    for (const r of itemResults) {
+      if (!r.valid) continue;
+      totalLengthM += r.totalLengthM;
+      totalMassT += r.massT;
+    }
+    return { totalLengthM, totalMassT };
+  }, [itemResults]);
+
+  const isValid = totals.totalMassT > 0;
+  const allItemsValid = items.length > 0 && itemResults.every(r => r.valid);
+  const [showItemError, setShowItemError] = useState(false);
+
+  function handleSaveClick() {
+    if (!allItemsValid) { setShowItemError(true); return; }
+    setShowItemError(false);
+    setShowSaveModal(true);
+  }
+
+  const rentalCost = useMemo(() =>
+    isValid ? calculateRentalCost(totals.totalMassT, pricePerTon) : 0,
+    [totals.totalMassT, pricePerTon, isValid]
+  );
+  const rentalCostPLN = currency === 'PLN' ? rentalCost : rentalCost * exchangeRate;
+  const rentalCostEUR = currency === 'EUR' ? rentalCost : rentalCost / exchangeRate;
+
+  const transportCalc = useMemo(() => {
+    if (!isValid) return null;
+    const autoTrucks = Math.ceil(totals.totalMassT / TRUCK_CAPACITY_T);
+    const trucks = typeof customTrucks === 'number' && customTrucks > 0 ? customTrucks : autoTrucks;
+    const costPerTruck = typeof transportCostPerTruck === 'number' ? transportCostPerTruck : 0;
+    return { trucks, autoTrucks, costPerTruck, totalCost: trucks * costPerTruck };
+  }, [isValid, totals.totalMassT, transportCostPerTruck, customTrucks]);
+
+  const totalCostInclTransport = useMemo(() => {
+    if (!transportCalc || transportPaidBy !== 'dap_included') return rentalCost;
+    return rentalCost + transportCalc.totalCost;
+  }, [rentalCost, transportCalc, transportPaidBy]);
+
+  const offerItems = useMemo((): BeamOfferItemInput[] =>
+    items.flatMap((item, idx) => {
+      const r = itemResults[idx];
+      if (!r.profile || !r.valid) return [];
+      return [{
+        profileId: item.profileId,
+        profileName: r.profile.name,
+        series: r.profile.series,
+        weightKgPerM: r.profile.weight_kg_per_m,
+        steelGrade: item.steelGrade,
+        quantityPcs: Number(item.quantityPcs) || 0,
+        lengthM: Number(item.lengthM) || 0,
+        totalLengthM: r.totalLengthM,
+        massT: r.massT,
+      }];
+    }),
+    [items, itemResults]
+  );
+
+  const effectivePricesForOffer = useMemo((): BeamRentalPrices => ({
+    ...prices,
+    rent_price_per_ton_pln: pricePerTon,
+    base_period_months: basePeriodMonths,
+    extra_week_price_per_ton_pln: extraWeekPrice,
+    loss_price_pln: lossPrice,
+    sorting_price_pln: sortingPrice,
+    welding_price_pln: weldingPrice,
+    cutting_price_pln: cuttingPrice,
+    repair_price_pln: repairPrice,
+    lifting_hole_price_pln: liftingHolePrice,
+  }), [prices, pricePerTon, basePeriodMonths, extraWeekPrice, lossPrice, sortingPrice, weldingPrice, cuttingPrice, repairPrice, liftingHolePrice]);
+
+  return (
+    <div className="space-y-6">
+
+      {/* ── POZYCJE OFERTY ── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-800">Pozycje oferty</h2>
+          <button
+            onClick={addItem}
+            className="px-3 py-1.5 text-sm font-medium text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            + Dodaj pozycję
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          {items.map((item, idx) => {
+            const r = itemResults[idx];
+            const profile = r.profile;
+            const qtyInvalid = !(Number(item.quantityPcs) > 0);
+            const lenInvalid = !(Number(item.lengthM) > 0);
+            return (
+              <div key={item.uid} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-3 bg-gray-50 rounded-lg border border-gray-200">
+                {/* Profil */}
+                <div className="sm:col-span-3">
+                  {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Profil dwuteownika</label>}
+                  <select
+                    value={item.profileId}
+                    onChange={e => updateItem(item.uid, { profileId: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.series})</option>
+                    ))}
+                  </select>
+                  {profile && (
+                    <p className="text-xs text-gray-400 mt-0.5">{profile.weight_kg_per_m} kg/m</p>
+                  )}
+                </div>
+
+                {/* Gatunek stali */}
+                <div className="sm:col-span-3">
+                  {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Gatunek stali</label>}
+                  <select
+                    value={item.steelGrade}
+                    onChange={e => updateItem(item.uid, { steelGrade: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    {BEAM_STEEL_GRADES.map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Ilość */}
+                <div className="sm:col-span-2">
+                  {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Ilość [szt.]</label>}
+                  <input
+                    type="number" min={1} step={1} placeholder="np. 10"
+                    value={item.quantityPcs}
+                    onChange={e => updateItem(item.uid, { quantityPcs: e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0) })}
+                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${qtyInvalid ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`}
+                  />
+                  {qtyInvalid && <p className="text-xs text-red-600 mt-0.5">Wpisz ilość</p>}
+                </div>
+
+                {/* Długość */}
+                <div className="sm:col-span-2">
+                  {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Długość [m]</label>}
+                  <input
+                    type="number" min={0.1} step={0.5} placeholder="np. 12"
+                    value={item.lengthM}
+                    onChange={e => updateItem(item.uid, { lengthM: e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0) })}
+                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${lenInvalid ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`}
+                  />
+                  {lenInvalid && <p className="text-xs text-red-600 mt-0.5">Wpisz długość</p>}
+                </div>
+
+                {/* Masa tej pozycji */}
+                <div className="sm:col-span-3">
+                  {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Masa pozycji</label>}
+                  <div className="rounded-lg bg-white border border-gray-200 px-3 py-2 text-sm text-gray-700 min-h-[38px] flex items-center">
+                    {r.valid
+                      ? <span className="font-semibold">{formatNumber(r.massT, 3)} t</span>
+                      : <span className="text-gray-400">—</span>
+                    }
+                  </div>
+                </div>
+
+                {/* Usuń */}
+                <div className="sm:col-span-1 flex justify-end">
+                  {items.length > 1 && (
+                    <button
+                      onClick={() => removeItem(item.uid)}
+                      className="w-9 h-9 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200 transition-colors"
+                      title="Usuń pozycję"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Podstawowy okres dzierżawy (informacyjny, w miesiącach) */}
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-sm font-medium text-gray-700">Podstawowy okres dzierżawy</span>
+            <span className="text-xs text-gray-400">(informacyjnie – nie wpływa na cenę)</span>
+          </div>
+          <div className="max-w-xs">
+            <label className="block text-xs text-gray-500 mb-1">Miesiące</label>
+            <input
+              type="number" min={1} step={1}
+              value={basePeriodMonths}
+              onChange={e => setBasePeriodMonths(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            Na ofercie: <strong>{(() => { const m = basePeriodMonths; if (m === 1) return '1 miesiąc'; if (m % 10 >= 2 && m % 10 <= 4 && (m % 100 < 10 || m % 100 >= 20)) return `${m} miesiące`; return `${m} miesięcy`; })()}</strong>
+          </p>
+        </div>
+
+        {/* Cena wynajmu i waluta */}
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          {/* Toggle EUR/PLN */}
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-sm font-medium text-gray-700">Waluta oferty</span>
+            <div className="flex rounded-lg border border-gray-300 overflow-hidden text-xs font-medium">
+              {(['PLN', 'EUR'] as const).map(c => (
+                <button key={c} type="button"
+                  onClick={() => handleCurrencyChange(c)}
+                  className={`px-4 py-1.5 transition-colors ${currency === c ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Kurs – widoczny tylko przy EUR */}
+          {currency === 'EUR' && (
+            <div className="mb-3 flex items-start gap-4 flex-wrap">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Kurs EUR/PLN</label>
+                <div className="flex items-center gap-2">
+                  <input type="number" min={1} step={0.0001}
+                    value={manualRate}
+                    onChange={e => { setManualRate(parseFloat(e.target.value) || 4.25); setNbpRate(null); }}
+                    className="w-28 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button onClick={() => {
+                    setNbpLoading(true);
+                    fetch('https://api.nbp.pl/api/exchangerates/rates/A/EUR/last/1/?format=json')
+                      .then(r => r.json())
+                      .then(d => { setNbpRate({ rate: d.rates[0].mid, date: d.rates[0].effectiveDate }); setManualRate(d.rates[0].mid); })
+                      .catch(() => {})
+                      .finally(() => setNbpLoading(false));
+                  }} className="px-2 py-1.5 text-xs bg-blue-50 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-100">
+                    {nbpLoading ? '...' : '↻ NBP'}
+                  </button>
+                </div>
+                {nbpRate && <p className="text-xs text-gray-400 mt-1">NBP: {nbpRate.rate.toFixed(4)} PLN (tabela z {nbpRate.date})</p>}
+              </div>
+              <div className="text-xs text-gray-500 bg-blue-50 rounded-lg px-3 py-2 border border-blue-100 self-end">
+                <p className="font-medium text-blue-700 mb-0.5">1 EUR = {exchangeRate.toFixed(4)} PLN</p>
+                {isValid && <p>Koszt ≈ {formatPLN(rentalCostPLN)} PLN</p>}
+              </div>
+            </div>
+          )}
+
+          {/* Cena i stawka tygodniowa */}
+          <div className="grid grid-cols-2 gap-4 max-w-lg">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Cena wynajmu [{currency}/t]</label>
+              <input
+                type="number" min={0} step={1}
+                value={pricePerTon}
+                onChange={e => setPricePerTon(parseFloat(e.target.value) || 0)}
+                className="w-full border border-blue-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-blue-50 font-semibold"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 whitespace-nowrap">Każdy kolejny tydzień [{currency}/t]</label>
+              <input
+                type="number" min={0} step={1}
+                value={extraWeekPrice}
+                onChange={e => setExtraWeekPrice(parseFloat(e.target.value) || 0)}
+                className="w-full border border-blue-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-blue-50 font-semibold"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Cennik szkód i napraw */}
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <p className="text-sm font-medium text-gray-700 mb-3">Cennik szkód i napraw</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {[
+              { label: `Zagubienie / strata [${currency}/t]`, value: lossPrice, set: setLossPrice },
+              { label: `Sortowanie i czyszczenie [${currency}/t]`, value: sortingPrice, set: setSortingPrice },
+              { label: `Spawanie otworów [${currency}/szt]`, value: weldingPrice, set: setWeldingPrice },
+              { label: `Głowica tnąca [${currency}/cięcie]`, value: cuttingPrice, set: setCuttingPrice },
+              { label: `Naprawa / prostowanie [${currency}/mb]`, value: repairPrice, set: setRepairPrice },
+              { label: `Nowy otwór do podnoszenia [${currency}/szt]`, value: liftingHolePrice, set: setLiftingHolePrice },
+            ].map(({ label, value, set }) => (
+              <div key={label}>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+                <input
+                  type="number" min={0} step={1}
+                  value={value}
+                  onChange={e => set(parseFloat(e.target.value) || 0)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── WYNIKI ── */}
+      {isValid && (
+        <>
+          {/* Dane wynajmu */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Dane wynajmu – łącznie</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <ResultCard label="Masa całkowita" value={formatNumber(totals.totalMassT, 3)} unit="t" />
+            </div>
+            {items.length > 1 && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-2">Rozkład pozycji</p>
+                <div className="space-y-1">
+                  {itemResults.map((r, idx) => r.valid && (
+                    <div key={items[idx].uid} className="flex justify-between text-sm text-gray-600">
+                      <span>{r.profile!.name} – {items[idx].quantityPcs} szt. × {items[idx].lengthM} m</span>
+                      <span className="font-medium">{formatNumber(r.massT, 3)} t</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Koszt dzierżawy */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Koszt dzierżawy</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <ResultCard label="Koszt łączny"
+                value={currency === 'EUR' ? formatEUR(totalCostInclTransport) : formatPLN(totalCostInclTransport)}
+                unit={currency === 'EUR' ? `EUR  ≈ ${formatPLN(totalCostInclTransport * exchangeRate)} PLN` : 'PLN'}
+                highlight />
+              <ResultCard label="Każdy kolejny tydzień"
+                value={currency === 'EUR' ? formatEUR(totals.totalMassT * extraWeekPrice) : formatPLN(totals.totalMassT * extraWeekPrice)}
+                unit={`${currency}/tydz.`} />
+              <ResultCard label="Koszt / tonę"
+                value={formatRound(totals.totalMassT > 0 ? totalCostInclTransport / totals.totalMassT : 0)}
+                unit={`${currency}/t`} />
+            </div>
+          </div>
+
+          {/* Transport */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">Koszty transportu</h2>
+            <p className="text-xs text-gray-400 mb-4">
+              Ładowność 1 auta: ~{TRUCK_CAPACITY_T} t &nbsp;·&nbsp;
+              Masa: {formatNumber(totals.totalMassT, 3)} t &nbsp;·&nbsp;
+              Szacowana liczba aut: <strong className="text-gray-700">{transportCalc?.autoTrucks ?? '—'}</strong>
+            </p>
+
+            {/* Opcja transportu – 3 przyciski */}
+            <div className="mb-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Opcja transportu:</p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                {([
+                  { val: 'dap_included', label: 'DAP – transport w cenie', desc: 'Intra organizuje i pokrywa koszt' },
+                  { val: 'dap_extra',    label: 'DAP – refaktura na klienta', desc: 'Intra organizuje, klient płaci osobno' },
+                  { val: 'fca',          label: 'FCA – odbiór własny',        desc: 'Klient podstawia swoje auto' },
+                ] as const).map(({ val, label, desc }) => (
+                  <label key={val} className={`flex-1 flex items-start gap-2.5 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                    transportPaidBy === val ? 'border-blue-700 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}>
+                    <input type="radio" name="beamTransportPaidBy" value={val} checked={transportPaidBy === val}
+                      onChange={() => setTransportPaidBy(val)} className="accent-blue-900 mt-0.5" />
+                    <span>
+                      <span className="block text-sm font-semibold text-gray-800">{label}</span>
+                      <span className="block text-xs text-gray-400 mt-0.5">{desc}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Pola kosztów – ukryte tylko dla FCA */}
+            {transportPaidBy !== 'fca' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Liczba aut</label>
+                  <input type="number" min={1} step={1}
+                    value={customTrucks === '' ? 1 : customTrucks}
+                    onChange={e => setCustomTrucks(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <p className="text-xs text-gray-400 mt-1">Szacunek: {transportCalc?.autoTrucks ?? '—'} aut</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Koszt / auto [{currency}]
+                    {currency === 'EUR' && <span className="ml-1 text-xs text-blue-600 font-normal">(wpisz w EUR)</span>}
+                  </label>
+                  <input type="number" min={0} step={currency === 'EUR' ? 10 : 100}
+                    value={transportCostPerTruck}
+                    placeholder={currency === 'EUR' ? 'np. 600' : 'np. 2500'}
+                    onChange={e => setTransportCostPerTruck(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value)))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  {currency === 'EUR' && typeof transportCostPerTruck === 'number' && transportCostPerTruck > 0 && (
+                    <p className="text-xs text-gray-400 mt-1">≈ {formatPLN(transportCostPerTruck * exchangeRate)} PLN / auto</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Nazwa zadania (opcjonalnie) */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nazwa zadania (opcjonalnie)</label>
+              <input type="text" value={taskName} maxLength={35}
+                onChange={e => setTaskName(e.target.value)}
+                placeholder="np. Budowa hali – Wrocław"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+
+            {/* Trasa – zawsze widoczna */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {transportPaidBy === 'fca' ? 'Odbiór z (magazyn)' : 'Załadunek (magazyn)'}
+                </label>
+                <select
+                  value={transportFrom === WAREHOUSE_PRESET ? WAREHOUSE_PRESET : transportFrom === WAREHOUSE_PRESET_CZ ? WAREHOUSE_PRESET_CZ : '__custom__'}
+                  onChange={e => setTransportFrom(e.target.value === '__custom__' ? '' : e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value={WAREHOUSE_PRESET}>Magazyn Intra B.V. (Cieśle 42, 56400, PL)</option>
+                  <option value={WAREHOUSE_PRESET_CZ}>Magazyn Intra B.V. (Pohraniční 3272/130, 703 00 Ostrava, CZ)</option>
+                  <option value="__custom__">Inny adres…</option>
+                </select>
+                {transportFrom !== WAREHOUSE_PRESET && transportFrom !== WAREHOUSE_PRESET_CZ && (
+                  <input type="text" value={transportFrom} placeholder="Wpisz adres magazynu"
+                    onChange={e => setTransportFrom(e.target.value)}
+                    className="w-full mt-1.5 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                )}
+              </div>
+              {transportPaidBy !== 'fca' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Dostawa (adres budowy)</label>
+                  <input type="text" value={transportTo} placeholder="ul. Przykładowa 1, Warszawa"
+                    onChange={e => setTransportTo(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              )}
+            </div>
+
+            {/* Podsumowanie kosztów – dla DAP gdy wpisano koszt */}
+            {transportCalc && transportCalc.costPerTruck > 0 && transportPaidBy !== 'fca' && (
+              <div className="mt-2 pt-4 border-t border-gray-100 flex flex-wrap gap-4">
+                <div className={`rounded-lg px-5 py-3 text-right ${transportPaidBy === 'dap_extra' ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-200'}`}>
+                  <p className="text-xs text-gray-500 mb-0.5">
+                    {transportCalc.trucks} auto{transportCalc.trucks > 1 ? 'a' : ''} × {currency === 'EUR' ? formatEUR(transportCalc.costPerTruck) : formatPLN(transportCalc.costPerTruck)} {currency}
+                  </p>
+                  <p className="text-xl font-bold text-gray-800">
+                    {currency === 'EUR' ? formatEUR(transportCalc.totalCost) : formatPLN(transportCalc.totalCost)} {currency}
+                  </p>
+                  {currency === 'EUR' && (
+                    <p className="text-xs text-gray-400">≈ {formatPLN(transportCalc.totalCost * exchangeRate)} PLN</p>
+                  )}
+                  <p className={`text-xs font-medium mt-0.5 ${transportPaidBy === 'dap_extra' ? 'text-orange-600' : 'text-gray-500'}`}>
+                    {transportPaidBy === 'dap_extra' ? '⚠ Refaktura na klienta' : 'Koszt po stronie Intra B.V.'}
+                  </p>
+                </div>
+                {transportPaidBy === 'dap_included' && (
+                  <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
+                    <p className="text-blue-200 text-xs mb-0.5">Łączny koszt dla klienta (dzierżawa + transport)</p>
+                    <p className="text-2xl font-bold">
+                      {currency === 'EUR' ? formatEUR(totalCostInclTransport) : formatPLN(totalCostInclTransport)} {currency}
+                    </p>
+                    <p className="text-blue-300 text-xs mt-0.5">
+                      dzierżawa {currency === 'EUR' ? formatEUR(rentalCost) : formatPLN(rentalCost)} + transport {currency === 'EUR' ? formatEUR(transportCalc.totalCost) : formatPLN(transportCalc.totalCost)} {currency}
+                    </p>
+                  </div>
+                )}
+                {transportPaidBy === 'dap_extra' && (
+                  <div className="bg-blue-900 rounded-lg px-5 py-3 text-white">
+                    <p className="text-blue-200 text-xs mb-0.5">Koszt dzierżawy (na ofercie)</p>
+                    <p className="text-2xl font-bold">
+                      {currency === 'EUR' ? `${formatEUR(rentalCost)} EUR` : `${formatPLN(rentalCost)} PLN`}
+                    </p>
+                    <p className="text-orange-300 text-xs mt-0.5">
+                      + {currency === 'EUR' ? `${formatEUR(transportCalc.totalCost)} EUR` : `${formatPLN(transportCalc.totalCost)} PLN`} transport (refaktura)
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Przycisk zapisu */}
+          {showItemError && !allItemsValid && (
+            <div className="bg-red-50 border border-red-300 rounded-xl p-4 text-red-700 text-sm text-center font-medium">
+              Uzupełnij ilość i długość we wszystkich pozycjach — pozycje bez wartości nie mogą zostać zapisane.
+            </div>
+          )}
+          <button
+            onClick={handleSaveClick}
+            className={`w-full py-3 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors ${allItemsValid ? 'bg-green-700 hover:bg-green-600' : 'bg-gray-300 cursor-not-allowed'}`}
+          >
+            💾 Zapisz jako ofertę
+          </button>
+        </>
+      )}
+
+      {!isValid && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5 text-yellow-700 text-sm text-center">
+          Dodaj przynajmniej jedną pozycję z poprawnymi danymi, aby zobaczyć wyniki kalkulacji.
+        </div>
+      )}
+
+      {/* Modal zapisu */}
+      {showSaveModal && isValid && allItemsValid && transportCalc && (
+        <BeamSaveOfferModal
+          clients={clients}
+          offerItems={offerItems}
+          basePeriodMonths={basePeriodMonths}
+          extraWeekPricePerTon={extraWeekPrice}
+          pricePerTon={pricePerTon}
+          totals={{
+            massT: totals.totalMassT,
+            totalLengthM: totals.totalLengthM,
+            rentalCostPLN: rentalCostPLN,
+            rentalCostEUR: rentalCostEUR,
+            costPerTon: totals.totalMassT > 0 ? totalCostInclTransport / totals.totalMassT : 0,
+          }}
+          currency={currency}
+          exchangeRate={exchangeRate}
+          nbpDate={nbpRate?.date ?? ''}
+          transport={{ trucks: transportCalc.trucks, costPerTruck: transportCalc.costPerTruck, totalCost: transportCalc.totalCost, paidBy: transportPaidBy, from: transportFrom, to: transportTo }}
+          prices={effectivePricesForOffer}
+          taskName={taskName}
+          onClientAdded={onClientAdded}
+          onSaved={(offer) => { onOfferSaved(offer); setShowSaveModal(false); }}
+          onClose={() => setShowSaveModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+interface ResultCardProps { label: string; value: string; unit: string; highlight?: boolean; }
+function ResultCard({ label, value, unit, highlight = false }: ResultCardProps) {
+  return (
+    <div className={`rounded-lg p-4 ${highlight ? 'bg-blue-900 text-white' : 'bg-gray-50 text-gray-800'}`}>
+      <p className={`text-xs font-medium uppercase tracking-wide mb-1 ${highlight ? 'text-blue-200' : 'text-gray-500'}`}>{label}</p>
+      <p className={`text-2xl font-bold ${highlight ? 'text-white' : 'text-gray-900'}`}>{value}</p>
+      <p className={`text-xs mt-0.5 ${highlight ? 'text-blue-300' : 'text-gray-400'}`}>{unit}</p>
+    </div>
+  );
+}

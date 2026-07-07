@@ -1,0 +1,637 @@
+import { useState, useMemo, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
+import type { BeamRentalOffer, BeamProfile, BeamRentalPrices, Client, BeamRentalOfferItem } from '../../types';
+import { BEAM_STEEL_GRADES } from '../../types';
+import { calculateRentalCost, formatPLN, formatEUR, formatNumber } from '../../lib/calculations';
+import { convertCurrencyValue } from '../../lib/currency';
+import ClientSearchInput from '../ClientSearchInput';
+import { SALES_REPS } from '../../lib/constants';
+
+interface NBPRate { rate: number; date: string; }
+
+interface CalcItem {
+  uid: string;
+  profileId: string;
+  steelGrade: string;
+  quantityPcs: number | '';
+  lengthM: number | '';
+}
+
+interface Props {
+  offer: BeamRentalOffer;
+  profiles: BeamProfile[];
+  prices: BeamRentalPrices;
+  clients: Client[];
+  onSaved: (offer: BeamRentalOffer) => void;
+  onClose: () => void;
+  mode?: 'edit' | 'copy';
+}
+
+const TRUCK_CAPACITY_T = 24.5;
+const WAREHOUSE_PRESET = 'Cieśle 42, 56400, PL';
+const WAREHOUSE_PRESET_CZ = 'Pohraniční 3272/130, 703 00 Ostrava, CZ';
+
+function itemsFromOffer(offer: BeamRentalOffer, profiles: BeamProfile[]): CalcItem[] {
+  if (offer.items && offer.items.length > 0) {
+    return offer.items
+      .slice()
+      .sort((a: BeamRentalOfferItem, b: BeamRentalOfferItem) => a.sort_order - b.sort_order)
+      .map((item: BeamRentalOfferItem) => {
+        const profile = profiles.find(p => p.name === item.profile_name);
+        return {
+          uid: crypto.randomUUID(),
+          profileId: profile?.id ?? profiles[0]?.id ?? '',
+          steelGrade: item.steel_grade ?? BEAM_STEEL_GRADES[0],
+          quantityPcs: item.quantity_pcs,
+          lengthM: item.length_m,
+        };
+      });
+  }
+  return [{ uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: BEAM_STEEL_GRADES[0], quantityPcs: '', lengthM: '' }];
+}
+
+export default function BeamEditOfferModal({ offer, profiles, prices, clients, onSaved, onClose, mode = 'edit' }: Props) {
+  const isCopy = mode === 'copy';
+  const [items, setItems] = useState<CalcItem[]>(() => itemsFromOffer(offer, profiles));
+  const [basePeriodMonths, setBasePeriodMonths] = useState<number>(offer.base_period_months ?? prices.base_period_months ?? 3);
+  const [clientId, setClientId] = useState(offer.client_id ?? '');
+  const [taskName, setTaskName] = useState(offer.task_name ?? '');
+  const [notes, setNotes] = useState(offer.notes ?? '');
+  const [deliveryInfo, setDeliveryInfo] = useState(offer.delivery_info ?? '');
+  const [validDays, setValidDays] = useState(offer.valid_days);
+  const [paymentDays, setPaymentDays] = useState(offer.payment_days ?? 30);
+  const [transportCostPerTruck, setTransportCostPerTruck] = useState<number | ''>(
+    offer.delivery_cost_per_truck != null
+      ? (offer.currency === 'EUR' && offer.exchange_rate
+          ? Math.round(offer.delivery_cost_per_truck / offer.exchange_rate * 100) / 100
+          : offer.delivery_cost_per_truck)
+      : ''
+  );
+  const [customTrucks, setCustomTrucks] = useState<number | ''>(offer.delivery_trucks ?? '');
+  const [transportPaidBy, setTransportPaidBy] = useState<'dap_included' | 'dap_extra' | 'fca'>(
+    (offer.delivery_paid_by as 'dap_included' | 'dap_extra' | 'fca') ?? 'dap_included'
+  );
+  const [transportFrom, setTransportFrom] = useState(offer.delivery_from ?? WAREHOUSE_PRESET);
+  const [transportTo, setTransportTo] = useState(offer.delivery_to ?? '');
+  const [preparedBy, setPreparedBy] = useState(offer.prepared_by ?? SALES_REPS[0].name);
+
+  // Waluta i kurs
+  const [currency, setCurrency]     = useState<'EUR' | 'PLN'>(offer.currency ?? 'PLN');
+  const [manualRate, setManualRate] = useState(offer.exchange_rate ?? 4.25);
+  const [nbpRate, setNbpRate]       = useState<NBPRate | null>(null);
+  const [nbpLoading, setNbpLoading] = useState(false);
+  const exchangeRate = nbpRate?.rate ?? manualRate;
+
+  useEffect(() => {
+    setNbpLoading(true);
+    fetch('https://api.nbp.pl/api/exchangerates/rates/A/EUR/last/1/?format=json')
+      .then(r => r.json())
+      .then(d => { setNbpRate({ rate: d.rates[0].mid, date: d.rates[0].effectiveDate }); setManualRate(d.rates[0].mid); })
+      .catch(() => {})
+      .finally(() => setNbpLoading(false));
+  }, []);
+
+  // Cena wynajmu / t (ze snapshotu oferty — items[0].price_per_ton lub rental_cost/total_mass)
+  const initPricePerTon = (offer.items && offer.items.length > 0)
+    ? offer.items[0].price_per_ton
+    : ((offer.total_mass_t ?? 0) > 0 ? (offer.rental_cost_total ?? 0) / (offer.total_mass_t ?? 1) : 0);
+  const [pricePerTon, setPricePerTon] = useState<number>(initPricePerTon);
+  const [extraWeekPrice, setExtraWeekPrice] = useState<number>(offer.extra_week_price_per_ton ?? prices.extra_week_price_per_ton_pln ?? 0);
+
+  // Ceny szkód — ze snapshotu oferty (są w walucie oferty)
+  const [lossPrice, setLossPrice]             = useState<number>(offer.loss_price_pln         ?? prices.loss_price_pln         ?? 0);
+  const [sortingPrice, setSortingPrice]       = useState<number>(offer.sorting_price_pln      ?? prices.sorting_price_pln      ?? 0);
+  const [weldingPrice, setWeldingPrice]       = useState<number>(offer.welding_price_pln      ?? prices.welding_price_pln      ?? 0);
+  const [cuttingPrice, setCuttingPrice]       = useState<number>(offer.cutting_price_pln      ?? prices.cutting_price_pln      ?? 0);
+  const [repairPrice, setRepairPrice]         = useState<number>(offer.repair_price_pln       ?? prices.repair_price_pln       ?? 0);
+  const [liftingHolePrice, setLiftingHolePrice] = useState<number>(offer.lifting_hole_price_pln ?? prices.lifting_hole_price_pln ?? 0);
+
+  function handleCurrencyChange(newCur: 'EUR' | 'PLN') {
+    if (newCur === currency) return;
+    const conv = (v: number) => convertCurrencyValue(v, currency, newCur, exchangeRate, 'cents');
+    const convDmg = (v: number) => {
+      const out = conv(v);
+      return newCur === 'EUR' ? Math.round(out) : out;
+    };
+    setPricePerTon(prev => conv(prev));
+    setExtraWeekPrice(prev => conv(prev));
+    setLossPrice(prev => convDmg(prev));
+    setSortingPrice(prev => convDmg(prev));
+    setWeldingPrice(prev => convDmg(prev));
+    setCuttingPrice(prev => convDmg(prev));
+    setRepairPrice(prev => convDmg(prev));
+    setLiftingHolePrice(prev => convDmg(prev));
+    if (typeof transportCostPerTruck === 'number' && transportCostPerTruck > 0) {
+      setTransportCostPerTruck(conv(transportCostPerTruck));
+    }
+    setCurrency(newCur);
+  }
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  function addItem() {
+    setItems(prev => [...prev, { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: BEAM_STEEL_GRADES[0], quantityPcs: '', lengthM: '' }]);
+  }
+  function removeItem(uid: string) {
+    setItems(prev => prev.filter(i => i.uid !== uid));
+  }
+  function updateItem(uid: string, patch: Partial<CalcItem>) {
+    setItems(prev => prev.map(i => i.uid === uid ? { ...i, ...patch } : i));
+  }
+
+  const itemResults = useMemo(() =>
+    items.map(item => {
+      const profile = profiles.find(p => p.id === item.profileId) ?? null;
+      const qty = Number(item.quantityPcs) || 0;
+      const lengthM = Number(item.lengthM) || 0;
+      if (!profile || qty <= 0 || lengthM <= 0) {
+        return { profile, totalLengthM: 0, massT: 0, valid: false };
+      }
+      const totalLengthM = qty * lengthM;
+      const massT = (totalLengthM * profile.weight_kg_per_m) / 1000;
+      return { profile, totalLengthM, massT, valid: true };
+    }),
+    [items, profiles]
+  );
+
+  const totals = useMemo(() => {
+    let totalLengthM = 0, totalMassT = 0;
+    for (const r of itemResults) {
+      if (!r.valid) continue;
+      totalLengthM += r.totalLengthM;
+      totalMassT += r.massT;
+    }
+    return { totalLengthM, totalMassT };
+  }, [itemResults]);
+
+  const rentalCost = useMemo(() =>
+    totals.totalMassT > 0 ? calculateRentalCost(totals.totalMassT, pricePerTon) : 0,
+    [totals.totalMassT, pricePerTon]
+  );
+  const rentalCostPLN = currency === 'PLN' ? rentalCost : rentalCost * exchangeRate;
+  const rentalCostEUR = currency === 'EUR' ? rentalCost : rentalCost / exchangeRate;
+
+  const transportCalc = useMemo(() => {
+    const autoTrucks = totals.totalMassT > 0 ? Math.ceil(totals.totalMassT / TRUCK_CAPACITY_T) : 0;
+    const trucks = typeof customTrucks === 'number' && customTrucks > 0 ? customTrucks : autoTrucks;
+    const costPerTruck = typeof transportCostPerTruck === 'number' ? transportCostPerTruck : 0;
+    return { trucks, autoTrucks, costPerTruck, totalCost: trucks * costPerTruck };
+  }, [totals.totalMassT, transportCostPerTruck, customTrucks]);
+
+  const validItems = itemResults.filter(r => r.valid);
+
+  async function handleSave() {
+    if (!clientId) return setError('Wybierz klienta.');
+    if (validItems.length === 0) return setError('Dodaj przynajmniej jedną pozycję.');
+    if (validItems.length !== items.length) return setError('Uzupełnij ilość i długość we wszystkich pozycjach — pozycje bez wartości nie mogą zostać zapisane.');
+    setSaving(true);
+    setError('');
+
+    const rentalCostMain = currency === 'EUR' ? rentalCostEUR : rentalCostPLN;
+
+    const transportCostPlnPerTruck = transportCalc.costPerTruck > 0
+      ? (currency === 'EUR' ? transportCalc.costPerTruck * exchangeRate : transportCalc.costPerTruck)
+      : null;
+    const transportCostPlnTotal = transportCalc.costPerTruck > 0
+      ? (currency === 'EUR' ? transportCalc.totalCost * exchangeRate : transportCalc.totalCost)
+      : null;
+
+    const offerPayload = {
+      client_id: clientId,
+      task_name: taskName.trim() || null,
+      base_period_months: basePeriodMonths,
+      extra_week_price_per_ton: extraWeekPrice,
+      total_mass_t: totals.totalMassT,
+      rental_cost_total: rentalCostMain,
+      rental_cost_pln: rentalCostPLN,
+      rental_cost_eur: rentalCostEUR,
+      currency,
+      exchange_rate: currency === 'EUR' ? exchangeRate : null,
+      loss_price_pln: lossPrice,
+      sorting_price_pln: sortingPrice,
+      welding_price_pln: weldingPrice,
+      cutting_price_pln: cuttingPrice,
+      repair_price_pln: repairPrice,
+      lifting_hole_price_pln: liftingHolePrice,
+      delivery_trucks: transportCalc.trucks,
+      delivery_cost_per_truck: transportCostPlnPerTruck,
+      delivery_cost_total: transportCostPlnTotal,
+      delivery_paid_by: transportPaidBy,
+      delivery_from: transportFrom || null,
+      delivery_to: transportTo || null,
+      delivery_info: deliveryInfo.trim() || null,
+      notes: notes.trim() || null,
+      valid_days: validDays,
+      payment_days: paymentDays,
+      prepared_by: preparedBy,
+    };
+
+    const newItems = items.flatMap((item, idx) => {
+      const r = itemResults[idx];
+      if (!r.profile || !r.valid) return [];
+      const valueTotal = r.massT * pricePerTon;
+      return [{
+        profile_id: r.profile.id,
+        profile_name: r.profile.name,
+        series: r.profile.series,
+        weight_kg_per_m: r.profile.weight_kg_per_m,
+        steel_grade: item.steelGrade,
+        quantity_pcs: Number(item.quantityPcs) || 0,
+        length_m: Number(item.lengthM) || 0,
+        total_length_m: r.totalLengthM,
+        mass_t: r.massT,
+        price_per_ton: pricePerTon,
+        value_total: valueTotal,
+        value_eur: currency === 'EUR' ? valueTotal : valueTotal / exchangeRate,
+        value_pln: currency === 'PLN' ? valueTotal : valueTotal * exchangeRate,
+        sort_order: idx,
+      }];
+    });
+
+    if (isCopy) {
+      // Kopia = INSERT nowej oferty (trigger nada numer OH)
+      const { data, error: err } = await supabase.from('beam_rental_offers').insert({
+        ...offerPayload,
+        offer_number: '',
+        status: 'szkic',
+        deleted_at: null,
+      }).select('*, client:clients(*)').single();
+
+      if (err) { setSaving(false); return setError('Błąd zapisu kopii: ' + err.message); }
+
+      const savedOffer = data as BeamRentalOffer;
+      const { data: insertedItems, error: itemsErr } = await supabase.from('beam_rental_offer_items').insert(
+        newItems.map(ni => ({ ...ni, offer_id: savedOffer.id }))
+      ).select();
+
+      if (itemsErr) {
+        await supabase.from('beam_rental_offers').update({ deleted_at: new Date().toISOString() }).eq('id', savedOffer.id);
+        setSaving(false);
+        return setError('Błąd zapisu pozycji kopii – oferta anulowana. Spróbuj ponownie: ' + itemsErr.message);
+      }
+      setSaving(false);
+      savedOffer.items = (insertedItems ?? []) as typeof savedOffer.items;
+      onSaved(savedOffer);
+    } else {
+      // Edycja = saga: UPDATE nagłówka → DELETE pozycji → INSERT pozycji
+      const { data, error: err } = await supabase.from('beam_rental_offers').update({
+        ...offerPayload,
+        updated_at: new Date().toISOString(),
+      }).eq('id', offer.id).select('*, client:clients(*)').single();
+
+      if (err) { setSaving(false); return setError('Błąd zapisu: ' + err.message); }
+
+      const { error: delErr } = await supabase.from('beam_rental_offer_items').delete().eq('offer_id', offer.id);
+      if (delErr) { setSaving(false); return setError('Błąd usuwania starych pozycji: ' + delErr.message); }
+
+      const { data: insertedItems, error: insErr } = await supabase.from('beam_rental_offer_items').insert(
+        newItems.map(ni => ({ ...ni, offer_id: offer.id }))
+      ).select();
+
+      if (insErr) {
+        setSaving(false);
+        return setError('Błąd zapisu pozycji — stare pozycje zostały usunięte. Otwórz edycję ponownie aby naprawić: ' + insErr.message);
+      }
+      setSaving(false);
+
+      const updatedOffer = data as BeamRentalOffer;
+      updatedOffer.items = (insertedItems ?? []) as typeof updatedOffer.items;
+      onSaved(updatedOffer);
+    }
+  }
+
+  const priceModified = pricePerTon !== initPricePerTon;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800">{isCopy ? 'Kopiuj ofertę' : 'Edytuj ofertę'}</h3>
+            <p className="text-xs text-gray-400 mt-0.5 font-mono">{isCopy ? `na podstawie ${offer.offer_number}` : offer.offer_number}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+        </div>
+
+        <div className="p-6 space-y-5">
+
+          {/* Pozycje */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-semibold text-gray-700">Pozycje oferty</h4>
+              <button onClick={addItem} className="px-3 py-1 text-xs font-medium text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50">
+                + Dodaj pozycję
+              </button>
+            </div>
+            <div className="space-y-2">
+              {items.map((item, idx) => {
+                const r = itemResults[idx];
+                return (
+                  <div key={item.uid} className="grid grid-cols-12 gap-2 items-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="col-span-3">
+                      {idx === 0 && <p className="text-xs text-gray-400 mb-1">Profil</p>}
+                      <select value={item.profileId} onChange={e => updateItem(item.uid, { profileId: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        {profiles.map(p => <option key={p.id} value={p.id}>{p.name} ({p.series})</option>)}
+                      </select>
+                    </div>
+                    <div className="col-span-3">
+                      {idx === 0 && <p className="text-xs text-gray-400 mb-1">Gatunek stali</p>}
+                      <select value={item.steelGrade} onChange={e => updateItem(item.uid, { steelGrade: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        {BEAM_STEEL_GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+                      </select>
+                    </div>
+                    <div className="col-span-2">
+                      {idx === 0 && <p className="text-xs text-gray-400 mb-1">Ilość</p>}
+                      <input type="number" min={1} placeholder="np. 10" value={item.quantityPcs}
+                        onChange={e => updateItem(item.uid, { quantityPcs: e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0) })}
+                        className={`w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 ${!(Number(item.quantityPcs) > 0) ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`} />
+                    </div>
+                    <div className="col-span-2">
+                      {idx === 0 && <p className="text-xs text-gray-400 mb-1">Dług. [m]</p>}
+                      <input type="number" min={0.1} step={0.5} placeholder="np. 12" value={item.lengthM}
+                        onChange={e => updateItem(item.uid, { lengthM: e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0) })}
+                        className={`w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 ${!(Number(item.lengthM) > 0) ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`} />
+                    </div>
+                    <div className="col-span-2">
+                      {idx === 0 && <p className="text-xs text-gray-400 mb-1">Masa</p>}
+                      <div className="rounded-lg bg-white border border-gray-200 px-2 py-1.5 text-sm text-gray-700 min-h-[34px] flex items-center">
+                        {r.valid ? <span className="font-semibold">{formatNumber(r.massT, 3)} t</span> : <span className="text-gray-400">—</span>}
+                      </div>
+                    </div>
+                    <div className="col-span-12 flex justify-end -mt-1">
+                      {items.length > 1 && (
+                        <button onClick={() => removeItem(item.uid)}
+                          className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200 transition-colors text-xs px-2 py-1">
+                          ✕ usuń pozycję
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {totals.totalMassT > 0 && (
+              <div className="mt-2 flex gap-4 text-xs text-gray-500 px-1">
+                <span>Masa łączna: <strong className="text-gray-800">{formatNumber(totals.totalMassT, 3)} t</strong></span>
+                <span>Koszt: <strong className="text-blue-900">
+                  {currency === 'EUR' ? `${formatEUR(rentalCost)} EUR` : `${formatPLN(rentalCost)} PLN`}
+                </strong></span>
+              </div>
+            )}
+          </div>
+
+          {/* Okres + ważność + płatność */}
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Podstawowy okres [mies.]</label>
+              <input type="number" min={1} step={1} value={basePeriodMonths}
+                onChange={e => setBasePeriodMonths(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ważność oferty [dni]</label>
+              <input type="number" min={1} value={validDays}
+                onChange={e => setValidDays(Math.max(1, parseInt(e.target.value) || 30))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Termin płatności</label>
+              <select value={paymentDays} onChange={e => setPaymentDays(parseInt(e.target.value))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value={0}>Przedpłata</option>
+                <option value={7}>7 dni</option>
+                <option value={14}>14 dni</option>
+                <option value={21}>21 dni</option>
+                <option value={30}>30 dni</option>
+                <option value={60}>60 dni</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Waluta i kurs */}
+          <div className="border border-blue-200 rounded-lg p-4 bg-blue-50 space-y-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm font-semibold text-gray-700">Waluta oferty</span>
+              <div className="flex rounded-lg border border-gray-300 overflow-hidden text-xs font-medium">
+                {(['PLN', 'EUR'] as const).map(c => (
+                  <button key={c} type="button"
+                    onClick={() => handleCurrencyChange(c)}
+                    className={`px-4 py-1.5 transition-colors ${currency === c ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+              {currency === 'EUR' && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">Kurs EUR/PLN:</span>
+                  <input type="number" min={1} step={0.0001}
+                    value={manualRate}
+                    onChange={e => { setManualRate(parseFloat(e.target.value) || 4.25); setNbpRate(null); }}
+                    className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button onClick={() => {
+                    setNbpLoading(true);
+                    fetch('https://api.nbp.pl/api/exchangerates/rates/A/EUR/last/1/?format=json')
+                      .then(r => r.json())
+                      .then(d => { setNbpRate({ rate: d.rates[0].mid, date: d.rates[0].effectiveDate }); setManualRate(d.rates[0].mid); })
+                      .catch(() => {})
+                      .finally(() => setNbpLoading(false));
+                  }} className="px-2 py-1 text-xs bg-white border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-100">
+                    {nbpLoading ? '...' : '↻ NBP'}
+                  </button>
+                  {nbpRate && <span className="text-xs text-gray-400">NBP: {nbpRate.rate.toFixed(4)} ({nbpRate.date})</span>}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Ceny */}
+          <div className="border border-amber-200 rounded-lg p-4 bg-amber-50 space-y-3">
+            <h4 className="text-sm font-semibold text-gray-700">
+              Ceny wynajmu dla tej oferty
+              {priceModified && (
+                <span className="ml-2 px-2 py-0.5 bg-amber-200 text-amber-800 text-xs rounded-full font-semibold">zmodyfikowane</span>
+              )}
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Cena wynajmu [{currency}/t]</label>
+                <input type="number" min={0} step={1} value={pricePerTon}
+                  onChange={e => setPricePerTon(Math.max(0, parseFloat(e.target.value) || 0))}
+                  className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Każdy kolejny tydzień [{currency}/t]</label>
+                <input type="number" min={0} step={1} value={extraWeekPrice}
+                  onChange={e => setExtraWeekPrice(Math.max(0, parseFloat(e.target.value) || 0))}
+                  className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white" />
+              </div>
+            </div>
+            {totals.totalMassT > 0 && (
+              <div className="pt-2 border-t border-amber-200 text-sm text-gray-700">
+                Koszt przy tych cenach:
+                <strong className="text-blue-900 ml-1">
+                  {currency === 'EUR' ? `${formatEUR(rentalCost)} EUR  ≈ ${formatPLN(rentalCostPLN)} PLN` : `${formatPLN(rentalCost)} PLN`}
+                </strong>
+              </div>
+            )}
+          </div>
+
+          {/* Cennik szkód */}
+          <details className="border border-gray-200 rounded-lg">
+            <summary className="px-4 py-3 text-sm font-semibold text-gray-700 cursor-pointer select-none list-none flex items-center justify-between hover:bg-gray-50 rounded-lg">
+              <span>Cennik szkód i napraw</span>
+              <span className="text-xs font-normal text-gray-400 ml-2">({currency} / jedn.) ▸ rozwiń</span>
+            </summary>
+            <div className="px-4 pb-4 pt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {([
+                { label: `Zagubienie / strata [${currency}/t]`,        val: lossPrice,        set: (v: number) => setLossPrice(v)        },
+                { label: `Sortowanie i czyszczenie [${currency}/t]`,   val: sortingPrice,     set: (v: number) => setSortingPrice(v)     },
+                { label: `Spawanie otworów [${currency}/szt]`,         val: weldingPrice,     set: (v: number) => setWeldingPrice(v)     },
+                { label: `Głowica tnąca [${currency}/cięcie]`,         val: cuttingPrice,     set: (v: number) => setCuttingPrice(v)     },
+                { label: `Naprawa / prostowanie [${currency}/mb]`,     val: repairPrice,      set: (v: number) => setRepairPrice(v)      },
+                { label: `Nowy otwór do podnoszenia [${currency}/szt]`, val: liftingHolePrice, set: (v: number) => setLiftingHolePrice(v) },
+              ] as { label: string; val: number; set: (v: number) => void }[]).map(({ label, val, set }) => (
+                <div key={label}>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+                  <input type="number" min={0} step={0.01} value={val}
+                    onChange={e => set(Math.max(0, parseFloat(e.target.value) || 0))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              ))}
+            </div>
+          </details>
+
+          {/* Klient */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Klient</label>
+            <ClientSearchInput clients={clients} value={clientId} onChange={setClientId} />
+          </div>
+
+          {/* Nazwa zadania */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nazwa zadania (opcjonalnie)</label>
+            <input type="text" value={taskName} maxLength={35} onChange={e => setTaskName(e.target.value)} placeholder="np. Budowa hali – Wrocław" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+
+          {/* Transport */}
+          <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+            <h4 className="text-sm font-semibold text-gray-700">Transport
+              <span className="text-xs font-normal text-gray-400 ml-2">
+                (auto {TRUCK_CAPACITY_T} t, masa: {formatNumber(totals.totalMassT, 3)} t, auto: {transportCalc.autoTrucks} szt.)
+              </span>
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  Koszt / auto [{currency}]
+                  {currency === 'EUR' && <span className="ml-1 text-blue-600">(wpisz w EUR)</span>}
+                </label>
+                <input type="number" min={0} step={currency === 'EUR' ? 10 : 100}
+                  value={transportCostPerTruck}
+                  placeholder={currency === 'EUR' ? 'np. 600' : 'np. 2500'}
+                  onChange={e => setTransportCostPerTruck(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value)))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                {currency === 'EUR' && typeof transportCostPerTruck === 'number' && transportCostPerTruck > 0 && (
+                  <p className="text-xs text-gray-400 mt-1">≈ {formatPLN(transportCostPerTruck * exchangeRate)} PLN / auto</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  Liczba aut{typeof customTrucks === 'number' && customTrucks > 0 && <span className="ml-1 text-amber-600">(ręcznie)</span>}
+                </label>
+                <input type="number" min={1} step={1}
+                  value={customTrucks}
+                  placeholder={String(transportCalc.autoTrucks)}
+                  onChange={e => setCustomTrucks(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Załadunek</label>
+                <select
+                  value={transportFrom === WAREHOUSE_PRESET ? WAREHOUSE_PRESET : transportFrom === WAREHOUSE_PRESET_CZ ? WAREHOUSE_PRESET_CZ : '__custom__'}
+                  onChange={e => setTransportFrom(e.target.value === '__custom__' ? '' : e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value={WAREHOUSE_PRESET}>Magazyn Intra B.V. (Cieśle, PL)</option>
+                  <option value={WAREHOUSE_PRESET_CZ}>Magazyn Intra B.V. (Ostrava, CZ)</option>
+                  <option value="__custom__">Inny adres…</option>
+                </select>
+                {transportFrom !== WAREHOUSE_PRESET && transportFrom !== WAREHOUSE_PRESET_CZ && (
+                  <input type="text" value={transportFrom} placeholder="Wpisz adres magazynu"
+                    onChange={e => setTransportFrom(e.target.value)}
+                    className="w-full mt-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                )}
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Dostawa</label>
+                <input type="text" value={transportTo} onChange={e => setTransportTo(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <p className="text-xs text-gray-600 font-medium">Opcja transportu:</p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                {([
+                  { val: 'dap_included', label: 'DAP – w cenie' },
+                  { val: 'dap_extra',    label: 'DAP – refaktura' },
+                  { val: 'fca',          label: 'FCA – odbiór własny' },
+                ] as const).map(({ val, label }) => (
+                  <label key={val} className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 cursor-pointer text-sm transition-colors ${
+                    transportPaidBy === val ? 'border-blue-700 bg-blue-50 font-semibold' : 'border-gray-200 hover:border-gray-300'
+                  }`}>
+                    <input type="radio" name="beamEditTransportPaidBy" value={val} checked={transportPaidBy === val}
+                      onChange={() => setTransportPaidBy(val)} className="accent-blue-900" />
+                    {label}
+                  </label>
+                ))}
+                {transportCalc.costPerTruck > 0 && transportPaidBy !== 'fca' && (
+                  <span className="ml-auto self-center text-sm font-semibold text-gray-700">
+                    {currency === 'EUR' ? `${formatEUR(transportCalc.totalCost)} EUR` : `${formatPLN(transportCalc.totalCost)} PLN`}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Opiekun handlowy */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Opiekun handlowy</label>
+            <select value={preparedBy} onChange={e => setPreparedBy(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              {SALES_REPS.map(r => (
+                <option key={r.name} value={r.name}>{r.name} – tel. {r.phone}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Termin dostawy */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Termin dostawy</label>
+            <input type="text" value={deliveryInfo} onChange={e => setDeliveryInfo(e.target.value)}
+              placeholder="np. 5-7 dni roboczych"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+
+          {/* Notatki */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notatki</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+
+          {error && <p className="text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+        </div>
+
+        <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">Anuluj</button>
+          <button onClick={handleSave} disabled={saving} className="px-6 py-2 text-sm text-white bg-blue-900 rounded-lg hover:bg-blue-800 font-medium disabled:opacity-50">
+            {saving ? 'Zapisywanie...' : isCopy ? 'Zapisz kopię' : 'Zapisz zmiany'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
