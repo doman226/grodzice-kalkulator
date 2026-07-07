@@ -690,8 +690,7 @@ export default function SaleOfferPDF({ offer, lang = 'pl' }: Props) {
           {isUsed ? (
             <>
               <Text style={[s.conditionItem, { fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{t.techUsedLabel}</Text>
-              <Text style={s.conditionItem}>{t.techNoStandard}</Text>
-              <Text style={s.conditionItem}>{t.techNoCert}</Text>
+              <Text style={s.conditionItem}>{t.techTolerance}</Text>
               <Text style={s.conditionItem}>{t.techWeighing}</Text>
               <Text style={s.conditionItem}>{t.techUsedNote}</Text>
             </>
