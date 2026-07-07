@@ -145,6 +145,7 @@ CREATE TABLE IF NOT EXISTS beam_rental_offers (
     CHECK (delivery_paid_by IS NULL OR delivery_paid_by IN ('dap_included','dap_extra','fca','cif')),
   delivery_from                 TEXT,
   delivery_to                   TEXT,
+  delivery_info                 TEXT,   -- termin dostawy (free-text, jak grodzice)
   -- Warunki dostawy (etykieta Incoterms)
   delivery_terms                TEXT
     CHECK (delivery_terms IS NULL OR delivery_terms IN ('DAP','DAP_EXTRA','FCA','CIF')),

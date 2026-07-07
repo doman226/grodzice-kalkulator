@@ -1018,6 +1018,305 @@ export const ROAD_PLATE_RENTAL_PDF_STRINGS: Record<PdfLang, RoadPlateRentalPdfSt
   en: roadPlate_en,
 };
 
+// ══════════════════════════════════════════════════════════════════════════════
+// BEAM RENTAL PDF STRINGS (dwuteowniki HEB/HEA/IPE — wynajem)
+// Osobny zestaw od grodzic. Tabela 7 kolumn (bez pow. ścianki / koszt/m²).
+// Cennik szkód wg dokumentu WITEK: loss/sorting/welding/cutting/repair/lifting_hole.
+// ══════════════════════════════════════════════════════════════════════════════
+
+export interface BeamRentalPdfStrings {
+  docTitle:      (offerNo: string) => string;
+  docLanguage:   string;
+  offerTitle:    string;
+
+  // Meta
+  date:          string;
+  offerNumber:   string;
+  salesRep:      string;
+  phone:         string;
+  customerLabel: string;
+  taskLabel:     string;
+  vatLabel:      (country: string) => string;
+
+  // Greeting & intro
+  greeting: string;
+  intro:    string;
+
+  // Table headers (7 kolumn: Profil, Gatunek, Ilość, Dług., kg/m, Masa, Koszt/t)
+  thProfile:    string;
+  thSteelGrade: string;
+  thQty:        string;
+  thLength:     string;
+  thKgPerM:     string;
+  thMass:       string;
+  thCostPerT:   string;
+  totalRow:     string;
+  unitPcs:      string;
+  rentalPeriodRow: string;
+
+  // Price box
+  rentalCostLabel:   string;
+  netSuffix:         string;
+  costPerTonLabel:   string;
+  exchangeRateLabel: string;
+
+  // Weekly rate box
+  weeklyRateTitle:  string;
+  weeklyRateSuffix: string;
+  weeklyRateNote:   string;
+
+  // Transport
+  sectionTransport:    string;
+  labelDelivery:       string;
+  labelRoute:          string;
+  labelTrucks:         string;
+  labelCostPerTruck:   string;
+  labelTotalTransport: string;
+  labelSettlement:     string;
+  labelPickupFrom:     string;
+  valueDapIncluded:    string;
+  valueDapExtra:       string;
+  valueFca:            string;
+  valueCif:            string;
+  valueRecharge:       string;
+
+  // Rental conditions
+  sectionRentalTerms: string;
+  rentalTerm1:        string;
+  rentalTerm1Fca:     string;
+  rentalTerm2:        string;
+  rentalTerm3:        string;
+  para1:              string;
+  para2:              (val: number | string, unit: string) => string;
+  para3:              string;
+  para4:              string;
+
+  // Damage schedule (6 pozycji wg dokumentu WITEK)
+  sectionDamages:    string;
+  damageLoss:        (val: number | string, unit: string) => string;
+  damageSorting:     (val: number | string, unit: string) => string;
+  damageWelding:     (val: number | string, unit: string) => string;
+  damageCutting:     (val: number | string, unit: string) => string;
+  damageRepair:      (val: number | string, unit: string) => string;
+  damageLiftingHole: (val: number | string, unit: string) => string;
+
+  // Delivery time
+  sectionDelivery:     string;
+  deliveryPlaceholder: string;
+
+  // Technical
+  sectionTechnical: string;
+  techStandard:     string;
+  techGrade:        string;
+  techTolerance:    string;
+  techWeighing:     string;
+
+  // Payment
+  sectionPayment:  string;
+  paymentPrepaid:  string;
+  paymentCredit:   (days: number) => string;
+
+  // Validity
+  sectionValidity:    string;
+  validityLine:       (label: string) => string;
+  validityLabel:      (days: number) => string;
+  validityDisclaimer: string;
+
+  // Notes
+  notesLabel: string;
+}
+
+// ─── BEAM RENTAL POLISH ───────────────────────────────────────────────────────
+
+const beam_pl: BeamRentalPdfStrings = {
+  docTitle:      offerNo => `Oferta ${offerNo}`,
+  docLanguage:   'pl',
+  offerTitle:    'OFERTA WYNAJMU',
+
+  date:          'Data:',
+  offerNumber:   'Numer oferty:',
+  salesRep:      'Opiekun handlowy:',
+  phone:         'Telefon:',
+  customerLabel: 'Dane klienta:',
+  taskLabel:     'Zadanie:',
+  vatLabel:      country => country === 'PL' ? 'NIP:' : 'VAT:',
+
+  greeting: 'Dzień dobry,',
+  intro:    'W nawiązaniu do przesłanego zapytania oraz naszych Ogólnych Warunków Sprzedaży i Płatności oferujemy usługę dzierżawy dwuteowników stalowych:',
+
+  thProfile:       'Profil',
+  thSteelGrade:    'Gatunek stali',
+  thQty:           'Ilość',
+  thLength:        'Dług. [m]',
+  thKgPerM:        'kg/m',
+  thMass:          'Masa [t]',
+  thCostPerT:      'Koszt/t',
+  totalRow:        'Łącznie',
+  unitPcs:         'szt.',
+  rentalPeriodRow: 'Podstawowy okres dzierżawy',
+
+  rentalCostLabel:   'Koszt dzierżawy',
+  netSuffix:         'netto',
+  costPerTonLabel:   'Koszt za tonę:',
+  exchangeRateLabel: 'Kurs EUR/PLN:',
+
+  weeklyRateTitle:  'KAŻDY KOLEJNY TYDZIEŃ WYNAJMU',
+  weeklyRateSuffix: '/tona netto',
+  weeklyRateNote:   'po upływie podstawowego okresu wynajmu',
+
+  sectionTransport:    'Transport:',
+  labelDelivery:       'Dostawa:',
+  labelRoute:          'Trasa:',
+  labelTrucks:         'Liczba aut:',
+  labelCostPerTruck:   'Koszt / auto:',
+  labelTotalTransport: 'Łączny koszt transportu:',
+  labelSettlement:     'Rozliczenie:',
+  labelPickupFrom:     'Odbiór z:',
+  valueDapIncluded:    'DAP – w cenie / Intra B.V.',
+  valueDapExtra:       'DAP / Intra B.V.',
+  valueFca:            'FCA – odbiór własny',
+  valueCif:            'CIF – odbiór z portu',
+  valueRecharge:       'Refaktura kosztów transportu na klienta',
+
+  sectionRentalTerms: 'Warunki dzierżawy:',
+  rentalTerm1: '1) Oferowana cena jest ceną z transportami po stronie Intra: magazyn - budowa. Zwrot do magazynu Intra BV (Cieśle 42 k. Wrocławia) jest obowiązkiem i kosztem Klienta.',
+  rentalTerm1Fca: '1) Transport dwuteowników po stronie Klienta (FCA – odbiór własny). Zwrot do magazynu Intra BV (Cieśle 42 k. Wrocławia) jest obowiązkiem i kosztem Klienta.',
+  rentalTerm2: '2) Załadunek i rozładunek na budowie po stronie Najemcy.',
+  rentalTerm3: '3) Podane ceny są cenami netto.',
+
+  para1: 'Pragniemy zaznaczyć, że są to kształtowniki wypożyczone i w każdym przypadku należy je zwrócić. Zwracamy uwagę, że zwrotowi mogą podlegać wyłącznie materiały dostarczone przez Intra.',
+  para2: (val, unit) => `Dostawa i zwrot materiału muszą nastąpić wg. EN10248-1/2. Za straty materialne, także spowodowane cięciami uszkodzonych części materiału, obciążymy Państwa dodatkową kwotą w wysokości ${val},- ${unit}/tona materiału.`,
+  para3: 'Kształtowniki po zwrocie muszą nadawać się do ponownego użycia – bez konieczności ponownej obróbki, czyszczenia oraz napraw. Nie mogą posiadać uszkodzeń, zabrudzeń, przylegającej ziemi i innych niedoskonałości ponad normatywne zużycie.',
+  para4: 'W przeciwnym razie obciążymy Państwa następującymi kosztami:',
+
+  sectionDamages: 'Cennik:',
+  damageLoss:        (val, unit) => `- Zagubienie / całkowita strata kształtowników = +${val},- ${unit} / tona;`,
+  damageSorting:     (val, unit) => `- Sortowanie oraz czyszczenie = +${val},- ${unit} / tona;`,
+  damageWelding:     (val, unit) => `- Spawanie (zamykanie) otworów = +${val},- ${unit} / szt.;`,
+  damageCutting:     (val, unit) => `- Głowica tnąca – w celu np. ucięcia uszkodzenia = +${val},- ${unit} / za cięcie;`,
+  damageRepair:      (val, unit) => `- Naprawa / prostowanie = +${val},- ${unit} / mb;`,
+  damageLiftingHole: (val, unit) => `- Nowy otwór do podnoszenia = +${val},- ${unit} / szt.;`,
+
+  sectionDelivery:     'Termin dostawy:',
+  deliveryPlaceholder: '- ............',
+
+  sectionTechnical: 'Warunki techniczne:',
+  techStandard:     '- dostawa wg. EN10248-1/2.',
+  techGrade:        '- gatunek stali zgodny z ofertą.',
+  techTolerance:    '- tolerancja długości +-200mm.',
+  techWeighing:     '- fakturowanie wg. wagi teoretycznej.',
+
+  sectionPayment:  'Warunki płatności:',
+  paymentPrepaid:  '- Przedpłata – płatność wymagana przed realizacją zlecenia.',
+  paymentCredit:   days => `- ${days} dni od daty wystawienia faktury, z zastrzeżeniem uzyskania zabezpieczenia wartości zamówienia (Limit kupiecki, gwarancja bankowa, gwarancja płatności publicznego inwestora lub inne zabezpieczenie zaakceptowane przez Intra BV).`,
+
+  sectionValidity:    'Ważność oferty:',
+  validityLine:       label => `- ${label} od daty przesłania oferty.`,
+  validityLabel:      days  => days === 1 ? '24 godziny' : `${days} dni`,
+  validityDisclaimer: 'Oferta nie rezerwuje dostępności z magazynu oraz możliwości produkcyjnych i wymaga finalnego potwierdzenia.',
+
+  notesLabel: 'Uwagi',
+};
+
+// ─── BEAM RENTAL ENGLISH ──────────────────────────────────────────────────────
+
+const beam_en: BeamRentalPdfStrings = {
+  docTitle:      offerNo => `Rental Offer ${offerNo}`,
+  docLanguage:   'en',
+  offerTitle:    'RENTAL OFFER',
+
+  date:          'Date:',
+  offerNumber:   'Offer No.:',
+  salesRep:      'Account Manager:',
+  phone:         'Phone:',
+  customerLabel: 'Customer:',
+  taskLabel:     'Project:',
+  vatLabel:      country => country === 'PL' ? 'Tax No.:' : 'VAT No.:',
+
+  greeting: 'Dear Sir or Madam,',
+  intro:    'With reference to your enquiry and our General Terms and Conditions of Rental and Payment, we are pleased to offer steel beams (H/I sections) for hire on the following terms:',
+
+  thProfile:       'Profile',
+  thSteelGrade:    'Steel grade',
+  thQty:           'Qty',
+  thLength:        'Length [m]',
+  thKgPerM:        'kg/m',
+  thMass:          'Mass [t]',
+  thCostPerT:      'Cost/t',
+  totalRow:        'Total',
+  unitPcs:         'pcs.',
+  rentalPeriodRow: 'Basic rental period',
+
+  rentalCostLabel:   'Rental cost',
+  netSuffix:         'net',
+  costPerTonLabel:   'Cost per ton:',
+  exchangeRateLabel: 'EUR/PLN rate:',
+
+  weeklyRateTitle:  'EACH ADDITIONAL WEEK OF RENTAL',
+  weeklyRateSuffix: '/ton net',
+  weeklyRateNote:   'after the basic rental period',
+
+  sectionTransport:    'Transport:',
+  labelDelivery:       'Delivery:',
+  labelRoute:          'Route:',
+  labelTrucks:         'No. of trucks:',
+  labelCostPerTruck:   'Cost / truck:',
+  labelTotalTransport: 'Total transport cost:',
+  labelSettlement:     'Settlement:',
+  labelPickupFrom:     'Collection from:',
+  valueDapIncluded:    'DAP – included in price / Intra B.V.',
+  valueDapExtra:       'DAP / Intra B.V.',
+  valueFca:            "FCA – ex works, customer's collection",
+  valueCif:            'CIF – collection from port',
+  valueRecharge:       'Transport costs recharged to customer',
+
+  sectionRentalTerms: 'Rental terms:',
+  rentalTerm1: "1) The quoted price includes delivery by Intra from warehouse to site. Return to Intra B.V. warehouse (Cieśle 42, near Wrocław) is the Customer's responsibility and cost.",
+  rentalTerm1Fca: "1) Transport of beams is arranged by the Customer (FCA – ex works, customer's collection). Return to Intra B.V. warehouse (Cieśle 42, near Wrocław) is the Customer's responsibility and cost.",
+  rentalTerm2: "2) Loading and unloading at the construction site is at the Lessee's expense.",
+  rentalTerm3: '3) All prices quoted are net prices.',
+
+  para1: 'Please note that these are rented sections and must be returned in all cases. Only materials supplied by Intra B.V. are eligible for return.',
+  para2: (val, unit) => `Delivery and return of the material must comply with EN 10248-1/2. For material losses, including those caused by cutting of damaged sections, an additional charge of ${val},- ${unit}/ton of material will apply.`,
+  para3: 'Sections must be returned in a reusable condition – without the need for re-processing, cleaning or repairs. They must not show damage, contamination, adhering soil or other defects beyond normal wear.',
+  para4: 'Otherwise the following charges will apply:',
+
+  sectionDamages: 'Schedule of charges:',
+  damageLoss:        (val, unit) => `- Loss / total damage of sections = +${val},- ${unit} / ton;`,
+  damageSorting:     (val, unit) => `- Sorting and cleaning = +${val},- ${unit} / ton;`,
+  damageWelding:     (val, unit) => `- Welding (sealing) of holes = +${val},- ${unit} / pc.;`,
+  damageCutting:     (val, unit) => `- Cutting head – e.g. to remove damage = +${val},- ${unit} / cut;`,
+  damageRepair:      (val, unit) => `- Repair / straightening = +${val},- ${unit} / lm;`,
+  damageLiftingHole: (val, unit) => `- New lifting hole = +${val},- ${unit} / pc.;`,
+
+  sectionDelivery:     'Delivery time:',
+  deliveryPlaceholder: '- ............',
+
+  sectionTechnical: 'Technical terms:',
+  techStandard:     '- supply in accordance with EN 10248-1/2.',
+  techGrade:        '- steel grade as stated in this offer.',
+  techTolerance:    '- length tolerance ±200 mm.',
+  techWeighing:     '- invoicing based on theoretical weight.',
+
+  sectionPayment:  'Payment terms:',
+  paymentPrepaid:  '- Prepayment – payment required prior to execution of the order.',
+  paymentCredit:   days => `- ${days} days from invoice date, subject to obtaining security for the order value (Credit limit, bank guarantee, payment guarantee from a public investor, or other security accepted by Intra B.V.).`,
+
+  sectionValidity:    'Validity of offer:',
+  validityLine:       label => `- ${label} from the date of issue.`,
+  validityLabel:      days  => days === 1 ? '24 hours' : `${days} days`,
+  validityDisclaimer: 'This offer does not reserve stock availability or production capacity and requires final confirmation.',
+
+  notesLabel: 'Notes',
+};
+
+// ─── Export (Beam Rental) ─────────────────────────────────────────────────────
+
+export const BEAM_RENTAL_PDF_STRINGS: Record<PdfLang, BeamRentalPdfStrings> = {
+  pl: beam_pl,
+  en: beam_en,
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ─── PDF: Pipe Sale (sprzedaż rur stalowych) ──────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════

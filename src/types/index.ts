@@ -90,6 +90,125 @@ export interface PriceHistory {
   changed_at: string;
 }
 
+// ─── Dwuteowniki HEB/HEA/IPE (wynajem) ────────────────────────────────────────
+// Moduł w pełni niezależny (własne tabele beam_*). Model rental: koszt = masa × cena/t.
+// Okres podstawowy i stawka za dodatkowy tydzień = pola informacyjne (warunki PDF).
+
+/** Gatunki stali dla dwuteowników. Wartości MUSZĄ odpowiadać CHECK constraint
+ *  na beam_rental_offer_items.steel_grade (migracja 2026-07-07-beam-rental.sql).
+ *  `as const` daje literal-union BeamSteelGrade. */
+export const BEAM_STEEL_GRADES = [
+  'S235',
+  'S275',
+  'S355',
+  'min. S235',
+  'min. S275',
+  'min. S355',
+] as const;
+export type BeamSteelGrade = typeof BEAM_STEEL_GRADES[number];
+
+export type BeamSeries = 'HEB' | 'HEA' | 'IPE';
+
+export interface BeamProfile {
+  id: string;
+  name: string;
+  series: BeamSeries;
+  weight_kg_per_m: number;   // sterownik masy: mass = szt × L × kg/m / 1000
+  height_mm?: number | null; // informacyjne (wysokość profilu)
+  width_mm?: number | null;  // informacyjne (szerokość półki)
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BeamRentalPrices {
+  id: string;
+  rent_price_per_ton_pln: number;        // czynsz za okres podstawowy [PLN/t]
+  base_period_months: number;            // podstawowy okres dzierżawy [mies.] (info)
+  extra_week_price_per_ton_pln: number;  // stawka za dodatkowy tydzień [PLN/t] (info)
+  // Cennik szkód (PLN kanoniczne)
+  loss_price_pln: number;                // zagubienie / całkowita strata [PLN/t]
+  sorting_price_pln: number;             // sortowanie + czyszczenie [PLN/t]
+  welding_price_pln: number;             // spawanie (zamykanie) otworów [PLN/szt]
+  cutting_price_pln: number;             // głowica tnąca [PLN/cięcie]
+  repair_price_pln: number;              // naprawa / prostowanie [PLN/mb]
+  lifting_hole_price_pln: number;        // nowy otwór do podnoszenia [PLN/szt]
+  note?: string;
+  updated_at: string;
+}
+
+export interface BeamRentalOffer {
+  id: string;
+  offer_number: string;                  // OH/YYYY/NNN
+  year: number;
+  sequence: number;
+  client_id?: string;
+  client?: Client;
+  task_name?: string;
+  status: OfferStatus;
+  notes?: string;
+  valid_days: number;
+  payment_days: number;
+  prepared_by?: string;
+  currency: 'EUR' | 'PLN';
+  exchange_rate?: number;
+  // Warunki wynajmu (informacyjne; snapshot w walucie oferty gdzie dotyczy)
+  base_period_months?: number;
+  extra_week_price_per_ton?: number;     // w walucie oferty
+  // Sumy snapshot
+  total_mass_t?: number;
+  rental_cost_total?: number;            // w walucie oferty
+  rental_cost_eur?: number;
+  rental_cost_pln?: number;
+  // Snapshot cennika szkód (w walucie oferty — konwencja grodzic, mimo sufiksu _pln)
+  loss_price_pln?: number;
+  sorting_price_pln?: number;
+  welding_price_pln?: number;
+  cutting_price_pln?: number;
+  repair_price_pln?: number;
+  lifting_hole_price_pln?: number;
+  // Dostawa: koszty
+  delivery_trucks?: number;
+  delivery_cost_per_truck?: number;
+  delivery_cost_total?: number;
+  delivery_paid_by?: 'dap_included' | 'dap_extra' | 'fca' | 'cif';
+  delivery_from?: string;
+  delivery_to?: string;
+  delivery_info?: string;                // termin dostawy (free-text, jak grodzice)
+  // Warunki dostawy (etykieta Incoterms)
+  delivery_terms?: 'DAP' | 'DAP_EXTRA' | 'FCA' | 'CIF';
+  fca_location?: string;
+  // Audit / soft-delete
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+  items?: BeamRentalOfferItem[];
+}
+
+export interface BeamRentalOfferItem {
+  id: string;
+  offer_id: string;
+  profile_id?: string | null;            // FK ON DELETE SET NULL
+  // Snapshot atrybutów profilu
+  profile_name: string;
+  series: string;
+  weight_kg_per_m: number;
+  steel_grade: BeamSteelGrade;
+  // Ilość i agregaty
+  quantity_pcs: number;
+  length_m: number;
+  total_length_m: number;                // quantity × length
+  mass_t: number;                        // total_length × kg/m / 1000
+  // Cena i wartość (w walucie oferty)
+  price_per_ton: number;
+  value_total: number;                   // mass_t × price_per_ton
+  // Denominacja (zawsze)
+  value_eur: number;
+  value_pln: number;
+  sort_order: number;
+  created_at?: string;
+}
+
 // ─── Sprzedaż ────────────────────────────────────────────────────────────────
 
 export interface SaleOffer {
