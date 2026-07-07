@@ -1185,7 +1185,7 @@ const beam_pl: BeamRentalPdfStrings = {
   rentalTerm3: '3) Podane ceny są cenami netto.',
 
   para1: 'Pragniemy zaznaczyć, że są to kształtowniki wypożyczone i w każdym przypadku należy je zwrócić. Zwracamy uwagę, że zwrotowi mogą podlegać wyłącznie materiały dostarczone przez Intra.',
-  para2: (val, unit) => `Dostawa i zwrot materiału muszą nastąpić wg. EN10248-1/2. Za straty materialne, także spowodowane cięciami uszkodzonych części materiału, obciążymy Państwa dodatkową kwotą w wysokości ${val},- ${unit}/tona materiału.`,
+  para2: (val, unit) => `Dostawa i zwrot materiału muszą nastąpić wg. EN 10034 / EN 10025. Za straty materialne, także spowodowane cięciami uszkodzonych części materiału, obciążymy Państwa dodatkową kwotą w wysokości ${val},- ${unit}/tona materiału.`,
   para3: 'Kształtowniki po zwrocie muszą nadawać się do ponownego użycia – bez konieczności ponownej obróbki, czyszczenia oraz napraw. Nie mogą posiadać uszkodzeń, zabrudzeń, przylegającej ziemi i innych niedoskonałości ponad normatywne zużycie.',
   para4: 'W przeciwnym razie obciążymy Państwa następującymi kosztami:',
 
@@ -1201,9 +1201,9 @@ const beam_pl: BeamRentalPdfStrings = {
   deliveryPlaceholder: '- ............',
 
   sectionTechnical: 'Warunki techniczne:',
-  techStandard:     '- dostawa wg. EN10248-1/2.',
+  techStandard:     '- dostawa wg. EN 10025.',
   techGrade:        '- gatunek stali zgodny z ofertą.',
-  techTolerance:    '- tolerancja długości +-200mm.',
+  techTolerance:    '- tolerancje wymiarowe wg EN 10034, tolerancja długości +-200mm.',
   techWeighing:     '- fakturowanie wg. wagi teoretycznej.',
 
   sectionPayment:  'Warunki płatności:',
@@ -1277,7 +1277,7 @@ const beam_en: BeamRentalPdfStrings = {
   rentalTerm3: '3) All prices quoted are net prices.',
 
   para1: 'Please note that these are rented sections and must be returned in all cases. Only materials supplied by Intra B.V. are eligible for return.',
-  para2: (val, unit) => `Delivery and return of the material must comply with EN 10248-1/2. For material losses, including those caused by cutting of damaged sections, an additional charge of ${val},- ${unit}/ton of material will apply.`,
+  para2: (val, unit) => `Delivery and return of the material must comply with EN 10034 / EN 10025. For material losses, including those caused by cutting of damaged sections, an additional charge of ${val},- ${unit}/ton of material will apply.`,
   para3: 'Sections must be returned in a reusable condition – without the need for re-processing, cleaning or repairs. They must not show damage, contamination, adhering soil or other defects beyond normal wear.',
   para4: 'Otherwise the following charges will apply:',
 
@@ -1293,9 +1293,9 @@ const beam_en: BeamRentalPdfStrings = {
   deliveryPlaceholder: '- ............',
 
   sectionTechnical: 'Technical terms:',
-  techStandard:     '- supply in accordance with EN 10248-1/2.',
+  techStandard:     '- supply in accordance with EN 10025.',
   techGrade:        '- steel grade as stated in this offer.',
-  techTolerance:    '- length tolerance ±200 mm.',
+  techTolerance:    '- dimensional tolerances per EN 10034, length tolerance ±200 mm.',
   techWeighing:     '- invoicing based on theoretical weight.',
 
   sectionPayment:  'Payment terms:',
