@@ -187,7 +187,7 @@ export default function BeamOffersTable({ offers, onOffersChange, profiles, pric
                       : firstProfile}
                   </td>
                   <td className="px-4 py-3 text-right text-gray-600">{formatNumber(offer.total_mass_t ?? 0, 3)}</td>
-                  <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">{offer.base_period_months ?? '—'} mies.</td>
+                  <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">{offer.rental_weeks ?? '—'} tyg.</td>
                   <td className="px-4 py-3 text-right font-semibold text-gray-800">
                     {isEUR && offer.rental_cost_eur != null ? (
                       <div>

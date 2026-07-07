@@ -180,15 +180,22 @@ export default function BeamOfferPDF({ offer, lang = 'pl' }: Props) {
       ? rentalCostPln + (dPaidBy === 'dap_included' ? (offer.delivery_cost_total ?? 0) : 0)
       : rentalCostPln;
 
-  // Okres podstawowy w miesiącach — lokalizowany
-  function formatMonths(m: number): string {
-    if (lang === 'en') return m === 1 ? '1 month' : `${m} months`;
-    if (m === 1) return '1 miesiąc';
-    const mod10 = m % 10, mod100 = m % 100;
-    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return `${m} miesiące`;
-    return `${m} miesięcy`;
+  // Okres — lokalizowany (tygodnie/miesiące jak grodzicowy PDF)
+  function formatPeriod(weeks: number): string {
+    const n = weeks / 4;
+    if (lang === 'en') {
+      return n === 1 ? '1 month' : n % 1 === 0 ? `${n} months` : `${weeks} weeks`;
+    }
+    if (n === 1) return '1 miesiąc';
+    if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) return `${n} miesiące`;
+    return `${n} miesięcy`;
   }
-  const rentalPeriodLabel = formatMonths(offer.base_period_months ?? 3);
+  const periodWeeks = offer.rental_weeks ?? 8;
+  const rentalPeriodLabel = offer.display_unit === 'months'
+    ? formatPeriod(periodWeeks)
+    : lang === 'en'
+      ? `${periodWeeks} weeks`
+      : `${periodWeeks} tygodni`;
 
   // Jednostka waluty w cenniku szkód
   const dmgUnit = isEUR ? 'EUR' : (lang === 'en' ? 'PLN' : 'zł');

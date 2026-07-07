@@ -10,8 +10,10 @@ interface Props {
 
 interface FormState {
   rent_price_per_ton_pln: string;
-  base_period_months: string;
+  base_weeks: string;
   extra_week_price_per_ton_pln: string;
+  threshold_weeks: string;
+  price_per_week_2_pln: string;
   note: string;
   loss_price_pln: string;
   sorting_price_pln: string;
@@ -24,8 +26,10 @@ interface FormState {
 function toForm(p: BeamRentalPrices): FormState {
   return {
     rent_price_per_ton_pln: String(p.rent_price_per_ton_pln ?? 0),
-    base_period_months: String(p.base_period_months ?? 3),
+    base_weeks: String(p.base_weeks ?? 8),
     extra_week_price_per_ton_pln: String(p.extra_week_price_per_ton_pln ?? 0),
+    threshold_weeks: String(p.threshold_weeks ?? 26),
+    price_per_week_2_pln: String(p.price_per_week_2_pln ?? 0),
     note: p.note ?? '',
     loss_price_pln: String(p.loss_price_pln ?? 0),
     sorting_price_pln: String(p.sorting_price_pln ?? 0),
@@ -47,12 +51,16 @@ export default function BeamPriceSettings({ prices, onPricesChange }: Props) {
   }
 
   function validate(): string | null {
-    const rp = parseFloat(form.rent_price_per_ton_pln);
-    const bm = parseInt(form.base_period_months);
-    const ew = parseFloat(form.extra_week_price_per_ton_pln);
-    if (isNaN(rp) || rp <= 0) return 'Cena wynajmu / t musi być liczbą dodatnią.';
-    if (isNaN(bm) || bm < 1) return 'Podstawowy okres (mies.) musi być ≥ 1.';
-    if (isNaN(ew) || ew < 0) return 'Stawka za dodatkowy tydzień nie może być ujemna.';
+    const bp = parseFloat(form.rent_price_per_ton_pln);
+    const bw = parseInt(form.base_weeks);
+    const pw1 = parseFloat(form.extra_week_price_per_ton_pln);
+    const tw = parseInt(form.threshold_weeks);
+    const pw2 = parseFloat(form.price_per_week_2_pln);
+    if (isNaN(bp) || bp <= 0) return 'Cena bazowa musi być liczbą dodatnią.';
+    if (isNaN(bw) || bw < 1) return 'Liczba tygodni bazowych musi być ≥ 1.';
+    if (isNaN(pw1) || pw1 < 0) return 'Cena za tydz. (faza 1) nie może być ujemna.';
+    if (isNaN(tw) || tw <= bw) return `Próg obniżki musi być większy niż ${bw} tygodni.`;
+    if (isNaN(pw2) || pw2 < 0) return 'Cena za tydz. (faza 2) nie może być ujemna.';
     return null;
   }
 
@@ -63,8 +71,10 @@ export default function BeamPriceSettings({ prices, onPricesChange }: Props) {
     setSaving(true);
     const payload = {
       rent_price_per_ton_pln: parseFloat(form.rent_price_per_ton_pln),
-      base_period_months: parseInt(form.base_period_months),
+      base_weeks: parseInt(form.base_weeks),
       extra_week_price_per_ton_pln: parseFloat(form.extra_week_price_per_ton_pln),
+      threshold_weeks: parseInt(form.threshold_weeks),
+      price_per_week_2_pln: parseFloat(form.price_per_week_2_pln),
       note: form.note.trim() || null,
       loss_price_pln: parseFloat(form.loss_price_pln) || 0,
       sorting_price_pln: parseFloat(form.sorting_price_pln) || 0,
@@ -132,9 +142,10 @@ export default function BeamPriceSettings({ prices, onPricesChange }: Props) {
         <p className="text-xs text-gray-400 mb-6">Ostatnia aktualizacja: {formatDate(prices.updated_at)}</p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {field('rent_price_per_ton_pln', 'Cena wynajmu [PLN/t]', 'Czynsz za podstawowy okres dzierżawy, za tonę', 'number', '0.01')}
-          {field('base_period_months', 'Podstawowy okres [mies.]', 'Informacyjnie w warunkach oferty (np. 3)', 'number', '1')}
-          {field('extra_week_price_per_ton_pln', 'Dodatkowy tydzień [PLN/t]', 'Informacyjnie: stawka za każdy tydzień po okresie', 'number', '0.01')}
+          {field('rent_price_per_ton_pln', 'Cena bazowa [PLN/t]', `Wynajem za pierwsze ${form.base_weeks} tygodni`, 'number', '0.01')}
+          {field('base_weeks', 'Tygodnie w cenie bazowej', 'Liczba tygodni objęta ceną bazową')}
+          {field('extra_week_price_per_ton_pln', `Cena / tydzień (tygodnie ${parseInt(form.base_weeks) + 1 || '?'}–${form.threshold_weeks || '?'}) [PLN/t]`, 'Stawka za każdy tydzień po zakończeniu okresu bazowego, do progu obniżki', 'number', '0.01')}
+          {field('price_per_week_2_pln', `Cena / tydzień od tygodnia ${parseInt(form.threshold_weeks) + 1 || '?'} [PLN/t]`, 'Obniżona stawka po przekroczeniu progu (długi wynajem)', 'number', '0.01')}
           {field('note', 'Notatka (opcjonalna)', 'Opis zmiany cennika', 'text')}
         </div>
 
@@ -142,8 +153,9 @@ export default function BeamPriceSettings({ prices, onPricesChange }: Props) {
         <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
           <h4 className="text-sm font-semibold text-blue-800 mb-2">Podgląd struktury cennika</h4>
           <div className="text-sm text-blue-700 space-y-1">
-            <p>• Podstawowy okres ({form.base_period_months || '?'} mies.): <strong>{formatPLN(parseFloat(form.rent_price_per_ton_pln) || 0)} PLN/t</strong></p>
-            <p>• Każdy dodatkowy tydzień: <strong>+{formatPLN(parseFloat(form.extra_week_price_per_ton_pln) || 0)} PLN/t</strong></p>
+            <p>• Tygodnie 1–{form.base_weeks || '?'}: <strong>{formatPLN(parseFloat(form.rent_price_per_ton_pln) || 0)} PLN/t</strong> (cena bazowa)</p>
+            <p>• Tygodnie {parseInt(form.base_weeks) + 1 || '?'}–{form.threshold_weeks || '?'}: <strong>+{formatPLN(parseFloat(form.extra_week_price_per_ton_pln) || 0)} PLN/t</strong> za tydzień</p>
+            <p>• Od tygodnia {parseInt(form.threshold_weeks) + 1 || '?'}: <strong>+{formatPLN(parseFloat(form.price_per_week_2_pln) || 0)} PLN/t</strong> za tydzień (stawka obniżona)</p>
           </div>
         </div>
 

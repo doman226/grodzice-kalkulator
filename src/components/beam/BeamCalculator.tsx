@@ -27,7 +27,10 @@ export default function BeamCalculator({ profiles, prices, clients, onClientAdde
   const [items, setItems] = useState<CalcItem[]>([
     { uid: crypto.randomUUID(), profileId: profiles[0]?.id ?? '', steelGrade: BEAM_STEEL_GRADES[0], quantityPcs: '', lengthM: '' },
   ]);
-  const [basePeriodMonths, setBasePeriodMonths] = useState<number>(prices.base_period_months ?? 3);
+  const [rentalWeeks, setRentalWeeks] = useState<number>(prices.base_weeks ?? 8);
+  const [displayUnit, setDisplayUnit] = useState<'weeks' | 'months'>('weeks');
+  const weeksToMonths = (w: number) => w / 4;
+  const monthsToWeeks = (m: number) => Math.max(1, m * 4);
 
   // Cena PLN/t wpisywana ręcznie (domyślnie z globalnych ustawień)
   const [pricePerTon, setPricePerTon] = useState<number>(prices.rent_price_per_ton_pln);
@@ -51,7 +54,6 @@ export default function BeamCalculator({ profiles, prices, clients, onClientAdde
   useEffect(() => {
     setPricePerTon(prices.rent_price_per_ton_pln);
     setExtraWeekPrice(prices.extra_week_price_per_ton_pln);
-    setBasePeriodMonths(prices.base_period_months ?? 3);
     setLossPrice(prices.loss_price_pln ?? 0);
     setSortingPrice(prices.sorting_price_pln ?? 0);
     setWeldingPrice(prices.welding_price_pln ?? 0);
@@ -199,7 +201,6 @@ export default function BeamCalculator({ profiles, prices, clients, onClientAdde
   const effectivePricesForOffer = useMemo((): BeamRentalPrices => ({
     ...prices,
     rent_price_per_ton_pln: pricePerTon,
-    base_period_months: basePeriodMonths,
     extra_week_price_per_ton_pln: extraWeekPrice,
     loss_price_pln: lossPrice,
     sorting_price_pln: sortingPrice,
@@ -207,7 +208,7 @@ export default function BeamCalculator({ profiles, prices, clients, onClientAdde
     cutting_price_pln: cuttingPrice,
     repair_price_pln: repairPrice,
     lifting_hole_price_pln: liftingHolePrice,
-  }), [prices, pricePerTon, basePeriodMonths, extraWeekPrice, lossPrice, sortingPrice, weldingPrice, cuttingPrice, repairPrice, liftingHolePrice]);
+  }), [prices, pricePerTon, extraWeekPrice, lossPrice, sortingPrice, weldingPrice, cuttingPrice, repairPrice, liftingHolePrice]);
 
   return (
     <div className="space-y-6">
@@ -315,23 +316,45 @@ export default function BeamCalculator({ profiles, prices, clients, onClientAdde
           })}
         </div>
 
-        {/* Podstawowy okres dzierżawy (informacyjny, w miesiącach) */}
+        {/* Okres dzierżawy (informacyjny) — przełącznik tygodnie/miesiące jak grodzice */}
         <div className="mt-4 pt-4 border-t border-gray-100">
           <div className="flex items-center gap-3 mb-3">
             <span className="text-sm font-medium text-gray-700">Podstawowy okres dzierżawy</span>
             <span className="text-xs text-gray-400">(informacyjnie – nie wpływa na cenę)</span>
+            <div className="flex rounded-lg border border-gray-300 overflow-hidden text-xs font-medium">
+              <button type="button"
+                onClick={() => setDisplayUnit('weeks')}
+                className={`px-3 py-1.5 transition-colors ${displayUnit === 'weeks' ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              >Tygodnie</button>
+              <button type="button"
+                onClick={() => setDisplayUnit('months')}
+                className={`px-3 py-1.5 transition-colors ${displayUnit === 'months' ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              >Miesiące</button>
+            </div>
           </div>
-          <div className="max-w-xs">
-            <label className="block text-xs text-gray-500 mb-1">Miesiące</label>
-            <input
-              type="number" min={1} step={1}
-              value={basePeriodMonths}
-              onChange={e => setBasePeriodMonths(Math.max(1, parseInt(e.target.value) || 1))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          <div className="flex items-end gap-4 max-w-sm">
+            <div className="flex-1">
+              <label className="block text-xs text-gray-500 mb-1">Tygodnie</label>
+              <input
+                type="number" min={1} step={1}
+                value={rentalWeeks}
+                onChange={e => setRentalWeeks(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="pb-2 text-gray-400 text-sm">=</div>
+            <div className="flex-1">
+              <label className="block text-xs text-gray-500 mb-1">Miesiące</label>
+              <input
+                type="number" min={0.1} step={0.5}
+                value={weeksToMonths(rentalWeeks)}
+                onChange={e => setRentalWeeks(monthsToWeeks(parseFloat(e.target.value) || 0))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
           <p className="text-xs text-gray-400 mt-1">
-            Na ofercie: <strong>{(() => { const m = basePeriodMonths; if (m === 1) return '1 miesiąc'; if (m % 10 >= 2 && m % 10 <= 4 && (m % 100 < 10 || m % 100 >= 20)) return `${m} miesiące`; return `${m} miesięcy`; })()}</strong>
+            Na ofercie wyświetli się: <strong>{displayUnit === 'weeks' ? `${rentalWeeks} tygodni` : (() => { const m = weeksToMonths(rentalWeeks); if (m === 1) return '1 miesiąc'; if (m % 10 >= 2 && m % 10 <= 4 && (m % 100 < 10 || m % 100 >= 20)) return `${m} miesiące`; return `${m} miesięcy`; })()}</strong>
           </p>
         </div>
 
@@ -403,6 +426,29 @@ export default function BeamCalculator({ profiles, prices, clients, onClientAdde
               />
             </div>
           </div>
+          {/* Banner informacyjny – sugerowana stawka wg cennika dla wybranych tygodni */}
+          {(() => {
+            const suggestedPLN = rentalWeeks <= prices.base_weeks
+              ? prices.rent_price_per_ton_pln
+              : prices.rent_price_per_ton_pln + (rentalWeeks - prices.base_weeks) * prices.extra_week_price_per_ton_pln;
+            const suggested = currency === 'EUR' ? suggestedPLN / exchangeRate : suggestedPLN;
+            const weekRate = currency === 'EUR'
+              ? +(prices.extra_week_price_per_ton_pln / exchangeRate).toFixed(2)
+              : prices.extra_week_price_per_ton_pln;
+            const detail = rentalWeeks <= prices.base_weeks
+              ? `stawka bazowa (do ${prices.base_weeks} tyg.)`
+              : `${prices.base_weeks} tyg. bazowych + ${rentalWeeks - prices.base_weeks}×${weekRate} ${currency}/t`;
+            return (
+              <div className="mt-2 max-w-lg bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 flex items-start gap-2">
+                <span>💡</span>
+                <span>
+                  Sugerowana dla <strong>{rentalWeeks} tyg.</strong>:{' '}
+                  <strong>{formatRound(suggested)} {currency}/t</strong>
+                  <span className="text-amber-600"> ({detail})</span>
+                </span>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Cennik szkód i napraw */}
@@ -640,7 +686,8 @@ export default function BeamCalculator({ profiles, prices, clients, onClientAdde
         <BeamSaveOfferModal
           clients={clients}
           offerItems={offerItems}
-          basePeriodMonths={basePeriodMonths}
+          rentalWeeks={rentalWeeks}
+          displayUnit={displayUnit}
           extraWeekPricePerTon={extraWeekPrice}
           pricePerTon={pricePerTon}
           totals={{

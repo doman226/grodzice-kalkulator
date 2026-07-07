@@ -70,9 +70,13 @@ CREATE INDEX IF NOT EXISTS idx_beam_profiles_active ON beam_profiles(active);
 --     Ustaw docelowe kwoty w UI „Ustawienia cen" przed pierwszą realną ofertą.
 CREATE TABLE IF NOT EXISTS beam_rental_prices (
   id                            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  rent_price_per_ton_pln        NUMERIC     NOT NULL DEFAULT 0,   -- czynsz za okres podstawowy [PLN/t]
-  base_period_months            INTEGER     NOT NULL DEFAULT 3,   -- podstawowy okres dzierżawy [mies.] (info)
-  extra_week_price_per_ton_pln  NUMERIC     NOT NULL DEFAULT 0,   -- stawka za dodatkowy tydzień [PLN/t] (info)
+  -- Model tygodniowy 1:1 jak grodzice: baza za base_weeks + stawki tygodniowe (banner sugestii)
+  rent_price_per_ton_pln        NUMERIC     NOT NULL DEFAULT 0,   -- cena bazowa za base_weeks tygodni [PLN/t]
+  base_weeks                    INTEGER     NOT NULL DEFAULT 8,   -- tygodnie w cenie bazowej
+  extra_week_price_per_ton_pln  NUMERIC     NOT NULL DEFAULT 0,   -- price_per_week_1: cena za każdy tydzień po bazie [PLN/t]
+  threshold_weeks               INTEGER     NOT NULL DEFAULT 26,  -- próg obniżki (tier 2)
+  price_per_week_2_pln          NUMERIC     NOT NULL DEFAULT 0,   -- stawka po progu [PLN/t]
+  base_period_months            INTEGER     NOT NULL DEFAULT 3,   -- legacy — nieużywane, zostaje dla zgodności
   -- Cennik szkód i napraw (PLN kanoniczne)
   loss_price_pln                NUMERIC     NOT NULL DEFAULT 0,   -- zagubienie / całkowita strata [PLN/t]
   sorting_price_pln             NUMERIC     NOT NULL DEFAULT 0,   -- sortowanie + czyszczenie [PLN/t]
@@ -91,15 +95,17 @@ COMMENT ON TABLE beam_rental_prices IS
 -- Placeholdery z PDF WITEK przeliczone z EUR wg ~4.30 (loss 910€, sort 30€,
 -- weld 60€, cut 25€, repair 59€, lift 6€; czynsz ~180€/t za 3 mies.; +tydzień 9€/t).
 INSERT INTO beam_rental_prices (
-  rent_price_per_ton_pln, base_period_months, extra_week_price_per_ton_pln,
+  rent_price_per_ton_pln, base_weeks, extra_week_price_per_ton_pln,
+  threshold_weeks, price_per_week_2_pln, base_period_months,
   loss_price_pln, sorting_price_pln, welding_price_pln,
   cutting_price_pln, repair_price_pln, lifting_hole_price_pln, note
 )
 SELECT
-  774, 3, 39,
+  618, 8, 39,
+  26, 39, 3,
   3913, 129, 258,
   108, 254, 26,
-  'Ceny placeholder (przeliczone z EUR ~4.30) — ustaw docelowe w UI.'
+  'Ceny placeholder (przeliczone z EUR ~4.30; baza 8 tyg., 12 tyg. = 774) — ustaw docelowe w UI.'
 WHERE NOT EXISTS (SELECT 1 FROM beam_rental_prices);
 
 -- ─── 4. Nagłówek oferty wynajmu belek — analog road_plate_sale_offers (rental) ─
@@ -122,9 +128,11 @@ CREATE TABLE IF NOT EXISTS beam_rental_offers (
   currency                      TEXT        NOT NULL DEFAULT 'PLN'
     CHECK (currency IN ('EUR','PLN')),
   exchange_rate                 NUMERIC,
-  -- Warunki wynajmu (informacyjne — snapshot w walucie oferty gdzie dotyczy)
-  base_period_months            INTEGER,
-  extra_week_price_per_ton      NUMERIC,
+  -- Warunki wynajmu (okres tygodniowy jak grodzice; snapshot w walucie oferty gdzie dotyczy)
+  rental_weeks                  INTEGER,
+  display_unit                  TEXT        CHECK (display_unit IS NULL OR display_unit IN ('weeks','months')),
+  extra_week_price_per_ton      NUMERIC,    -- price_per_week_1 w walucie oferty
+  base_period_months            INTEGER,    -- legacy — nieużywane
   -- Sumy (snapshot)
   total_mass_t                  NUMERIC,
   rental_cost_total             NUMERIC,     -- w walucie oferty

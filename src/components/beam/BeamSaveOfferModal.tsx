@@ -37,7 +37,8 @@ interface Totals {
 interface Props {
   clients: Client[];
   offerItems: BeamOfferItemInput[];
-  basePeriodMonths: number;
+  rentalWeeks: number;
+  displayUnit: 'weeks' | 'months';
   extraWeekPricePerTon: number;   // w walucie oferty
   pricePerTon: number;            // w walucie oferty
   totals: Totals;
@@ -52,14 +53,16 @@ interface Props {
   onClientAdded: (client: Client) => void;
 }
 
-function formatMonths(m: number): string {
+function formatPeriod(weeks: number, unit: 'weeks' | 'months'): string {
+  if (unit === 'weeks') return `${weeks} tygodni`;
+  const m = weeks / 4;
   if (m === 1) return '1 miesiąc';
   if (m % 10 >= 2 && m % 10 <= 4 && (m % 100 < 10 || m % 100 >= 20)) return `${m} miesiące`;
   return `${m} miesięcy`;
 }
 
 export default function BeamSaveOfferModal({
-  clients, offerItems, basePeriodMonths, extraWeekPricePerTon, pricePerTon, totals,
+  clients, offerItems, rentalWeeks, displayUnit, extraWeekPricePerTon, pricePerTon, totals,
   currency, exchangeRate, nbpDate, transport, prices, onSaved, onClose, onClientAdded, taskName: initialTaskName,
 }: Props) {
   const [clientId, setClientId] = useState('');
@@ -140,7 +143,8 @@ export default function BeamSaveOfferModal({
       task_name: taskName.trim() || null,
       currency,
       exchange_rate: currency === 'EUR' ? exchangeRate : null,
-      base_period_months: basePeriodMonths,
+      rental_weeks: rentalWeeks,
+      display_unit: displayUnit,
       extra_week_price_per_ton: extraWeekPricePerTon,
       total_mass_t: totals.massT,
       rental_cost_total: rentalCostMain,
@@ -234,7 +238,7 @@ export default function BeamSaveOfferModal({
             </div>
             <div className="pt-2 border-t border-blue-200 grid grid-cols-2 gap-2 text-sm">
               <div><span className="text-gray-500">Masa łączna:</span> <strong>{formatNumber(totals.massT, 3)} t</strong></div>
-              <div><span className="text-gray-500">Okres:</span> <strong>{formatMonths(basePeriodMonths)}</strong></div>
+              <div><span className="text-gray-500">Okres:</span> <strong>{formatPeriod(rentalWeeks, displayUnit)}</strong></div>
             </div>
             <div className="pt-2 border-t border-blue-200 mt-2 space-y-1">
               <div className="flex justify-between text-sm">

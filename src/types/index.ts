@@ -123,9 +123,13 @@ export interface BeamProfile {
 
 export interface BeamRentalPrices {
   id: string;
-  rent_price_per_ton_pln: number;        // czynsz za okres podstawowy [PLN/t]
-  base_period_months: number;            // podstawowy okres dzierżawy [mies.] (info)
-  extra_week_price_per_ton_pln: number;  // stawka za dodatkowy tydzień [PLN/t] (info)
+  // Model tygodniowy 1:1 jak grodzice: baza za base_weeks + stawka/tydzień (banner sugestii).
+  rent_price_per_ton_pln: number;        // cena bazowa za base_weeks tygodni [PLN/t]
+  base_weeks: number;                    // tygodnie w cenie bazowej (domyślnie 8)
+  extra_week_price_per_ton_pln: number;  // price_per_week_1: cena za każdy tydzień po bazie [PLN/t]
+  threshold_weeks: number;               // próg obniżki (tier 2)
+  price_per_week_2_pln: number;          // stawka po progu [PLN/t]
+  base_period_months: number;            // legacy — nieużywane, zostaje dla zgodności DB
   // Cennik szkód (PLN kanoniczne)
   loss_price_pln: number;                // zagubienie / całkowita strata [PLN/t]
   sorting_price_pln: number;             // sortowanie + czyszczenie [PLN/t]
@@ -152,9 +156,11 @@ export interface BeamRentalOffer {
   prepared_by?: string;
   currency: 'EUR' | 'PLN';
   exchange_rate?: number;
-  // Warunki wynajmu (informacyjne; snapshot w walucie oferty gdzie dotyczy)
-  base_period_months?: number;
-  extra_week_price_per_ton?: number;     // w walucie oferty
+  // Warunki wynajmu (okres tygodniowy jak grodzice; snapshot w walucie oferty gdzie dotyczy)
+  rental_weeks?: number;
+  display_unit?: 'weeks' | 'months';
+  extra_week_price_per_ton?: number;     // price_per_week_1 w walucie oferty
+  base_period_months?: number;           // legacy — nieużywane
   // Sumy snapshot
   total_mass_t?: number;
   rental_cost_total?: number;            // w walucie oferty

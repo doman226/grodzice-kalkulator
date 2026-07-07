@@ -53,7 +53,10 @@ function itemsFromOffer(offer: BeamRentalOffer, profiles: BeamProfile[]): CalcIt
 export default function BeamEditOfferModal({ offer, profiles, prices, clients, onSaved, onClose, mode = 'edit' }: Props) {
   const isCopy = mode === 'copy';
   const [items, setItems] = useState<CalcItem[]>(() => itemsFromOffer(offer, profiles));
-  const [basePeriodMonths, setBasePeriodMonths] = useState<number>(offer.base_period_months ?? prices.base_period_months ?? 3);
+  const [rentalWeeks, setRentalWeeks] = useState<number>(offer.rental_weeks ?? prices.base_weeks ?? 8);
+  const [displayUnit, setDisplayUnit] = useState<'weeks' | 'months'>(offer.display_unit ?? 'weeks');
+  const weeksToMonths = (w: number) => w / 4;
+  const monthsToWeeks = (m: number) => Math.max(1, m * 4);
   const [clientId, setClientId] = useState(offer.client_id ?? '');
   const [taskName, setTaskName] = useState(offer.task_name ?? '');
   const [notes, setNotes] = useState(offer.notes ?? '');
@@ -200,7 +203,8 @@ export default function BeamEditOfferModal({ offer, profiles, prices, clients, o
     const offerPayload = {
       client_id: clientId,
       task_name: taskName.trim() || null,
-      base_period_months: basePeriodMonths,
+      rental_weeks: rentalWeeks,
+      display_unit: displayUnit,
       extra_week_price_per_ton: extraWeekPrice,
       total_mass_t: totals.totalMassT,
       rental_cost_total: rentalCostMain,
@@ -383,13 +387,37 @@ export default function BeamEditOfferModal({ offer, profiles, prices, clients, o
             )}
           </div>
 
-          {/* Okres + ważność + płatność */}
-          <div className="grid grid-cols-3 gap-4">
+          {/* Okres (przełącznik tygodnie/miesiące jak grodzice) + ważność + płatność */}
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Podstawowy okres [mies.]</label>
-              <input type="number" min={1} step={1} value={basePeriodMonths}
-                onChange={e => setBasePeriodMonths(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <div className="flex items-center gap-2 mb-1">
+                <label className="text-sm font-medium text-gray-700">Podstawowy okres dzierżawy</label>
+                <div className="flex rounded-lg border border-gray-300 overflow-hidden text-xs font-medium">
+                  <button type="button"
+                    onClick={() => setDisplayUnit('weeks')}
+                    className={`px-2 py-1 transition-colors ${displayUnit === 'weeks' ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  >Tyg.</button>
+                  <button type="button"
+                    onClick={() => setDisplayUnit('months')}
+                    className={`px-2 py-1 transition-colors ${displayUnit === 'months' ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  >Mies.</button>
+                </div>
+              </div>
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <input type="number" min={1} step={1} value={rentalWeeks}
+                    onChange={e => setRentalWeeks(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <p className="text-xs text-gray-400 mt-0.5">tygodnie</p>
+                </div>
+                <div className="pb-5 text-gray-400 text-sm">=</div>
+                <div className="flex-1">
+                  <input type="number" min={0.25} step={0.5} value={weeksToMonths(rentalWeeks)}
+                    onChange={e => setRentalWeeks(monthsToWeeks(parseFloat(e.target.value) || 0))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <p className="text-xs text-gray-400 mt-0.5">miesiące</p>
+                </div>
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Ważność oferty [dni]</label>
