@@ -1,6 +1,6 @@
 import { Document, Page, View, Text, Image, StyleSheet, Font, Link } from '@react-pdf/renderer';
 import type { Offer } from '../types';
-import { formatPLN, formatEUR, formatRound, formatNumber } from '../lib/calculations';
+import { formatPLN, formatEUR, formatRound, formatNumber, formatRentalPeriod } from '../lib/calculations';
 import { RENTAL_PDF_STRINGS, translateWarehouseLocation } from '../lib/pdfStrings';
 import type { PdfLang } from '../lib/pdfStrings';
 import { SALES_REPS as SALES_REPS_LIST } from '../lib/constants';
@@ -374,21 +374,8 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
       ? offer.rental_cost_pln + (tPaidBy === 'dap_included' ? (offer.transport_cost_total ?? 0) : 0)
       : offer.rental_cost_pln;
 
-  // Okres dzierżawy – lokalizowany
-  function formatPeriod(weeks: number): string {
-    const n = weeks / 4;
-    if (lang === 'en') {
-      return n === 1 ? '1 month' : n % 1 === 0 ? `${n} months` : `${weeks} weeks`;
-    }
-    if (n === 1) return '1 miesiąc';
-    if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) return `${n} miesiące`;
-    return `${n} miesięcy`;
-  }
-  const rentalPeriodLabel = offer.display_unit === 'months'
-    ? formatPeriod(offer.rental_weeks)
-    : lang === 'en'
-      ? `${offer.rental_weeks} weeks`
-      : `${offer.rental_weeks} tygodni`;
+  // Okres dzierżawy – lokalizowany (wspólny helper, poprawna deklinacja tyg./mies.)
+  const rentalPeriodLabel = formatRentalPeriod(offer.rental_weeks, offer.display_unit ?? 'weeks', lang);
 
   // Jednostka waluty w cenniku szkód
   const dmgUnit = isEUR ? 'EUR' : (lang === 'en' ? 'PLN' : 'zł');
@@ -527,18 +514,6 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
               <Text style={[s.tdLabel, { flex: 1.1 }]}></Text>
               <Text style={[s.tdLabel, { flex: 0.9 }]}></Text>
             </View>
-            {/* Okres */}
-            <View style={[s.tableBodyRow, { borderBottom: 0 }]}>
-              <Text style={[s.tdLabel, { flex: 2.0, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{t.rentalPeriodRow}</Text>
-              <Text style={[s.tdLabel, { flex: 1.2, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{rentalPeriodLabel}</Text>
-              <Text style={[s.tdLabel, { flex: 1.2 }]}></Text>
-              <Text style={[s.tdLabel, { flex: 1.2 }]}></Text>
-              <Text style={[s.tdLabel, { flex: 0.9 }]}></Text>
-              <Text style={[s.tdLabel, { flex: 1.2 }]}></Text>
-              <Text style={[s.tdLabel, { flex: 1.2 }]}></Text>
-              <Text style={[s.tdLabel, { flex: 1.1 }]}></Text>
-              <Text style={[s.tdLabel, { flex: 0.9 }]}></Text>
-            </View>
           </View>
         ) : (
           // Fallback – stare oferty (jeden profil)
@@ -553,13 +528,12 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
             <Row label={t.legacyTotalLength} value={`${formatNumber(offer.total_length_m, 1)} m`} alt={true} />
             <Row label={t.legacyTotalMass} value={`${formatNumber(offer.mass_t, 3)} t`} alt={false} />
             <Row label={t.legacyWallArea} value={`${formatNumber(offer.wall_area_m2, 2)} m²`} alt={true} />
-            <Row label={t.legacyPeriod} value={rentalPeriodLabel} alt={false} />
           </View>
         )}
 
         {/* ── CENA DZIERŻAWY ── */}
         <View style={s.priceBox}>
-          <Text style={s.priceLabel}>{t.rentalCostLabel}</Text>
+          <Text style={s.priceLabel}>{t.rentalPeriodRow} {rentalPeriodLabel}</Text>
           <Text style={s.priceValue}>
             {fmtVal(totalWithTransport)}
             <Text style={s.priceSuffix}> {currSuffix}</Text>

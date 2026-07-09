@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase, fetchNipData } from '../lib/supabase';
 import type { Client, Offer } from '../types';
-import { formatPLN, formatEUR, formatNumber } from '../lib/calculations';
+import { formatPLN, formatEUR, formatNumber, formatRentalPeriod } from '../lib/calculations';
 import ClientSearchInput from './ClientSearchInput';
 import { SALES_REPS, CountryOptions } from '../lib/constants';
 
@@ -259,15 +259,7 @@ export default function SaveRoadPlateOfferModal({
             </div>
             <div className="pt-2 border-t border-blue-200 grid grid-cols-2 gap-2 text-sm">
               <div><span className="text-gray-500">Masa łączna:</span> <strong>{formatNumber(totals.massT, 3)} t</strong></div>
-              <div><span className="text-gray-500">Okres:</span> <strong>{(() => {
-                if (displayUnit === 'months') {
-                  const m = rentalWeeks / 4;
-                  if (m === 1) return '1 miesiąc';
-                  if (m % 10 >= 2 && m % 10 <= 4 && (m % 100 < 10 || m % 100 >= 20)) return `${m} miesiące`;
-                  return `${m} miesięcy`;
-                }
-                return `${rentalWeeks} tygodni`;
-              })()}</strong></div>
+              <div><span className="text-gray-500">Okres:</span> <strong>{formatRentalPeriod(rentalWeeks, displayUnit, 'pl')}</strong></div>
             </div>
             <div className="pt-2 border-t border-blue-200 mt-2 space-y-1">
               <div className="flex justify-between text-sm">

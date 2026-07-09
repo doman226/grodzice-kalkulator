@@ -72,6 +72,37 @@ export function formatNumber(value: number, decimals = 3): string {
   }).format(value);
 }
 
+// ─── Okres dzierżawy/wynajmu — jedno źródło prawdy dla opisu okresu ──────────────
+// Poprawna polska deklinacja (tydzień/tygodnie/tygodni, miesiąc/miesiące/miesięcy)
+// oraz angielska liczba pojedyncza/mnoga. Tygodnie są zawsze całkowite (kalkulator
+// wymusza parseInt); miesiące mogą być ułamkowe (krok 0,5) — ułamek dostaje formę
+// dopełniacza „X,Y miesiąca" (PL) lub spada do tygodni (EN, jak dotychczas).
+export function formatRentalPeriod(
+  weeks: number,
+  unit: 'weeks' | 'months',
+  lang: 'pl' | 'en',
+): string {
+  if (unit === 'months') {
+    const m = weeks / 4;
+    if (lang === 'en') {
+      if (Number.isInteger(m)) return m === 1 ? '1 month' : `${m} months`;
+      return `${weeks} weeks`;
+    }
+    if (!Number.isInteger(m)) return `${String(m).replace('.', ',')} miesiąca`;
+    return `${m} ${declensionPL(m, 'miesiąc', 'miesiące', 'miesięcy')}`;
+  }
+  if (lang === 'en') return weeks === 1 ? '1 week' : `${weeks} weeks`;
+  return `${weeks} ${declensionPL(weeks, 'tydzień', 'tygodnie', 'tygodni')}`;
+}
+
+// Polski wzór deklinacji przez liczbę: forma „1" / „2–4" / „5+".
+function declensionPL(n: number, one: string, few: string, many: string): string {
+  if (n === 1) return one;
+  const d = n % 10, h = n % 100;
+  if (d >= 2 && d <= 4 && (h < 10 || h >= 20)) return few;
+  return many;
+}
+
 // ─── Płyty drogowe ────────────────────────────────────────────────────────────
 
 /**

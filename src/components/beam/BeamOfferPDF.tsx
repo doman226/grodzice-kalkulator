@@ -1,6 +1,6 @@
 import { Document, Page, View, Text, Image, StyleSheet, Font, Link } from '@react-pdf/renderer';
 import type { BeamRentalOffer } from '../../types';
-import { formatPLN, formatEUR, formatNumber } from '../../lib/calculations';
+import { formatPLN, formatEUR, formatNumber, formatRentalPeriod } from '../../lib/calculations';
 import { BEAM_RENTAL_PDF_STRINGS, translateWarehouseLocation } from '../../lib/pdfStrings';
 import type { PdfLang } from '../../lib/pdfStrings';
 import { SALES_REPS as SALES_REPS_LIST } from '../../lib/constants';
@@ -181,21 +181,7 @@ export default function BeamOfferPDF({ offer, lang = 'pl' }: Props) {
       : rentalCostPln;
 
   // Okres — lokalizowany (tygodnie/miesiące jak grodzicowy PDF)
-  function formatPeriod(weeks: number): string {
-    const n = weeks / 4;
-    if (lang === 'en') {
-      return n === 1 ? '1 month' : n % 1 === 0 ? `${n} months` : `${weeks} weeks`;
-    }
-    if (n === 1) return '1 miesiąc';
-    if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) return `${n} miesiące`;
-    return `${n} miesięcy`;
-  }
-  const periodWeeks = offer.rental_weeks ?? 8;
-  const rentalPeriodLabel = offer.display_unit === 'months'
-    ? formatPeriod(periodWeeks)
-    : lang === 'en'
-      ? `${periodWeeks} weeks`
-      : `${periodWeeks} tygodni`;
+  const rentalPeriodLabel = formatRentalPeriod(offer.rental_weeks ?? 8, offer.display_unit ?? 'weeks', lang);
 
   // Jednostka waluty w cenniku szkód
   const dmgUnit = isEUR ? 'EUR' : (lang === 'en' ? 'PLN' : 'zł');
@@ -305,21 +291,11 @@ export default function BeamOfferPDF({ offer, lang = 'pl' }: Props) {
             <Text style={[s.tdLabel, { flex: 1.3, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{formatNumber(totalMassT, 3)} t</Text>
             <Text style={[s.tdLabel, { flex: 1.4 }]}></Text>
           </View>
-          {/* Okres podstawowy */}
-          <View style={[s.tableBodyRow, { borderBottom: 0 }]}>
-            <Text style={[s.tdLabel, { flex: 2.2, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{t.rentalPeriodRow}</Text>
-            <Text style={[s.tdLabel, { flex: 1.6, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{rentalPeriodLabel}</Text>
-            <Text style={[s.tdLabel, { flex: 1.1 }]}></Text>
-            <Text style={[s.tdLabel, { flex: 1.2 }]}></Text>
-            <Text style={[s.tdLabel, { flex: 1.0 }]}></Text>
-            <Text style={[s.tdLabel, { flex: 1.3 }]}></Text>
-            <Text style={[s.tdLabel, { flex: 1.4 }]}></Text>
-          </View>
         </View>
 
         {/* ── KOSZT DZIERŻAWY ── */}
         <View style={s.priceBox}>
-          <Text style={s.priceLabel}>{t.rentalCostLabel}</Text>
+          <Text style={s.priceLabel}>{t.rentalPeriodRow} {rentalPeriodLabel}</Text>
           <Text style={s.priceValue}>
             {fmtVal(totalWithTransport)}
             <Text style={s.priceSuffix}> {currSuffix}</Text>

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import type { BeamProfile, BeamRentalPrices, Client, BeamRentalOffer } from '../../types';
 import { BEAM_STEEL_GRADES } from '../../types';
-import { calculateRentalCost, formatPLN, formatEUR, formatRound, formatNumber } from '../../lib/calculations';
+import { calculateRentalCost, formatPLN, formatEUR, formatRound, formatNumber, formatRentalPeriod } from '../../lib/calculations';
 import { convertCurrencyValue } from '../../lib/currency';
 import BeamSaveOfferModal, { type BeamOfferItemInput } from './BeamSaveOfferModal';
 
@@ -354,7 +354,7 @@ export default function BeamCalculator({ profiles, prices, clients, onClientAdde
             </div>
           </div>
           <p className="text-xs text-gray-400 mt-1">
-            Na ofercie wyświetli się: <strong>{displayUnit === 'weeks' ? `${rentalWeeks} tygodni` : (() => { const m = weeksToMonths(rentalWeeks); if (m === 1) return '1 miesiąc'; if (m % 10 >= 2 && m % 10 <= 4 && (m % 100 < 10 || m % 100 >= 20)) return `${m} miesiące`; return `${m} miesięcy`; })()}</strong>
+            Na ofercie wyświetli się: <strong>{formatRentalPeriod(rentalWeeks, displayUnit, 'pl')}</strong>
           </p>
         </div>
 

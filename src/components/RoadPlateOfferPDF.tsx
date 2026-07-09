@@ -1,6 +1,6 @@
 import { Document, Page, View, Text, Image, StyleSheet, Font, Link } from '@react-pdf/renderer';
 import type { Offer } from '../types';
-import { formatPLN, formatEUR, formatRound, formatNumber } from '../lib/calculations';
+import { formatPLN, formatEUR, formatRound, formatNumber, formatRentalPeriod } from '../lib/calculations';
 import { ROAD_PLATE_RENTAL_PDF_STRINGS, translateWarehouseLocation } from '../lib/pdfStrings';
 import type { PdfLang } from '../lib/pdfStrings';
 import { SALES_REPS as SALES_REPS_LIST } from '../lib/constants';
@@ -186,20 +186,7 @@ export default function RoadPlateOfferPDF({ offer, lang = 'pl' }: Props) {
       : offer.rental_cost_pln;
 
   // Okres wynajmu
-  function formatPeriod(weeks: number): string {
-    const n = weeks / 4;
-    if (lang === 'en') {
-      return n === 1 ? '1 month' : n % 1 === 0 ? `${n} months` : `${weeks} weeks`;
-    }
-    if (n === 1) return '1 miesiąc';
-    if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) return `${n} miesiące`;
-    return `${n} miesięcy`;
-  }
-  const rentalPeriodLabel = offer.display_unit === 'months'
-    ? formatPeriod(offer.rental_weeks)
-    : lang === 'en'
-      ? `${offer.rental_weeks} weeks`
-      : `${offer.rental_weeks} tygodni`;
+  const rentalPeriodLabel = formatRentalPeriod(offer.rental_weeks, offer.display_unit ?? 'weeks', lang);
 
   const headerUrl = `${window.location.origin}/header-logo.png`;
   const footerUrl = `${window.location.origin}/footer-logo.png`;
@@ -321,18 +308,12 @@ export default function RoadPlateOfferPDF({ offer, lang = 'pl' }: Props) {
               <Text style={[s.tdCell, { flex: COL.price }]} />
               <Text style={[s.tdCell, { flex: COL.total, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{fmtVal(offer.rental_cost_pln)}</Text>
             </View>
-            {/* Okres wynajmu */}
-            <View style={[s.tableBodyRow, { borderBottom: 0 }]}>
-              <Text style={[s.tdCell, { flex: COL.material, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{t.rentalPeriodRow}</Text>
-              <Text style={[s.tdCell, { flex: COL.steel + COL.thickness, fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{rentalPeriodLabel}</Text>
-              <Text style={[s.tdCell, { flex: COL.size + COL.qty + COL.kgM2 + COL.mass + COL.area + COL.price + COL.total }]} />
-            </View>
           </View>
         )}
 
         {/* CENA WYNAJMU */}
         <View style={s.priceBox}>
-          <Text style={s.priceLabel}>{t.rentalCostLabel}</Text>
+          <Text style={s.priceLabel}>{t.rentalPeriodRow} {rentalPeriodLabel}</Text>
           <Text style={s.priceValue}>
             {fmtVal(totalWithTransport)}
             <Text style={s.priceSuffix}> {currSuffix}</Text>
