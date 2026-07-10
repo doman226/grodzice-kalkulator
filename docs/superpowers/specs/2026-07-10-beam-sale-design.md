@@ -126,9 +126,13 @@ RLS celowo wyłączony (konwencja wszystkich tabel ofert w projekcie).
 ## 8. PDF — `BeamSaleOfferPDF.tsx` + `pdfStrings.ts`
 
 - Nowy interfejs **`BeamSalePdfStrings`** + `beamSalePdfStrings_pl` + `beamSalePdfStrings_en`
-  (6. interfejs w pliku; każde pole w OBU obiektach — wymusza TS).
+  (7. interfejs w pliku; każde pole w OBU obiektach — wymusza TS).
 - Tabela **7 kolumn**: Profil | Gatunek | Ilość [szt.] | Długość [m] | Masa [t] | Cena [waluta/t] | Wartość [waluta]
-  (bez pow. ścianki / ceny/m²).
+  (bez pow. ścianki / ceny/m²). UWAGA: inny zestaw kolumn niż rental `BeamOfferPDF`
+  mimo tej samej liczby 7 — rental ma kg/m i nie ma wartości per pozycja; nie kopiować 1:1.
+- Free-text PL→EN: `delivery_from`/`delivery_to` owijać `translateWarehouseLocation(value, lang)`,
+  `warehouse_delivery_time` owijać `translateWarehouseDeliveryTime(value, lang)`
+  (gotcha z CLAUDE.md — surowe polskie snapshoty w angielskim PDF).
 - Warunki techniczne (nowe, zamówione przez użytkownika):
   ```
   - produkowane i dostarczane zgodnie z normą EN 10034.
@@ -142,8 +146,15 @@ RLS celowo wyłączony (konwencja wszystkich tabel ofert w projekcie).
   `- mill certificate 3.1 in accordance with EN 10204.` /
   `- invoicing based on theoretical weight.`
 - Wariant `is_used` (jak SP, commit `011b0b0`): nagłówek bold „Dwuteowniki używane:",
-  tolerancja, fakturowanie, dopisek `techUsedNote` zaadaptowany do belek
-  („Dwuteowniki używane mogą posiadać ślady użytkowania…") — bez normy i certyfikatu.
+  tolerancja, fakturowanie, dopisek `techUsedNote` — bez normy i certyfikatu.
+  Pełne brzmienie (mechaniczna adaptacja stringów SP):
+  - PL: „Dwuteowniki używane mogą posiadać ślady użytkowania, w tym zabrudzenia,
+    przylegającą ziemię, rdzę, pozostałości powłok ochronnych, otwory technologiczne,
+    ślady spawania i cięcia oraz uszkodzenia mechaniczne i odchyłki wymiarowe
+    wynikające z eksploatacji."
+  - EN: „Used steel beams may show signs of use, including dirt, adhering soil, rust,
+    residues of protective coatings, technological holes, welding and cutting marks,
+    as well as mechanical damage and dimensional deviations resulting from operation."
 - Blok „Dane klienta" 1:1 z pozostałymi PDF (`s.metaRight`, `{offer.client ? … : '—'}`),
   etykieta `customerLabel: 'Klient:'` (konwencja rur/płyt-sprzedaż).
 - Sekcja transportu w `<View wrap={false}>`; `dap_included` = transport wliczony
