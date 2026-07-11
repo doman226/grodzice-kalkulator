@@ -74,7 +74,7 @@ Klon `beam_rental_offers` minus pola wynajmu (rental_weeks, display_unit,
 extra_week, ceny szkód), plus pola handlowe sprzedaży (wzorzec `road_plate_sale_offers`):
 
 - numeracja: `offer_number TEXT UNIQUE DEFAULT ''`, `year`, `sequence` — trigger BEFORE INSERT
-- klient/meta: `client_id FK clients ON DELETE SET NULL`, `task_name`, **`is_used BOOLEAN NOT NULL DEFAULT FALSE`**, `status` CHECK (szkic/wysłana/przyjęta/odrzucona), `notes`, `valid_days INT DEFAULT 14`, `payment_days INT DEFAULT 14`, `prepared_by`
+- klient/meta: `client_id FK clients ON DELETE SET NULL`, `task_name`, **`is_used BOOLEAN NOT NULL DEFAULT FALSE`**, `status` CHECK (szkic/wysłana/przyjęta/odrzucona), `notes`, `valid_days INT DEFAULT 14`, `payment_days INT DEFAULT 30`, `prepared_by`
 - waluta: `currency` CHECK (EUR/PLN) DEFAULT 'PLN', `exchange_rate NUMERIC`
 - sumy snapshot: `total_mass_t`, `total_cost_eur`, `total_sell_eur`, `total_sell_pln`, `margin_pct`
 - dostawa (koszt): `delivery_trucks`, `delivery_cost_per_truck`, `delivery_cost_total`, `delivery_paid_by` CHECK (dap_included/dap_extra/fca/cif), `delivery_from`, `delivery_to`
