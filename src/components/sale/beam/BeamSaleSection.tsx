@@ -4,14 +4,15 @@ import type { Client, BeamProfile, BeamSalePrices, BeamSaleOffer } from '../../.
 import BeamSaleCalculator from './BeamSaleCalculator';
 import BeamSaleOffersTable from './BeamSaleOffersTable';
 import BeamSalePriceSettings from './BeamSalePriceSettings';
+import BeamProfilesTable from '../../beam/BeamProfilesTable';
 import ClientsTable from '../../ClientsTable';
 
 // Komponent kontrolowany — analogicznie do BeamRentalSection / RoadPlateSaleSection.
-// Ładuje własne dane (beam_profiles [wspólny katalog z wynajmem OH — tylko odczyt],
-// beam_sale_prices, beam_sale_offers) i renderuje 4 zakładki.
-// App.tsx steruje activeTab / offersCount.
+// Ładuje własne dane (beam_profiles [WSPÓLNY katalog z wynajmem OH — CRUD tutaj
+// edytuje ten sam katalog co zakładka w wynajmie], beam_sale_prices,
+// beam_sale_offers) i renderuje 5 zakładek. App.tsx steruje activeTab / offersCount.
 
-export type BeamSaleTab = 'calculator' | 'offers' | 'clients' | 'prices';
+export type BeamSaleTab = 'calculator' | 'offers' | 'clients' | 'prices' | 'profiles';
 
 interface Props {
   clients: Client[];
@@ -139,6 +140,12 @@ export default function BeamSaleSection({
 
       {activeTab === 'clients' && (
         <ClientsTable clients={clients} onClientsChange={onClientsChange} />
+      )}
+
+      {activeTab === 'profiles' && (
+        loading ? spinner : (
+          <BeamProfilesTable profiles={profiles} onProfilesChange={setProfiles} />
+        )
       )}
 
       {activeTab === 'prices' && (

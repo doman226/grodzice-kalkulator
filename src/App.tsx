@@ -164,13 +164,15 @@ function App() {
     { id: 'prices',     label: 'Cennik' },
   ];
 
-  // Sprzedaż dwuteowników — kalkulator, oferty SH, klienci, cennik.
-  // Profile to wspólny katalog z wynajmem — edycja w Wynajem → Dwuteowniki → Profile.
+  // Sprzedaż dwuteowników — kalkulator, oferty SH, klienci, cennik, profile.
+  // Profile to WSPÓLNY katalog z wynajmem (beam_profiles) — edycja tu i w
+  // Wynajem → Dwuteowniki działa na tych samych danych.
   const beamSaleTabs: { id: BeamSaleTab; label: string; badge?: number }[] = [
     { id: 'calculator', label: 'Kalkulator' },
     { id: 'offers',     label: 'Oferty SH',  badge: beamSaleOffersCount || undefined },
     { id: 'clients',    label: 'Klienci',    badge: clients.length      || undefined },
     { id: 'prices',     label: 'Cennik' },
+    { id: 'profiles',   label: 'Profile dwuteowników' },
   ];
 
   // Wspólna lista zakładek dla nawigacji — string id, bo cztery różne discriminated unions.
