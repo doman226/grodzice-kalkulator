@@ -1977,7 +1977,7 @@ export interface BeamSalePdfStrings {
   // Termin dostawy (huta / magazyn)
   sectionDeliveryTime: string;
   deliveryFromMill:    (weeks: string, deliveryWeeks?: string) => string;
-  deliveryFromStock:   (time: string) => string;
+  deliveryFromStock:   (time: string | undefined) => string;
 
   // Warunki dostawy (Incoterms)
   sectionDeliveryTerms: string;
