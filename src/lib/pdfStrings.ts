@@ -1919,3 +1919,271 @@ export const ROAD_PLATE_SALE_PDF_STRINGS: Record<PdfLang, RoadPlateSalePdfString
   pl: roadPlateSale_pl,
   en: roadPlateSale_en,
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── PDF: Beam Sale (sprzedaż dwuteowników SH) ────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface BeamSalePdfStrings {
+  docTitle:      (offerNo: string) => string;
+  docLanguage:   string;
+  offerTitle:    string;
+
+  // Meta
+  date:          string;
+  offerNumber:   string;
+  salesRep:      string;
+  phone:         string;
+  customerLabel: string;   // 'Klient:' (konwencja rur/płyt-sprzedaż)
+  taskLabel:     string;
+  vatLabel:      (country: string) => string;
+
+  // Greeting & intro
+  greeting: string;
+  intro:    string;
+
+  // Table headers (7 kolumn sprzedażowych: Profil, Gatunek, Ilość, Dług., Masa, Cena/t, Wartość)
+  thProfile:    string;
+  thSteelGrade: string;
+  thQty:        string;
+  thLength:     string;
+  thMass:       string;
+  thPricePerT:  string;   // nagłówek EUR — komponent nadpisuje dla PLN
+  thValue:      string;   // nagłówek EUR — komponent nadpisuje dla PLN
+  unitPcs:      string;
+  totalRow:     string;
+
+  // Price box
+  priceLabel:        string;
+  netSuffix:         string;
+  breakdownBeams:    string;   // 'Dwuteowniki' w rozbiciu ceny
+  breakdownDelivery: string;   // 'Dostawa' w rozbiciu ceny
+
+  // Transport
+  sectionTransport:    string;
+  labelDelivery:       string;
+  labelRoute:          string;
+  labelTrucks:         string;
+  labelCostPerTruck:   string;
+  labelTotalTransport: string;
+  labelSettlement:     string;
+  labelPickupFrom:     string;
+  valueDapIncluded:    string;
+  valueDapExtra:       string;
+  valueFca:            string;
+  valueCif:            string;
+  valueRecharge:       string;
+
+  // Termin dostawy (huta / magazyn)
+  sectionDeliveryTime: string;
+  deliveryFromMill:    (weeks: string, deliveryWeeks?: string) => string;
+  deliveryFromStock:   (time: string) => string;
+
+  // Warunki dostawy (Incoterms)
+  sectionDeliveryTerms: string;
+  deliveryDap:          (destination: string) => string;
+  deliveryDapExtra:     (destination: string) => string;
+  deliveryFca:          (location: string) => string;
+  deliveryCif:          (port: string) => string;
+
+  // Warunki techniczne
+  sectionTechnical: string;
+  techStandard:     string;
+  techGrade:        string;
+  techTolerance:    string;
+  techCert:         string;
+  techWeighing:     string;
+  techCurrencyEUR:  string;
+  techCurrencyPLN:  (rate: number) => string;
+  techUsedLabel:    string;
+  techUsedNote:     string;
+
+  // Płatność
+  sectionPayment: string;
+  paymentPrepaid: string;
+  paymentCredit:  (days: number) => string;
+
+  // Ważność
+  sectionValidity: string;
+  validityLine1:   (label: string) => string;
+  validityLine2:   string;
+  validityLabel:   (days: number) => string;
+
+  // Notes
+  notesLabel: string;
+}
+
+// ─── BEAM SALE POLISH ─────────────────────────────────────────────────────────
+
+const beamSale_pl: BeamSalePdfStrings = {
+  docTitle:      offerNo => `Oferta ${offerNo}`,
+  docLanguage:   'pl',
+  offerTitle:    'OFERTA SPRZEDAŻY DWUTEOWNIKÓW',
+
+  date:          'Data:',
+  offerNumber:   'Numer oferty:',
+  salesRep:      'Opiekun handlowy:',
+  phone:         'Telefon:',
+  customerLabel: 'Klient:',
+  taskLabel:     'Zadanie:',
+  vatLabel:      country => country === 'PL' ? 'NIP:' : 'VAT:',
+
+  greeting: 'Dzień dobry,',
+  intro:    'W nawiązaniu do przesłanego zapytania oraz naszych Ogólnych Warunków Sprzedaży i Płatności, oferujemy sprzedaż dwuteowników stalowych na poniższych warunkach:',
+
+  thProfile:    'Profil',
+  thSteelGrade: 'Gatunek stali',
+  thQty:        'Ilość',
+  thLength:     'Dług. [m]',
+  thMass:       'Masa [t]',
+  thPricePerT:  'Cena [EUR/t]',
+  thValue:      'Wartość [EUR]',
+  unitPcs:      'szt.',
+  totalRow:     'Łącznie',
+
+  priceLabel:        'Cena sprzedaży',
+  netSuffix:         'netto',
+  breakdownBeams:    'Dwuteowniki',
+  breakdownDelivery: 'Dostawa',
+
+  sectionTransport:    'Transport:',
+  labelDelivery:       'Dostawa:',
+  labelRoute:          'Trasa:',
+  labelTrucks:         'Liczba aut:',
+  labelCostPerTruck:   'Koszt / auto:',
+  labelTotalTransport: 'Łączny koszt transportu:',
+  labelSettlement:     'Rozliczenie:',
+  labelPickupFrom:     'Odbiór z:',
+  valueDapIncluded:    'DAP – w cenie / Intra B.V.',
+  valueDapExtra:       'DAP / Intra B.V.',
+  valueFca:            'FCA – odbiór własny',
+  valueCif:            'CIF – odbiór z portu',
+  valueRecharge:       'Refaktura kosztów transportu na klienta',
+
+  sectionDeliveryTime: 'Termin dostawy:',
+  deliveryFromMill: (weeks, deliveryWeeks) =>
+    `produkcja w planowanej kampanii w tyg. ${weeks}`
+    + (deliveryWeeks ? ` – dostawy wstępnie możliwe od ${deliveryWeeks} tygodnia` : '')
+    + ' – do potwierdzenia po zakończonej produkcji.',
+  deliveryFromStock: time =>
+    `z magazynu${time ? `, ${time}` : ''}.`,
+
+  sectionDeliveryTerms: 'Warunki dostawy:',
+  deliveryDap:      address  => `dostawa w cenie wg. DAP (${address}).`,
+  deliveryDapExtra: address  => `dostawa wg. DAP (${address}), transport refakturowany na klienta.`,
+  deliveryFca:      location => `odbiór własny wg. FCA (${location}).`,
+  deliveryCif:      port => `odbiór z portu wg. CIF (${port}).`,
+
+  sectionTechnical: 'Warunki techniczne:',
+  techStandard:     '- produkowane i dostarczane zgodnie z normą EN 10034.',
+  techGrade:        '- gatunek stali zgodny z ofertą.',
+  techTolerance:    '- tolerancja długości -50/+50 mm.',
+  techCert:         '- certyfikat 3.1 zgodnie z normą EN10204.',
+  techWeighing:     '- fakturowanie wg. wagi teoretycznej.',
+  techCurrencyEUR:  '- ceny podane w EUR netto.',
+  techCurrencyPLN:  _rate => `- oferta kalkulowana po kursie €/zł z dnia przesłania oferty.`,
+  techUsedLabel:    'Dwuteowniki używane:',
+  techUsedNote:     'Dwuteowniki używane mogą posiadać ślady użytkowania, w tym zabrudzenia, przylegającą ziemię, rdzę, pozostałości powłok ochronnych, otwory technologiczne, ślady spawania i cięcia oraz uszkodzenia mechaniczne i odchyłki wymiarowe wynikające z eksploatacji.',
+
+  sectionPayment: 'Warunki płatności:',
+  paymentPrepaid: '- Przedpłata – płatność wymagana przed realizacją zlecenia.',
+  paymentCredit:  days => `- ${days} dni od daty wystawienia faktury, z zastrzeżeniem uzyskania zabezpieczenia wartości zamówienia (Limit kupiecki, gwarancja bankowa, gwarancja płatności publicznego inwestora lub inne zabezpieczenie zaakceptowane przez Intra BV).`,
+
+  sectionValidity: 'Ważność oferty:',
+  validityLine1:   label => `- Oferta ważna ${label} od daty wysłania i wymaga finalnego potwierdzenia.`,
+  validityLine2:   '- Oferta nie rezerwuje dostępności magazynowych oraz możliwości produkcyjnych.',
+  validityLabel:   days  => days === 1 ? '24h' : `${days} dni`,
+
+  notesLabel: 'Uwagi',
+};
+
+// ─── BEAM SALE ENGLISH ────────────────────────────────────────────────────────
+
+const beamSale_en: BeamSalePdfStrings = {
+  docTitle:      offerNo => `Quotation ${offerNo}`,
+  docLanguage:   'en',
+  offerTitle:    'STEEL BEAM SALES QUOTATION',
+
+  date:          'Date:',
+  offerNumber:   'Quotation No.:',
+  salesRep:      'Account Manager:',
+  phone:         'Phone:',
+  customerLabel: 'Customer:',
+  taskLabel:     'Project:',
+  vatLabel:      country => country === 'PL' ? 'Tax No.:' : 'VAT No.:',
+
+  greeting: 'Dear Sir or Madam,',
+  intro:    'With reference to your enquiry and our General Terms and Conditions of Sale and Payment, we are pleased to offer steel beams (H/I sections) on the following terms:',
+
+  thProfile:    'Profile',
+  thSteelGrade: 'Steel grade',
+  thQty:        'Qty',
+  thLength:     'Length [m]',
+  thMass:       'Mass [t]',
+  thPricePerT:  'Price [EUR/t]',
+  thValue:      'Value [EUR]',
+  unitPcs:      'pcs.',
+  totalRow:     'Total',
+
+  priceLabel:        'SALES PRICE',
+  netSuffix:         'net',
+  breakdownBeams:    'Steel beams',
+  breakdownDelivery: 'Delivery',
+
+  sectionTransport:    'Transport:',
+  labelDelivery:       'Delivery:',
+  labelRoute:          'Route:',
+  labelTrucks:         'No. of trucks:',
+  labelCostPerTruck:   'Cost / truck:',
+  labelTotalTransport: 'Total transport cost:',
+  labelSettlement:     'Settlement:',
+  labelPickupFrom:     'Collection from:',
+  valueDapIncluded:    'DAP – included in price / Intra B.V.',
+  valueDapExtra:       'DAP / Intra B.V.',
+  valueFca:            "FCA – ex works, customer's collection",
+  valueCif:            'CIF – collection from port',
+  valueRecharge:       'Transport costs recharged to customer',
+
+  sectionDeliveryTime: 'Delivery time:',
+  deliveryFromMill: (weeks, deliveryWeeks) =>
+    `production in planned rolling campaign in week ${weeks}`
+    + (deliveryWeeks ? ` – deliveries preliminarily possible from week ${deliveryWeeks}` : '')
+    + ' – subject to confirmation after completion of rolling.',
+  deliveryFromStock: time =>
+    `ex stock${time ? `, ${time}` : ''}.`,
+
+  sectionDeliveryTerms: 'Delivery terms:',
+  deliveryDap:      address  => `delivery included, DAP (${address}).`,
+  deliveryDapExtra: address  => `delivery DAP (${address}), freight re-invoiced to customer.`,
+  deliveryFca:      location => `customer's own collection, FCA (${location}).`,
+  deliveryCif:      port => `collection from port, CIF (${port}).`,
+
+  sectionTechnical: 'Technical terms:',
+  techStandard:     '- produced and supplied in accordance with EN 10034.',
+  techGrade:        '- steel grade as stated in this quotation.',
+  techTolerance:    '- length tolerance -50/+50 mm.',
+  techCert:         '- mill certificate 3.1 in accordance with EN 10204.',
+  techWeighing:     '- invoicing based on theoretical weight.',
+  techCurrencyEUR:  '- prices quoted in EUR net.',
+  techCurrencyPLN:  _rate => `- quotation calculated at the EUR/PLN exchange rate on the date of issue.`,
+  techUsedLabel:    'Used steel beams:',
+  techUsedNote:     'Used steel beams may show signs of use, including dirt, adhering soil, rust, residues of protective coatings, technological holes, welding and cutting marks, as well as mechanical damage and dimensional deviations resulting from operation.',
+
+  sectionPayment: 'Payment terms:',
+  paymentPrepaid: '- Prepayment – payment required prior to execution of the order.',
+  paymentCredit:  days => `- ${days} days from invoice date, subject to obtaining security for the order value (Credit limit, bank guarantee, payment guarantee from a public investor, or other security accepted by Intra B.V.).`,
+
+  sectionValidity: 'Validity of offer:',
+  validityLine1:   label => `- This quotation is valid for ${label} from the date of issue and requires final confirmation.`,
+  validityLine2:   '- This quotation does not reserve stock availability or production capacity.',
+  validityLabel:   days  => days === 1 ? '24 hours' : `${days} days`,
+
+  notesLabel: 'Notes',
+};
+
+// ─── Export (Beam Sale) ───────────────────────────────────────────────────────
+
+export const BEAM_SALE_PDF_STRINGS: Record<PdfLang, BeamSalePdfStrings> = {
+  pl: beamSale_pl,
+  en: beamSale_en,
+};
