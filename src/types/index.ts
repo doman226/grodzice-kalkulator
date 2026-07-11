@@ -215,6 +215,86 @@ export interface BeamRentalOfferItem {
   created_at?: string;
 }
 
+// ─── Sprzedaż dwuteowników (SH) ──────────────────────────────────────────────
+
+export interface BeamSalePrices {
+  id: string;
+  default_sell_price_per_ton_pln: number;  // pre-fill ceny sprzedaży (PLN kanoniczne)
+  default_cost_price_per_ton_pln: number;  // pre-fill ceny kosztu (0 = brak pre-fill)
+  note?: string | null;
+  updated_at: string;
+}
+
+export interface BeamSaleOffer {
+  id: string;
+  offer_number: string;                  // SH/YYYY/NNN
+  year: number;
+  sequence: number;
+  client_id?: string;
+  client?: Client;
+  task_name?: string;
+  is_used?: boolean;                     // true = dwuteowniki używane (skrócona sekcja techniczna PDF)
+  status: OfferStatus;
+  notes?: string;
+  valid_days: number;
+  payment_days: number;
+  prepared_by?: string;
+  currency: 'EUR' | 'PLN';
+  exchange_rate?: number;
+  // Sumy snapshot
+  total_mass_t?: number;
+  total_cost_eur?: number;
+  total_sell_eur?: number;
+  total_sell_pln?: number;
+  margin_pct?: number;
+  // Dostawa: koszty
+  delivery_trucks?: number;
+  delivery_cost_per_truck?: number;
+  delivery_cost_total?: number;          // zawsze PLN (konwencja SP)
+  delivery_paid_by?: 'dap_included' | 'dap_extra' | 'fca' | 'cif';
+  delivery_from?: string;
+  delivery_to?: string;
+  // Warunki oferty
+  delivery_timeline?: 'huta' | 'magazyn';
+  campaign_weeks?: string;
+  campaign_delivery_weeks?: string;
+  warehouse_delivery_time?: string;
+  delivery_terms?: 'DAP' | 'DAP_EXTRA' | 'FCA' | 'CIF';
+  fca_location?: string;
+  // Audit / soft-delete
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+  items?: BeamSaleOfferItem[];
+}
+
+export interface BeamSaleOfferItem {
+  id: string;
+  offer_id: string;
+  profile_id?: string | null;            // FK ON DELETE SET NULL
+  // Snapshot atrybutów profilu
+  profile_name: string;
+  series: string;
+  weight_kg_per_m: number;
+  steel_grade: BeamSteelGrade;
+  // Ilość i agregaty
+  quantity_pcs: number;
+  length_m: number;
+  total_length_m: number;
+  mass_t: number;                        // total_length × kg/m / 1000, 3dp
+  // Ceny (konwencja SP: wartości w WALUCIE OFERTY mimo braku sufiksu)
+  cost_per_ton: number;
+  sell_per_ton: number;
+  cost_total: number;
+  sell_total: number;
+  // Denominacje (zawsze wyliczone)
+  sell_value_eur: number;
+  sell_value_pln: number;
+  margin_pct?: number;
+  sort_order: number;
+  created_at?: string;
+}
+
 // ─── Sprzedaż ────────────────────────────────────────────────────────────────
 
 export interface SaleOffer {
