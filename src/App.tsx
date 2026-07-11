@@ -16,10 +16,12 @@ import RoadPlateSaleSection from './components/sale/roadplate/RoadPlateSaleSecti
 import type { RoadPlateSaleTab } from './components/sale/roadplate/RoadPlateSaleSection';
 import BeamRentalSection from './components/beam/BeamRentalSection';
 import type { BeamRentalTab } from './components/beam/BeamRentalSection';
+import BeamSaleSection from './components/sale/beam/BeamSaleSection';
+import type { BeamSaleTab } from './components/sale/beam/BeamSaleSection';
 
 type Mode = 'rental' | 'sale';
 type RentalSubMode = 'sheet_pile' | 'road_plate' | 'beam';
-type SaleSubMode = 'sheet_pile' | 'pipe' | 'road_plate';
+type SaleSubMode = 'sheet_pile' | 'pipe' | 'road_plate' | 'beam';
 type Tab = 'calculator' | 'profiles' | 'prices' | 'clients' | 'offers';
 type SaleTab = 'calculator' | 'offers' | 'clients' | 'prices' | 'profiles';
 
@@ -36,6 +38,8 @@ function App() {
   const [roadPlateSaleOffersCount, setRoadPlateSaleOffersCount] = useState(0);
   const [beamRentalActiveTab, setBeamRentalActiveTab] = useState<BeamRentalTab>('calculator');
   const [beamRentalOffersCount, setBeamRentalOffersCount] = useState(0);
+  const [beamSaleActiveTab, setBeamSaleActiveTab] = useState<BeamSaleTab>('calculator');
+  const [beamSaleOffersCount, setBeamSaleOffersCount] = useState(0);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [prices, setPrices] = useState<RentalPrices | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
@@ -160,6 +164,15 @@ function App() {
     { id: 'prices',     label: 'Cennik' },
   ];
 
+  // Sprzedaż dwuteowników — kalkulator, oferty SH, klienci, cennik.
+  // Profile to wspólny katalog z wynajmem — edycja w Wynajem → Dwuteowniki → Profile.
+  const beamSaleTabs: { id: BeamSaleTab; label: string; badge?: number }[] = [
+    { id: 'calculator', label: 'Kalkulator' },
+    { id: 'offers',     label: 'Oferty SH',  badge: beamSaleOffersCount || undefined },
+    { id: 'clients',    label: 'Klienci',    badge: clients.length      || undefined },
+    { id: 'prices',     label: 'Cennik' },
+  ];
+
   // Wspólna lista zakładek dla nawigacji — string id, bo cztery różne discriminated unions.
   const currentTabs: { id: string; label: string; badge?: number }[] =
     mode === 'rental'
@@ -168,7 +181,9 @@ function App() {
         ? pipeSaleTabs
         : saleSubMode === 'road_plate'
           ? roadPlateSaleTabs
-          : saleTabs;
+          : saleSubMode === 'beam'
+            ? beamSaleTabs
+            : saleTabs;
 
   const currentActiveTab: string =
     mode === 'rental'
@@ -177,7 +192,9 @@ function App() {
         ? pipeSaleActiveTab
         : saleSubMode === 'road_plate'
           ? roadPlateSaleActiveTab
-          : saleActiveTab;
+          : saleSubMode === 'beam'
+            ? beamSaleActiveTab
+            : saleActiveTab;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -195,7 +212,9 @@ function App() {
                       ? 'Kalkulator Sprzedaży Rur Stalowych'
                       : saleSubMode === 'road_plate'
                         ? 'Kalkulator Sprzedaży Płyt Drogowych'
-                        : 'Kalkulator Sprzedaży Grodzic Stalowych')
+                        : saleSubMode === 'beam'
+                          ? 'Kalkulator Sprzedaży Dwuteowników'
+                          : 'Kalkulator Sprzedaży Grodzic Stalowych')
                   : rentalSubMode === 'road_plate'
                   ? 'Kalkulator Wynajmu Płyt Drogowych'
                   : rentalSubMode === 'beam'
@@ -303,6 +322,16 @@ function App() {
               >
                 Rury stalowe
               </button>
+              <button
+                onClick={() => setSaleSubMode('beam')}
+                className={`px-4 py-1.5 transition-colors ${
+                  saleSubMode === 'beam'
+                    ? 'bg-blue-100 text-blue-900'
+                    : 'bg-blue-800 text-blue-200 hover:bg-blue-700'
+                }`}
+              >
+                Dwuteowniki
+              </button>
             </div>
           </div>
         )}
@@ -322,6 +351,7 @@ function App() {
                     }
                     else if (saleSubMode === 'pipe') setPipeSaleActiveTab(tab.id as PipeSaleTab);
                     else if (saleSubMode === 'road_plate') setRoadPlateSaleActiveTab(tab.id as RoadPlateSaleTab);
+                    else if (saleSubMode === 'beam') setBeamSaleActiveTab(tab.id as BeamSaleTab);
                     else setSaleActiveTab(tab.id as SaleTab);
                   }}
                   className={`px-5 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${
@@ -380,6 +410,15 @@ function App() {
               activeTab={roadPlateSaleActiveTab}
               onTabChange={setRoadPlateSaleActiveTab}
               onOffersCountChange={setRoadPlateSaleOffersCount}
+            />
+          ) : saleSubMode === 'beam' ? (
+            <BeamSaleSection
+              clients={clients}
+              onClientAdded={(c) => setClients(prev => [...prev, c])}
+              onClientsChange={setClients}
+              activeTab={beamSaleActiveTab}
+              onTabChange={setBeamSaleActiveTab}
+              onOffersCountChange={setBeamSaleOffersCount}
             />
           ) : (
             <SaleSection
