@@ -29,11 +29,12 @@ const EMPTY_FORM: NewProfileForm = {
   width_mm: '',
 };
 
-const SERIES_OPTIONS: BeamSeries[] = ['HEB', 'HEA', 'IPE'];
+const SERIES_OPTIONS: BeamSeries[] = ['HEB', 'HEA', 'HEM', 'IPE'];
 
 function seriesBadge(series: string): string {
   return series === 'HEB' ? 'bg-blue-100 text-blue-700'
     : series === 'HEA' ? 'bg-green-100 text-green-700'
+    : series === 'HEM' ? 'bg-purple-100 text-purple-700'
     : 'bg-orange-100 text-orange-700';
 }
 

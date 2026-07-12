@@ -107,7 +107,7 @@ export const BEAM_STEEL_GRADES = [
 ] as const;
 export type BeamSteelGrade = typeof BEAM_STEEL_GRADES[number];
 
-export type BeamSeries = 'HEB' | 'HEA' | 'IPE';
+export type BeamSeries = 'HEB' | 'HEA' | 'IPE' | 'HEM';
 
 export interface BeamProfile {
   id: string;
