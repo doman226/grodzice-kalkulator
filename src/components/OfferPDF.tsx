@@ -472,7 +472,8 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
           // Wielopozycyjna tabela (nowe oferty) – 9 kolumn z Pow.[m²], Koszt/m² i Koszt/t
           <View style={s.table}>
             <View style={s.tableHeaderRow} wrap={false}>
-              <Text style={[s.thCell, { flex: 2.1 }]}>{t.thProfile}</Text>
+              <Text style={[s.thCell, { flex: 0.45, textAlign: 'center' }]}>{t.thOrdinal}</Text>
+              <Text style={[s.thCell, { flex: 2.0 }]}>{t.thProfile}</Text>
               <Text style={[s.thCell, { flex: 1.2 }]}>{t.thSteelGrade}</Text>
               <Text style={[s.thCell, { flex: 0.9, textAlign: 'center' }]}>{t.thQty}</Text>
               <Text style={[s.thCell, { flex: 1.0, textAlign: 'right' }]}>{t.thLength}</Text>
@@ -480,7 +481,7 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
               <Text style={[s.thCell, { flex: 1.1, textAlign: 'right' }]}>{t.thWallArea}</Text>
               <Text style={[s.thCell, { flex: 1.1, textAlign: 'right' }]}>{t.thCostPerT}</Text>
               <Text style={[s.thCell, { flex: 1.1, textAlign: 'right' }]}>{t.thCostPerM2}</Text>
-              <Text style={[s.thCell, { flex: 1.4, textAlign: 'right' }]}>{`${t.thLineValue} [${currCode}]`}</Text>
+              <Text style={[s.thCell, { flex: 1.3, textAlign: 'right' }]}>{`${t.thLineValue} [${currCode}]`}</Text>
             </View>
             {(() => {
               const costPerTonPLN = offer.mass_t > 0 ? totalWithTransport / offer.mass_t : 0;
@@ -489,7 +490,8 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
                 const costPerM2   = wallArea > 0 ? costPerTonPLN * (item.mass_t / wallArea) : 0;
                 return (
                   <View key={item.id || idx} wrap={false} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
-                    <View style={{ flex: 2.1, padding: 4, justifyContent: 'center' }}>
+                    <Text style={[s.tdLabel, { flex: 0.45, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700, color: C.gray700 }]}>{idx + 1}</Text>
+                    <View style={{ flex: 2.0, padding: 4, justifyContent: 'center' }}>
                       <Text style={{ fontFamily: 'Roboto', fontWeight: 700, fontSize: 8, color: C.gray800 }}>{item.profile_name} ({item.profile_type})</Text>
                       {item.total_length_m > 0 && (
                         <Text style={{ fontSize: 6.5, color: C.gray400, marginTop: 0.5 }}>{`${formatNumber(item.mass_t * 1000 / item.total_length_m, 1)} kg/m`}</Text>
@@ -502,14 +504,15 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
                     <Text style={[s.tdLabel, { flex: 1.1, textAlign: 'right', color: C.gray700 }]}>{wallArea > 0 ? `${formatNumber(wallArea, 1)} m²` : '—'}</Text>
                     <Text style={[s.tdLabel, { flex: 1.1, textAlign: 'right', color: C.gray700 }]}>{costPerTonPLN > 0 ? `${fmtRatio2(costPerTonPLN)} ${currCode}/t` : '—'}</Text>
                     <Text style={[s.tdLabel, { flex: 1.1, textAlign: 'right', color: C.gray700 }]}>{costPerM2 > 0 ? `${fmtRatio2(costPerM2)} ${currCode}/m²` : '—'}</Text>
-                    <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{costPerTonPLN > 0 ? fmtVal(costPerTonPLN * item.mass_t) : '—'}</Text>
+                    <Text style={[s.tdLabel, { flex: 1.3, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.gray800 }]}>{costPerTonPLN > 0 ? fmtVal(costPerTonPLN * item.mass_t) : '—'}</Text>
                   </View>
                 );
               });
             })()}
             {/* Podsumowanie */}
             <View wrap={false} style={[s.tableBodyRow, { backgroundColor: C.gray100 }]}>
-              <Text style={[s.tdLabel, { flex: 2.1, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{t.totalRow}</Text>
+              <Text style={[s.tdLabel, { flex: 0.45 }]}></Text>
+              <Text style={[s.tdLabel, { flex: 2.0, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{t.totalRow}</Text>
               <Text style={[s.tdLabel, { flex: 1.2 }]}></Text>
               <Text style={[s.tdLabel, { flex: 0.9 }]}></Text>
               <Text style={[s.tdLabel, { flex: 1.0 }]}></Text>
@@ -517,7 +520,7 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
               <Text style={[s.tdLabel, { flex: 1.1, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{offer.wall_area_m2 > 0 ? `${formatNumber(offer.wall_area_m2, 1)} m²` : ''}</Text>
               <Text style={[s.tdLabel, { flex: 1.1 }]}></Text>
               <Text style={[s.tdLabel, { flex: 1.1 }]}></Text>
-              <Text style={[s.tdLabel, { flex: 1.4, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{fmtVal(totalWithTransport)}</Text>
+              <Text style={[s.tdLabel, { flex: 1.3, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{fmtVal(totalWithTransport)}</Text>
             </View>
           </View>
         ) : (

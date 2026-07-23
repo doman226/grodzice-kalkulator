@@ -249,7 +249,10 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
             const qtyInvalid = !(Number(item.quantity) > 0);
             const lenInvalid = !(Number(item.lengthM) > 0);
             return (
-              <div key={item.uid} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <div key={item.uid} className="flex items-stretch gap-2">
+                {/* Liczba porządkowa (subtelna, szara) */}
+                <div className="flex items-center justify-center shrink-0 w-6 text-sm font-semibold text-gray-400 select-none">{idx + 1}</div>
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-3 bg-gray-50 rounded-lg border border-gray-200">
                 {/* Profil */}
                 <div className="sm:col-span-3">
                   {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Profil grodzicy</label>}
@@ -338,6 +341,7 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
                       ✕
                     </button>
                   )}
+                </div>
                 </div>
               </div>
             );

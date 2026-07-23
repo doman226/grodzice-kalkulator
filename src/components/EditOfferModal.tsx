@@ -394,7 +394,10 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
               {items.map((item, idx) => {
                 const r = itemResults[idx];
                 return (
-                  <div key={item.uid} className="grid grid-cols-12 gap-2 items-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div key={item.uid} className="flex items-stretch gap-2">
+                    {/* Liczba porządkowa (subtelna, szara) */}
+                    <div className="flex items-center justify-center shrink-0 w-5 text-sm font-semibold text-gray-400 select-none">{idx + 1}</div>
+                    <div className="flex-1 grid grid-cols-12 gap-2 items-center p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <div className="col-span-3">
                       {idx === 0 && <p className="text-xs text-gray-400 mb-1">Profil</p>}
                       <select value={item.profileId} onChange={e => updateItem(item.uid, { profileId: e.target.value })}
@@ -443,6 +446,7 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
                         </button>
                       )}
                     </div>
+                  </div>
                   </div>
                 );
               })}
