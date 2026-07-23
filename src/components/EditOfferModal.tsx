@@ -409,13 +409,13 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
                         {STEEL_GRADES.map(g => <option key={g} value={g}>{g}</option>)}
                       </select>
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-3">
                       {idx === 0 && <p className="text-xs text-gray-400 mb-1">Ilość</p>}
                       <input type="number" min={1} placeholder="np. 10" value={item.quantity}
                         onChange={e => updateItem(item.uid, { quantity: e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0) })}
                         className={`w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 ${!(Number(item.quantity) > 0) ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`} />
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-3">
                       {idx === 0 && <p className="text-xs text-gray-400 mb-1">Dług. [m]</p>}
                       <input type="number" min={0.1} step={0.5} placeholder="np. 12" value={item.lengthM}
                         onChange={e => updateItem(item.uid, { lengthM: e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0) })}
@@ -425,6 +425,14 @@ export default function EditOfferModal({ offer, profiles, prices, clients, onSav
                       {idx === 0 && <p className="text-xs text-gray-400 mb-1">Masa</p>}
                       <div className="rounded-lg bg-white border border-gray-200 px-2 py-1.5 text-sm text-gray-700 min-h-[34px] flex items-center">
                         {r.valid ? <span className="font-semibold">{formatNumber(r.massT, 3)} t</span> : <span className="text-gray-400">—</span>}
+                      </div>
+                    </div>
+                    <div className="col-span-2">
+                      {idx === 0 && <p className="text-xs text-gray-400 mb-1">Wartość</p>}
+                      <div className="rounded-lg bg-white border border-gray-200 px-2 py-1.5 text-sm min-h-[34px] flex items-center">
+                        {r.valid && customBasePricePln > 0
+                          ? <span className="font-semibold text-blue-700">{currency === 'EUR' ? formatEUR(r.massT * customBasePricePln) : formatPLN(r.massT * customBasePricePln)} {currency}</span>
+                          : <span className="text-gray-400">—</span>}
                       </div>
                     </div>
                     <div className="col-span-1 flex justify-end">
