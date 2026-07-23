@@ -402,6 +402,7 @@ export interface RentalPdfStrings {
   thWallArea:   string;   // Pow. ścianki [m²]
   thCostPerM2:  string;   // Koszt/m²
   thCostPerT:   string;   // Koszt/t
+  thLineValue:  string;   // Wartość pozycji (nagłówek nosi walutę: "Wartość [PLN]")
   totalRow:     string;
   unitPcs:      string;
   rentalPeriodRow: string;
@@ -516,6 +517,7 @@ const rental_pl: RentalPdfStrings = {
   thWallArea:      'Pow. [m²]',
   thCostPerM2:     'Koszt/m²',
   thCostPerT:      'Koszt/t',
+  thLineValue:     'Wartość',
   totalRow:        'Łącznie',
   unitPcs:         'szt.',
   rentalPeriodRow: 'Podstawowy okres dzierżawy',
@@ -620,6 +622,7 @@ const rental_en: RentalPdfStrings = {
   thWallArea:      'Wall area [m²]',
   thCostPerM2:     'Cost/m²',
   thCostPerT:      'Cost/t',
+  thLineValue:     'Value',
   totalRow:        'Total',
   unitPcs:         'pcs.',
   rentalPeriodRow: 'Basic rental period',
