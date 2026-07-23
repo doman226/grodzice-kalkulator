@@ -471,7 +471,7 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
         {offer.items && offer.items.length > 0 ? (
           // Wielopozycyjna tabela (nowe oferty) – 9 kolumn z Pow.[m²], Koszt/m² i Koszt/t
           <View style={s.table}>
-            <View style={s.tableHeaderRow}>
+            <View style={s.tableHeaderRow} wrap={false}>
               <Text style={[s.thCell, { flex: 2.1 }]}>{t.thProfile}</Text>
               <Text style={[s.thCell, { flex: 1.2 }]}>{t.thSteelGrade}</Text>
               <Text style={[s.thCell, { flex: 0.9, textAlign: 'center' }]}>{t.thQty}</Text>
@@ -488,7 +488,7 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
                 const wallArea    = item.wall_area_m2 ?? 0;
                 const costPerM2   = wallArea > 0 ? costPerTonPLN * (item.mass_t / wallArea) : 0;
                 return (
-                  <View key={item.id || idx} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
+                  <View key={item.id || idx} wrap={false} style={idx % 2 === 0 ? s.tableBodyRow : s.tableBodyRowAlt}>
                     <View style={{ flex: 2.1, padding: 4, justifyContent: 'center' }}>
                       <Text style={{ fontFamily: 'Roboto', fontWeight: 700, fontSize: 8, color: C.gray800 }}>{item.profile_name} ({item.profile_type})</Text>
                       {item.total_length_m > 0 && (
@@ -508,7 +508,7 @@ export default function OfferPDF({ offer, lang = 'pl' }: Props) {
               });
             })()}
             {/* Podsumowanie */}
-            <View style={[s.tableBodyRow, { backgroundColor: C.gray100 }]}>
+            <View wrap={false} style={[s.tableBodyRow, { backgroundColor: C.gray100 }]}>
               <Text style={[s.tdLabel, { flex: 2.1, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }]}>{t.totalRow}</Text>
               <Text style={[s.tdLabel, { flex: 1.2 }]}></Text>
               <Text style={[s.tdLabel, { flex: 0.9 }]}></Text>
