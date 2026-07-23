@@ -316,6 +316,17 @@ export default function Calculator({ profiles, prices, clients, onClientAdded, o
                   </div>
                 </div>
 
+                {/* Wartość tej pozycji (masa × cena/t, bez transportu) */}
+                <div className="sm:col-span-3">
+                  {idx === 0 && <label className="block text-xs font-medium text-gray-500 mb-1">Wartość pozycji</label>}
+                  <div className="rounded-lg bg-white border border-gray-200 px-3 py-2 text-sm min-h-[38px] flex items-center">
+                    {r.valid && pricePerTon > 0
+                      ? <span className="font-semibold text-blue-700">{currency === 'EUR' ? formatEUR(r.massT * pricePerTon) : formatPLN(r.massT * pricePerTon)} {currency}</span>
+                      : <span className="text-gray-400">—</span>
+                    }
+                  </div>
+                </div>
+
                 {/* Usuń */}
                 <div className="sm:col-span-1 flex justify-end">
                   {items.length > 1 && (
