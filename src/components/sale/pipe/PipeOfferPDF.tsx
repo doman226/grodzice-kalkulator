@@ -560,7 +560,7 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
           </View>
         )}
 
-        {/* ── CENA BOX (navy) — cena sprzedaży + cena/t ── */}
+        {/* ── CENA BOX (navy) — cena sprzedaży (bez ceny/t — usunięta na życzenie) ── */}
         {/* Reguła: DAP w cenie → transport "schowany" w cenie (klient nie zna jego kosztu).
             DAP_EXTRA → cena rur bez transportu, transport pokazany jako refaktura.
             FCA → cena rur bez transportu (klient odbiera sam).               */}
@@ -573,12 +573,6 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
             ? (isEUR ? totalForClientEUR : totalForClientPLN)
             : (isEUR ? totalSellEUR + locksTotalEUR : totalSellPLN + locksTotalPLN);
 
-          // Baza ceny za tonę = wartość rur (+transport przy DAP), BEZ zamków — jak w grodzicach
-          const pipeBase = dapIncludedHasCost
-            ? (isEUR ? totalSellEUR + deliveryCostEUR : totalSellPLN + deliveryCostPLN)
-            : (isEUR ? totalSellEUR : totalSellPLN);
-          const effectivePerT = totalMassT > 0 ? pipeBase / totalMassT : 0;
-
           return (
             <View style={s.priceBox} wrap={false}>
               <Text style={s.priceLabel}>{t.priceLabel}</Text>
@@ -587,12 +581,6 @@ export default function PipeOfferPDF({ offer, lang = 'pl' }: Props) {
                 <Text style={s.priceSuffix}>{currency} {t.netSuffix}</Text>
               </Text>
               <View style={s.priceRow}>
-                {/* Cena za tonę rur — efektywna (z transportem przy DAP w cenie) */}
-                {effectivePerT > 0 && (
-                  <Text>
-                    {isEUR ? formatEUR(effectivePerT) : formatPLN(effectivePerT)} {currency}/t {t.netSuffix}
-                  </Text>
-                )}
                 {/* Zamki — osobna linia rozbicia ceny */}
                 {hasLocks && (
                   <Text>{t.lockSectionTitle}: {isEUR ? `${formatEUR(locksTotalEUR)} EUR` : `${formatPLN(locksTotalPLN)} PLN`}</Text>
