@@ -88,6 +88,7 @@ czasem staje się fikcją.
 | Oś czasu wykresów | `created_at` (data wystawienia) | `accepted_at` uzupełniany wstecz skłamałby: oferta przyjęta w kwietniu dostałaby stempel sierpniowy. `created_at` mierzy skuteczność rocznika ofert — miara właściwsza handlowo |
 | Szkice i usunięte | Poza metrykami handlowymi | Szkic nie trafił do klienta; `deleted_at` wykluczone zawsze |
 | Testy | Bez Vitest w v1 | Projekt nie ma frameworka testowego; weryfikacja przez kontrolę krzyżową SQL |
+| Umiejscowienie „Do domknięcia" | Zakładka wewnątrz modułu statystyk | Bez licznika w globalnym nagłówku i bez osobnego trybu — `App.tsx` dostaje wyłącznie nowy tryb `stats` |
 
 ## Architektura — warstwa danych
 
@@ -262,6 +263,44 @@ SP/2026/144 · Budimex · 340 000 PLN · wysłana 47 dni temu
 
 Zapis: `UPDATE <tabela modułu> SET status = ... WHERE id = ...` plus `UPSERT` do
 `offer_followups`. Mapowanie `module_code → nazwa tabeli` w `statsQueries.ts`.
+
+#### Zapis idzie w te same wiersze co moduły (zweryfikowane)
+
+Zakładka zmienia status **bezpośrednio w tabelach ofertowych** — ten sam wiersz,
+który czyta lista ofert w module sprzedaży/wynajmu. Jedno źródło prawdy, bez
+kopii i bez synchronizacji. Zmiana widoczna w obie strony natychmiast.
+
+**To nie jest nowa ścieżka zapisu.** Identyczny `UPDATE` istnieje dziś w
+produkcji — rozwijana lista statusu w każdej z sześciu list ofert:
+
+| Plik | Linia |
+|---|---|
+| `OffersTable.tsx` | 88 — `.update({ status: newStatus, updated_at: ... })` |
+| `SaleOffersTable.tsx` | 101 — `.update({ status: newStatus })` |
+| `PipeOffersTable.tsx` | 100 |
+| `RoadPlateSaleOffersTable.tsx` | 105 |
+| `BeamOffersTable.tsx` | 81 |
+| `BeamSaleOffersTable.tsx` | 105 |
+
+Rozróżnienie względem ograniczenia „nie ruszamy dwóch modułów": **kod** modułów
+zostaje nietknięty, **dane** są wspólne — i muszą być, inaczej powstałyby dwie
+sprzeczne prawdy (handlowiec widzi „wysłana", zarząd „przyjęta").
+
+**Brak wyścigu o kolumnę `status`.** Modale edycji budują duży `offerPayload`,
+ale `status` pojawia się w nich **wyłącznie** w `INSERT` przy kopiowaniu oferty
+(`status: 'szkic'`) — ścieżka `UPDATE` tego pola nie dotyka. Statusem zarządza
+tylko lista ofert. Nie istnieje więc scenariusz, w którym zapis modalu cofa
+status ustawiony w statystykach.
+
+**RLS nie blokuje.** `offers` i `sale_offers` mają RLS **włączoną** (pozostałe
+cztery tabele nie). Polityki `public_update_offers` (UPDATE, `qual = true`) i
+`public_all_sale_offers` (ALL, `qual = true`) dla roli `public` pozwalają roli
+`anon` aktualizować. Weryfikacja: `SELECT * FROM pg_policies WHERE tablename IN
+('offers','sale_offers')`.
+
+Pozostałe ryzyko: dwie osoby zmieniające status tej samej oferty w tej samej
+chwili — wygrywa późniejsze kliknięcie. Identyczne z ryzykiem istniejącym dziś
+przy rozwijanych listach; przy 4 użytkownikach nieistotne. Bez obsługi.
 
 ## Przypadki brzegowe
 
