@@ -119,10 +119,19 @@ export default function PipeOffersTable({ offers, onOffersChange, clients, locks
 
   const filtered = offers.filter(o => {
     if (!search.trim()) return true;
-    const q = search.toLowerCase();
+    const q = search.trim().toLowerCase();
+
+    // Liczba w polu = dodatkowo wyszukiwanie po średnicy rury w pozycjach oferty.
+    // Przecinek dopuszczony jako separator dziesiętny (219,1 = 219.1).
+    const asNumber = Number(q.replace(',', '.'));
+    const matchesDiameter =
+      Number.isFinite(asNumber) && asNumber > 0 &&
+      (o.items ?? []).some(it => it.diameter_mm === asNumber);
+
     return (
       o.offer_number?.toLowerCase().includes(q) ||
-      o.client?.name?.toLowerCase().includes(q)
+      o.client?.name?.toLowerCase().includes(q) ||
+      matchesDiameter
     );
   });
 
@@ -170,7 +179,7 @@ export default function PipeOffersTable({ offers, onOffersChange, clients, locks
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Szukaj po numerze lub kliencie..."
+            placeholder="Szukaj po numerze, kliencie lub średnicy..."
             className="w-full sm:w-72 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
