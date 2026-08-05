@@ -87,7 +87,10 @@ export function isCertifiedCondition(condition: PipeCondition): boolean {
 // Gatunek stali dla rur bez atestu — nie da się zagwarantować dokładnego
 // gatunku, więc deklarujemy minimum gwarantowane (konwencja branżowa).
 // Gdy stan = "bez atestu": norma → "nie dotyczy", gatunek → ta stała.
-export const NO_CERT_STEEL_GRADE = 'min. S235JRH';
+export const NO_CERT_STEEL_GRADES = ['min. S235JRH', 'min. S235', 'min. S355'] as const;
+
+// Wartość domyślna po przełączeniu stanu na "bez atestu" — pierwszy element listy.
+export const NO_CERT_STEEL_GRADE: string = NO_CERT_STEEL_GRADES[0];
 
 // Magazyny Intra — lista do wyboru w sekcji dostawy ("Skąd"/"Odbiór z").
 // Format "Miasto, Kraj" — przechowywane w delivery_from jako jeden string.

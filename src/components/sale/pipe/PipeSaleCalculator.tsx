@@ -17,6 +17,7 @@ import {
   isCertifiedCondition,
   pipeKgPerM,
   NO_CERT_STEEL_GRADE,
+  NO_CERT_STEEL_GRADES,
   PIPE_WAREHOUSES,
   PIPE_WAREHOUSE_CUSTOM,
 } from '../../../lib/pipeConstants';
@@ -218,11 +219,14 @@ export default function PipeSaleCalculator({ clients, locks = [], onClientAdded,
         }
       }
       // Zmiana stanu materiału:
-      //   bez atestu → norma "nie dotyczy" (select zablokowany), gatunek → min. S235JRH
-      //   powrót do z atestem → gatunek prawidłowy (reset jeśli był min. S235JRH)
+      //   bez atestu → norma "nie dotyczy" (select zablokowany), gatunek z listy NO_CERT_STEEL_GRADES
+      //   powrót do z atestem → gatunek prawidłowy (reset jeśli był spoza normy)
       if ('condition' in patch) {
         if (!isCertifiedCondition(updated.condition)) {
-          updated.steelGrade = NO_CERT_STEEL_GRADE;
+          // Zachowaj wybór przy przełączaniu między stanami bez atestu; resetuj tylko spoza listy.
+          if (!(NO_CERT_STEEL_GRADES as readonly string[]).includes(updated.steelGrade)) {
+            updated.steelGrade = NO_CERT_STEEL_GRADE;
+          }
         } else if (!PIPE_NORM_GRADES[updated.norm].includes(updated.steelGrade)) {
           updated.steelGrade = PIPE_NORM_GRADES[updated.norm][0];
         }
@@ -651,10 +655,14 @@ export default function PipeSaleCalculator({ clients, locks = [], onClientAdded,
                         {allowedGrades.map(g => <option key={g} value={g}>{g}</option>)}
                       </select>
                     ) : (
-                      // Bez atestu → gatunek niegwarantowany; deklarujemy minimum
-                      <div className="w-full px-2 py-1.5 rounded-lg text-sm border bg-gray-100 border-gray-300 text-gray-500">
-                        {NO_CERT_STEEL_GRADE}
-                      </div>
+                      // Bez atestu → gatunek niegwarantowany; deklarujemy minimum (do wyboru)
+                      <select
+                        value={item.steelGrade}
+                        onChange={e => updateItem(item.uid, { steelGrade: e.target.value })}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {NO_CERT_STEEL_GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+                      </select>
                     )}
                   </Field>
 
