@@ -30,6 +30,7 @@ export const PIPE_NORMS = [
   'EN10210-1/2',
   'EN10216-1',
   'EN10216-2',
+  'API 5L',
 ] as const;
 export type PipeNorm = typeof PIPE_NORMS[number];
 
@@ -43,6 +44,7 @@ export const PIPE_NORM_DESCRIPTIONS: Record<PipeNorm, string> = {
   'EN10210-1/2': 'Rury stalowe bez szwu lub ze szwem ze stali konstrukcyjnych',
   'EN10216-1':   'Rury stalowe bez szwu do zastosowań ciśnieniowych',
   'EN10216-2':   'Rury stalowe bez szwu do zastosowań ciśnieniowych w podwyższonej temperaturze',
+  'API 5L':      'Rury stalowe przewodowe do transportu ropy i gazu',
 };
 
 // Gatunki stali dopuszczone w danej normie. Lista bieżącego pola steelGrade
@@ -56,6 +58,7 @@ export const PIPE_NORM_GRADES: Record<PipeNorm, readonly string[]> = {
   'EN10210-1/2': ['S235JRH', 'S275JR', 'S275J0H', 'S355J2H', 'S355J0H'],
   'EN10216-1':   ['P195TR1', 'P195TR2', 'P235TR1', 'P235TR2', 'P265TR1', 'P265TR2'],
   'EN10216-2':   ['P235GH', 'P265GH', 'P355GH', '16Mo3'],
+  'API 5L':      ['B', 'X42', 'X46', 'X52', 'X56', 'X60', 'X65', 'X70'],
 };
 
 export const PIPE_SURFACES = [
@@ -157,6 +160,7 @@ export const PIPE_NORM_DESCRIPTIONS_EN: Record<PipeNorm, string> = {
   'EN10210-1/2': 'Seamless or welded steel pipes from structural steel',
   'EN10216-1':   'Seamless steel pipes for pressure purposes',
   'EN10216-2':   'Seamless steel pipes for pressure purposes at elevated temperature',
+  'API 5L':      'Line pipe for oil and gas pipeline transportation systems',
 };
 
 export const PIPE_SURFACES_EN: Record<PipeSurface, string> = {
