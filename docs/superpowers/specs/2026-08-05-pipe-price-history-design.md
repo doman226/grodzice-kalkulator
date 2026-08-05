@@ -66,7 +66,14 @@ Kolejno, każdy filtr opcjonalny (pusty = nie zawęża):
 3. **Ścianka** — `<select>` budowany analogicznie, z unikalnych `wall_thickness_mm`.
 
 Sortowanie wyników: **data oferty malejąco** (najnowsze ceny u góry) — stała,
-bez sortowania klikanego (YAGNI).
+bez sortowania klikanego (YAGNI). Pole daty: `offer.created_at` — to samo, które
+pokazuje istniejąca lista ofert SR (spójność między widokami).
+
+**Reset filtrów zależnych:** listy gatunku i ścianki zależą od wyniku filtra
+średnicy. Po zmianie średnicy (lub przełącznika ±10%) wybrany wcześniej gatunek
+lub ścianka może już nie występować — wtedy filtr **resetuje się do „wszystkie"**
+zamiast dawać pustą tabelę bez wyjaśnienia. Warunek: jeśli aktualna wartość nie
+należy do nowo policzonej listy opcji, ustaw ją na pustą.
 
 ## Waluta — normalizacja
 
