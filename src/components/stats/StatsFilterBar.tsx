@@ -37,6 +37,24 @@ export default function StatsFilterBar({ filters, onChange, reps }: Props) {
     onChange({ ...filters, preset, from, to });
   }
 
+  /** Ręczna data — przełącza preset na „custom" i domyka dzień do pełnego zakresu. */
+  function setCustomBound(which: 'from' | 'to', value: string) {
+    if (!value) return;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return;
+    if (which === 'from') d.setHours(0, 0, 0, 0);
+    else d.setHours(23, 59, 59, 999);
+    onChange({ ...filters, preset: 'custom', [which]: d.toISOString() });
+  }
+
+  /** ISO → YYYY-MM-DD dla <input type="date">. */
+  const dateValue = (iso: string) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime())
+      ? ''
+      : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
   function toggleModule(m: StatsModule) {
     const next = filters.modules.includes(m)
       ? filters.modules.filter(x => x !== m)
@@ -59,13 +77,27 @@ export default function StatsFilterBar({ filters, onChange, reps }: Props) {
         {/* Okres */}
         <div>
           <span className={label}>Okres</span>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 items-center">
             {PERIOD_LABELS.map(p => (
               <button key={p.id} type="button" onClick={() => setPreset(p.id)}
                       className={chip(filters.preset === p.id)}>
                 {p.label}
               </button>
             ))}
+            <span className={`flex items-center gap-1 pl-2 ml-1 border-l border-gray-200 ${
+              filters.preset === 'custom' ? 'text-blue-800' : 'text-gray-500'}`}>
+              <input type="date" aria-label="Data od"
+                     value={dateValue(filters.from)}
+                     onChange={e => setCustomBound('from', e.target.value)}
+                     className={`border rounded-md px-2 py-1 text-xs ${
+                       filters.preset === 'custom' ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white'}`} />
+              <span className="text-xs text-gray-400">–</span>
+              <input type="date" aria-label="Data do"
+                     value={dateValue(filters.to)}
+                     onChange={e => setCustomBound('to', e.target.value)}
+                     className={`border rounded-md px-2 py-1 text-xs ${
+                       filters.preset === 'custom' ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white'}`} />
+            </span>
           </div>
         </div>
 

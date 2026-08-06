@@ -808,6 +808,66 @@ Push do `main` i deploy na Netlify **wyłącznie po osobnej zgodzie użytkownika
 
 ---
 
+## Wynik wdrożenia (2026-08-06)
+
+**Wszystkie 9 tasków wykonane.** Moduł działa, zweryfikowany kontrolą krzyżową SQL.
+
+### Kontrola krzyżowa KPI — zgodność co do ostatniej cyfry
+
+Stan bazy w chwili testu (dane żywe, rosną w trakcie pracy zespołu):
+
+| Zakres | Ofert | Wartość PLN | Wygrana | Skuteczność | Tonaż | Marża |
+|---|---:|---:|---:|---|---:|---|
+| WSZYSTKO | 529 | 246 035 781 | 4 021 464 | 63,3% (31 z 49) | 74 292 t | 8,8% |
+| WYNAJEM | 111 | 20 089 050 | 237 608 | 66,7% (8 z 12) | 23 276 t | — |
+| SPRZEDAŻ | 418 | 225 946 731 | 3 783 857 | 62,2% (23 z 37) | 51 016 t | 8,8% |
+
+Zweryfikowano też: ranking handlowców (4 wiersze × 10 kolumn), trend miesięczny
+(21/65/106/123/182/28), progi Do domknięcia (297/176/86), moduł SH (3 oferty).
+
+### Przypadki brzegowe — wszystkie zachowują się zgodnie z projektem
+
+| Sytuacja | Zachowanie | Wynik |
+|---|---|---|
+| Wynajem — brak marży | `—` + „brak ofert sprzedaży w filtrze" | ✅ |
+| SH — 0 rozstrzygniętych | `—` + „brak rozstrzygniętych ofert", nigdy `0%` | ✅ |
+| Styczeń 2026 — pusty okres | „Brak ofert w wybranym zakresie" | ✅ |
+| Odznaczone wszystkie moduły | „Nie wybrano żadnego modułu" | ✅ |
+| Piotr Domański — 1 oferta | marża `—`, skuteczność `—` | ✅ |
+| Sortowanie po kolumnie z `null` | `null` zawsze na końcu, w obu kierunkach | ✅ |
+| Brak poprzedniego okresu | wskaźnik zmiany ukryty, nie `0%` | ✅ |
+
+### Test ścieżki zapisu na produkcji
+
+Wykonany za zgodą użytkownika na `OF/2026/004` (134 dni, „wysłana"), ze
+**stanem przywróconym** — żaden numer oferty nie został zużyty.
+Potwierdzono trzy niezależne punkty: `UPDATE` trafia we właściwą z sześciu
+tabel, RLS przepuszcza `upsert` do `offer_followups`, klucz złożony
+`(module_code, offer_id)` działa. Po teście `offer_followups` = 0 wierszy.
+
+Test ujawnił dwie ciche niezgodności, obie naprawione:
+- brak jawnego `updated_at` przy zmianie statusu (tabela `offers` nie ma
+  triggera `touch`, więc znacznik zostawał nietknięty — inaczej niż przy
+  zmianie z listy ofert),
+- `decided_by` zapisywane jako pusty string zamiast `NULL`.
+
+### Bundle
+
+| Etap | gzip |
+|---|---:|
+| Przed modułem | 828,6 kB |
+| Z Rechartsem | 944,6 kB |
+| **Finalnie (wykresy w SVG)** | **835,6 kB** |
+
+Cały moduł statystyk kosztuje **+7,0 kB gzip**. Zależności runtime: nadal 5.
+
+### Uzupełnienie względem planu
+
+Task 4 pominął **własny zakres dat** z listy filtrów — uzupełnione w Tasku 9
+(dwa pola `<input type="date">`, przełączają preset na `custom`).
+
+---
+
 ## Poza zakresem tego planu
 
 Zakładki Produkty i Klienci (10 wykresów), eksport PDF/Excel, cele sprzedażowe,
