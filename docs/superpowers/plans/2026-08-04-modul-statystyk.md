@@ -627,7 +627,27 @@ git commit -m "feat(stats): zakladka Przeglad - 6 kafli KPI"
 
 ---
 
-## Task 6: Wykresy zakładki Przegląd (Recharts)
+## Task 6: Wykresy zakładki Przegląd
+
+> **DECYZJA ZMIENIONA 2026-08-06: bez Rechartsa, wykresy pisane ręcznie w SVG.**
+>
+> Recharts zainstalował się w wersji **3.10.1** (nie 2.x, jak zakładał plan —
+> `npm install` bierze najnowszą wersję główną). W tej wersji napotkano:
+> - 3 błędy kompilacji z zaostrzonego typowania (formatery `Tooltip` ×2,
+>   współrzędne funkcji etykiety ×1 — `x`/`y`/`width` są `string | number`),
+> - **2 ciche awarie renderowania**: `<Pie>` nie rysował ani jednego elementu
+>   `path` (naprawione jawnymi `cx`/`cy` + wymiarami na `ResponsiveContainer`),
+>   a `<LabelList>` ORAZ prop `label={fn}` w ogóle nie były wywoływane —
+>   nienaprawione mimo zastosowania oficjalnego przykładu z dokumentacji v3.
+> - koszt w bundlu: **+116 kB gzip** (+591 modułów).
+>
+> Ciche awarie są tu groźniejsze niż błędy typów: `tsc` i `npm run build`
+> przechodziły na zielono, a komponent nie rysował niczego. **Wniosek na
+> przyszłość: weryfikuj wykres licząc kształty w DOM, nie obecność kontenera.**
+>
+> Wykresy przepisano na czysty SVG (ta sama technika, co w zatwierdzonej
+> makiecie). Bundle wrócił do **831 kB gzip** — wykresy kosztują +2,4 kB.
+> Zależności projektu pozostają w liczbie pięciu.
 
 **Files:**
 - Modify: `package.json` (+ `recharts`)

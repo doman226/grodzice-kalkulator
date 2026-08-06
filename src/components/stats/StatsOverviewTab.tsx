@@ -7,7 +7,13 @@
 
 import { useMemo } from 'react';
 import KpiCard from './charts/KpiCard';
-import { computeKpis, pctChange, fmtInt, fmtCompact, fmtPct, fmtTons } from './lib/statsAggregate';
+import TrendChart from './charts/TrendChart';
+import StatusDonut from './charts/StatusDonut';
+import ModuleBars from './charts/ModuleBars';
+import {
+  computeKpis, computeMonthly, computeStatusSplit, computeByModule,
+  pctChange, fmtInt, fmtCompact, fmtPct, fmtTons,
+} from './lib/statsAggregate';
 import type { OfferFact } from './lib/statsTypes';
 import type { StatsTab } from './StatsSection';
 
@@ -19,8 +25,11 @@ interface Props {
 }
 
 export default function StatsOverviewTab({ facts, previousFacts, onTabChange }: Props) {
-  const kpis = useMemo(() => computeKpis(facts), [facts]);
-  const prev = useMemo(() => computeKpis(previousFacts), [previousFacts]);
+  const kpis     = useMemo(() => computeKpis(facts), [facts]);
+  const prev     = useMemo(() => computeKpis(previousFacts), [previousFacts]);
+  const monthly  = useMemo(() => computeMonthly(facts), [facts]);
+  const statuses = useMemo(() => computeStatusSplit(facts), [facts]);
+  const modules  = useMemo(() => computeByModule(facts), [facts]);
 
   // Bez danych porównawczych nie pokazujemy wskaźnika zmiany zamiast zmyślać 0%.
   const hasPrev = previousFacts.length > 0;
@@ -98,8 +107,13 @@ export default function StatsOverviewTab({ facts, previousFacts, onTabChange }: 
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-        <p className="text-sm text-gray-400">Wykresy trendu, statusów i modułów — Task 6.</p>
+      <div className="mb-4">
+        <TrendChart data={monthly} />
+      </div>
+
+      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+        <StatusDonut data={statuses} total={kpis.count} />
+        <ModuleBars rows={modules} />
       </div>
     </div>
   );
