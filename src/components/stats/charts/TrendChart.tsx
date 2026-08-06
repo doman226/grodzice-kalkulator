@@ -11,7 +11,7 @@
  */
 
 import type { MonthPoint } from '../lib/statsAggregate';
-import { fmtInt, fmtPln } from '../lib/statsAggregate';
+import { fmtInt, fmtPln, niceMax, axisLabel } from '../lib/statsAggregate';
 
 const MONTHS_PL = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
 
@@ -28,24 +28,6 @@ function monthLabel(iso: string): string {
 function isCurrentMonth(iso: string): boolean {
   const now = new Date();
   return iso === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
-
-/** Zaokrągla górę skali do 1/2/5 × 10^n, żeby podziałka miała okrągłe wartości. */
-function niceMax(value: number): number {
-  if (value <= 0) return 1;
-  const exp = Math.floor(Math.log10(value));
-  const base = Math.pow(10, exp);
-  const norm = value / base;
-  const step = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
-  return step * base;
-}
-
-/** Formatuje wartość osi: 80 mln / 800 tys. / 250 */
-function axisLabel(v: number): string {
-  if (v === 0) return '0';
-  if (Math.abs(v) >= 1_000_000) return `${+(v / 1_000_000).toFixed(1)} mln`;
-  if (Math.abs(v) >= 1_000) return `${+(v / 1_000).toFixed(0)} tys.`;
-  return String(Math.round(v));
 }
 
 interface Props {

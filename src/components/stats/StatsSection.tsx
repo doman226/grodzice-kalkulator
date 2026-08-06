@@ -15,6 +15,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import StatsFilterBar from './StatsFilterBar';
 import StatsOverviewTab from './StatsOverviewTab';
+import StatsRepsTab from './StatsRepsTab';
 import { fetchOfferFacts } from './lib/statsQueries';
 import {
   applyFilters, inDateRange, computeFollowUps, buildPeriod, previousPeriod,
@@ -135,7 +136,7 @@ export default function StatsSection({ activeTab, onTabChange, onFollowUpCountCh
           {activeTab === 'overview' && (
             <StatsOverviewTab facts={filtered} previousFacts={filteredPrev} onTabChange={onTabChange} />
           )}
-          {activeTab === 'reps'     && <TabPlaceholder name="Handlowcy" facts={filtered} />}
+          {activeTab === 'reps'     && <StatsRepsTab facts={filtered} />}
           {activeTab === 'followup' && <TabPlaceholder name="Do domknięcia" facts={followUps} />}
         </>
       )}

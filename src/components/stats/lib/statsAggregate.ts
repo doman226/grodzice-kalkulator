@@ -56,6 +56,12 @@ export interface Kpis {
   massT: number;
   /** Wartość ofert przyjętych. */
   wonPln: number;
+  /** Wartość ofert odrzuconych. */
+  lostPln: number;
+  /** Wartość ofert wysłanych, wciąż nierozstrzygniętych. */
+  pendingPln: number;
+  /** Wartość szkiców. */
+  draftPln: number;
   accepted: number;
   rejected: number;
   /** Wysłane i nierozstrzygnięte — mianownik problemu jakości danych. */
@@ -70,6 +76,9 @@ export interface Kpis {
   /** Średnia wartość oferty. */
   avgOffer: number;
 }
+
+const sumValue = (facts: OfferFact[]): number =>
+  facts.reduce((s, x) => s + num(x.value_pln), 0);
 
 export function computeKpis(facts: OfferFact[]): Kpis {
   const accepted = facts.filter(x => x.status === 'przyjęta');
@@ -86,7 +95,10 @@ export function computeKpis(facts: OfferFact[]): Kpis {
     count: facts.length,
     valuePln,
     massT: facts.reduce((s, x) => s + num(x.mass_t), 0),
-    wonPln: accepted.reduce((s, x) => s + num(x.value_pln), 0),
+    wonPln: sumValue(accepted),
+    lostPln: sumValue(rejected),
+    pendingPln: sumValue(facts.filter(x => x.status === 'wysłana')),
+    draftPln: sumValue(facts.filter(x => x.status === 'szkic')),
     accepted: accepted.length,
     rejected: rejected.length,
     pending: facts.filter(x => x.status === 'wysłana').length,
@@ -271,3 +283,26 @@ export const fmtPct = (v: number | null, digits = 1): string =>
 
 export const fmtTons = (v: number): string =>
   `${Math.round(v).toLocaleString('pl-PL')} t`;
+
+// ─── Skale wykresów ───────────────────────────────────────────────────────────
+
+/**
+ * Zaokrągla górę skali do 1/2/5 × 10^n, żeby podziałka osi wypadała na
+ * okrągłych wartościach (25/50/75/100 zamiast 23,4/46,8/70,2/93,7).
+ */
+export function niceMax(value: number): number {
+  if (value <= 0) return 1;
+  const exp = Math.floor(Math.log10(value));
+  const base = Math.pow(10, exp);
+  const norm = value / base;
+  const step = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
+  return step * base;
+}
+
+/** Etykieta osi dobierająca jednostkę do rzędu wielkości: 80 mln / 800 tys. / 250 */
+export function axisLabel(v: number): string {
+  if (v === 0) return '0';
+  if (Math.abs(v) >= 1_000_000) return `${+(v / 1_000_000).toFixed(1)} mln`;
+  if (Math.abs(v) >= 1_000) return `${+(v / 1_000).toFixed(0)} tys.`;
+  return String(Math.round(v));
+}
