@@ -71,15 +71,20 @@ export async function setOfferStatus(
   moduleCode: StatsModule,
   offerId: string,
   status: OfferStatus,
-  decidedBy: string,
+  decidedBy: string | null,
 ): Promise<void> {
+  const now = new Date().toISOString();
+
+  // `updated_at` ustawiane jawnie — tak samo robi OffersTable:88 i
+  // BeamOffersTable:81. Tabele sprzedażowe mają trigger `touch`, który i tak
+  // nadpisze tę wartość; jawny zapis daje spójne zachowanie we wszystkich
+  // sześciu modułach.
   const { error } = await supabase
     .from(MODULE_TABLE[moduleCode])
-    .update({ status })
+    .update({ status, updated_at: now })
     .eq('id', offerId);
   if (error) throw error;
 
-  const now = new Date().toISOString();
   const { error: followupError } = await supabase
     .from('offer_followups')
     .upsert(

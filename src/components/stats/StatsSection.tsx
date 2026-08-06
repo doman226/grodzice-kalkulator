@@ -16,10 +16,10 @@ import { useState, useEffect, useMemo } from 'react';
 import StatsFilterBar from './StatsFilterBar';
 import StatsOverviewTab from './StatsOverviewTab';
 import StatsRepsTab from './StatsRepsTab';
+import StatsFollowUpTab from './StatsFollowUpTab';
 import { fetchOfferFacts } from './lib/statsQueries';
 import {
   applyFilters, inDateRange, computeFollowUps, buildPeriod, previousPeriod,
-  fmtInt, fmtCompact,
 } from './lib/statsAggregate';
 import { STATS_MODULES, NO_REP } from './lib/statsTypes';
 import type { OfferFact, StatsFilters } from './lib/statsTypes';
@@ -98,6 +98,15 @@ export default function StatsSection({ activeTab, onTabChange, onFollowUpCountCh
 
   useEffect(() => { onFollowUpCountChange(followUps.length); }, [followUps.length, onFollowUpCountChange]);
 
+  /**
+   * Aktualizacja pojedynczego faktu po zapisie w zakładce Do domknięcia.
+   * Dzięki temu KPI, wykresy i licznik przeliczają się natychmiast, bez
+   * ponownego odpytywania bazy — stan lokalny i baza są już zgodne.
+   */
+  function handleFactUpdate(id: string, patch: Partial<OfferFact>) {
+    setFacts(prev => prev.map(f => (f.id === id ? { ...f, ...patch } : f)));
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -137,30 +146,12 @@ export default function StatsSection({ activeTab, onTabChange, onFollowUpCountCh
             <StatsOverviewTab facts={filtered} previousFacts={filteredPrev} onTabChange={onTabChange} />
           )}
           {activeTab === 'reps'     && <StatsRepsTab facts={filtered} />}
-          {activeTab === 'followup' && <TabPlaceholder name="Do domknięcia" facts={followUps} />}
+          {activeTab === 'followup' && (
+            <StatsFollowUpTab facts={filtered} activeRep={filters.rep} onFactUpdate={handleFactUpdate} />
+          )}
         </>
       )}
     </div>
   );
 }
 
-/** Tymczasowa zawartość zakładek — wypełniana w kolejnych taskach planu. */
-function TabPlaceholder({ name, facts }: { name: string; facts: OfferFact[] }) {
-  const value = facts.reduce((s, f) => s + (Number(f.value_pln) || 0), 0);
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-8">
-      <h2 className="text-lg font-semibold text-gray-800 mb-1">{name}</h2>
-      <p className="text-sm text-gray-500 mb-6">Zakładka w budowie — dane są już podłączone.</p>
-      <div className="flex flex-wrap gap-10">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Ofert w filtrze</p>
-          <p className="text-3xl font-semibold text-gray-900">{fmtInt(facts.length)}</p>
-        </div>
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Wartość</p>
-          <p className="text-3xl font-semibold text-gray-900">{fmtCompact(value)} <span className="text-base font-normal text-gray-500">PLN</span></p>
-        </div>
-      </div>
-    </div>
-  );
-}
