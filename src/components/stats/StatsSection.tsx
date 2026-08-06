@@ -14,8 +14,12 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import StatsFilterBar from './StatsFilterBar';
+import StatsOverviewTab from './StatsOverviewTab';
 import { fetchOfferFacts } from './lib/statsQueries';
-import { applyFilters, computeFollowUps, buildPeriod, fmtInt, fmtCompact } from './lib/statsAggregate';
+import {
+  applyFilters, inDateRange, computeFollowUps, buildPeriod, previousPeriod,
+  fmtInt, fmtCompact,
+} from './lib/statsAggregate';
 import { STATS_MODULES, NO_REP } from './lib/statsTypes';
 import type { OfferFact, StatsFilters } from './lib/statsTypes';
 
@@ -30,7 +34,7 @@ interface Props {
   onFollowUpCountChange: (count: number) => void;
 }
 
-export default function StatsSection({ activeTab, onFollowUpCountChange }: Props) {
+export default function StatsSection({ activeTab, onTabChange, onFollowUpCountChange }: Props) {
   const [facts, setFacts]     = useState<OfferFact[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
@@ -40,14 +44,22 @@ export default function StatsSection({ activeTab, onFollowUpCountChange }: Props
     return { from, to, preset: 'this_year', kind: 'all', rep: 'all', modules: [...STATS_MODULES] };
   });
 
+  /** Poprzedni okres o tej samej długości — potrzebny do wskaźników zmiany. */
+  const prevRange = useMemo(
+    () => previousPeriod(filters.from, filters.to),
+    [filters.from, filters.to],
+  );
+
   // Nowe zapytanie tylko przy zmianie okresu — pozostałe filtry działają lokalnie.
+  // Pobieramy POSZERZONY zakres (poprzedni okres + bieżący) jednym zapytaniem,
+  // a rozdzielamy je już po stronie klienta.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       setError('');
       try {
-        const data = await fetchOfferFacts(filters.from, filters.to);
+        const data = await fetchOfferFacts(prevRange.from, filters.to);
         if (!cancelled) setFacts(data);
       } catch (err) {
         if (!cancelled) {
@@ -59,9 +71,19 @@ export default function StatsSection({ activeTab, onFollowUpCountChange }: Props
       }
     })();
     return () => { cancelled = true; };
-  }, [filters.from, filters.to]);
+  }, [prevRange.from, filters.to]);
 
-  const filtered = useMemo(() => applyFilters(facts, filters), [facts, filters]);
+  // UWAGA: `facts` zawiera także poprzedni okres — każda metryka bieżąca MUSI
+  // wychodzić od `filtered`, nigdy od `facts`.
+  const filtered = useMemo(
+    () => applyFilters(inDateRange(facts, filters.from, filters.to), filters),
+    [facts, filters],
+  );
+
+  const filteredPrev = useMemo(
+    () => applyFilters(inDateRange(facts, prevRange.from, prevRange.to), filters),
+    [facts, prevRange, filters],
+  );
 
   const reps = useMemo(
     () => Array.from(new Set(facts.map(f => f.prepared_by ?? NO_REP))).sort((a, b) => a.localeCompare(b, 'pl')),
@@ -110,7 +132,9 @@ export default function StatsSection({ activeTab, onFollowUpCountChange }: Props
         </div>
       ) : (
         <>
-          {activeTab === 'overview' && <TabPlaceholder name="Przegląd" facts={filtered} />}
+          {activeTab === 'overview' && (
+            <StatsOverviewTab facts={filtered} previousFacts={filteredPrev} onTabChange={onTabChange} />
+          )}
           {activeTab === 'reps'     && <TabPlaceholder name="Handlowcy" facts={filtered} />}
           {activeTab === 'followup' && <TabPlaceholder name="Do domknięcia" facts={followUps} />}
         </>

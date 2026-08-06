@@ -30,6 +30,23 @@ export function applyFilters(facts: OfferFact[], f: StatsFilters): OfferFact[] {
     f.modules.includes(x.module_code));
 }
 
+/**
+ * Wycina fakty z przedziału dat (włącznie).
+ *
+ * Potrzebne, bo pobieramy z bazy POSZERZONY zakres — bieżący okres plus
+ * poprzedni o tej samej długości — żeby jednym zapytaniem policzyć wskaźniki
+ * zmiany na kaflach KPI. Bez tego podziału oferty z poprzedniego okresu
+ * zawyżałyby wszystkie bieżące metryki.
+ */
+export function inDateRange(facts: OfferFact[], from: string, to: string): OfferFact[] {
+  const a = new Date(from).getTime();
+  const b = new Date(to).getTime();
+  return facts.filter(x => {
+    const t = new Date(x.created_at).getTime();
+    return t >= a && t <= b;
+  });
+}
+
 // ─── KPI ──────────────────────────────────────────────────────────────────────
 
 export interface Kpis {
