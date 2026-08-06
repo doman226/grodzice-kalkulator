@@ -18,8 +18,10 @@ import BeamRentalSection from './components/beam/BeamRentalSection';
 import type { BeamRentalTab } from './components/beam/BeamRentalSection';
 import BeamSaleSection from './components/sale/beam/BeamSaleSection';
 import type { BeamSaleTab } from './components/sale/beam/BeamSaleSection';
+import StatsSection from './components/stats/StatsSection';
+import type { StatsTab } from './components/stats/StatsSection';
 
-type Mode = 'rental' | 'sale';
+type Mode = 'rental' | 'sale' | 'stats';
 type RentalSubMode = 'sheet_pile' | 'road_plate' | 'beam';
 type SaleSubMode = 'sheet_pile' | 'pipe' | 'road_plate' | 'beam';
 type Tab = 'calculator' | 'profiles' | 'prices' | 'clients' | 'offers';
@@ -40,6 +42,8 @@ function App() {
   const [beamRentalOffersCount, setBeamRentalOffersCount] = useState(0);
   const [beamSaleActiveTab, setBeamSaleActiveTab] = useState<BeamSaleTab>('calculator');
   const [beamSaleOffersCount, setBeamSaleOffersCount] = useState(0);
+  const [statsActiveTab, setStatsActiveTab] = useState<StatsTab>('overview');
+  const [statsFollowUpCount, setStatsFollowUpCount] = useState(0);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [prices, setPrices] = useState<RentalPrices | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
@@ -175,28 +179,40 @@ function App() {
     { id: 'profiles',   label: 'Profile dwuteowników' },
   ];
 
-  // Wspólna lista zakładek dla nawigacji — string id, bo cztery różne discriminated unions.
+  // Statystyki — moduł analityczny, bez sub-trybu produktowego.
+  // Licznik przy „Do domknięcia" to oferty wysłane, wiszące ponad 30 dni.
+  const statsTabs: { id: StatsTab; label: string; badge?: number }[] = [
+    { id: 'overview', label: 'Przegląd' },
+    { id: 'reps',     label: 'Handlowcy' },
+    { id: 'followup', label: 'Do domknięcia', badge: statsFollowUpCount || undefined },
+  ];
+
+  // Wspólna lista zakładek dla nawigacji — string id, bo kilka różnych discriminated unions.
   const currentTabs: { id: string; label: string; badge?: number }[] =
-    mode === 'rental'
-      ? (rentalSubMode === 'beam' ? beamTabs : tabs)
-      : saleSubMode === 'pipe'
-        ? pipeSaleTabs
-        : saleSubMode === 'road_plate'
-          ? roadPlateSaleTabs
-          : saleSubMode === 'beam'
-            ? beamSaleTabs
-            : saleTabs;
+    mode === 'stats'
+      ? statsTabs
+      : mode === 'rental'
+        ? (rentalSubMode === 'beam' ? beamTabs : tabs)
+        : saleSubMode === 'pipe'
+          ? pipeSaleTabs
+          : saleSubMode === 'road_plate'
+            ? roadPlateSaleTabs
+            : saleSubMode === 'beam'
+              ? beamSaleTabs
+              : saleTabs;
 
   const currentActiveTab: string =
-    mode === 'rental'
-      ? (rentalSubMode === 'beam' ? beamRentalActiveTab : activeTab)
-      : saleSubMode === 'pipe'
-        ? pipeSaleActiveTab
-        : saleSubMode === 'road_plate'
-          ? roadPlateSaleActiveTab
-          : saleSubMode === 'beam'
-            ? beamSaleActiveTab
-            : saleActiveTab;
+    mode === 'stats'
+      ? statsActiveTab
+      : mode === 'rental'
+        ? (rentalSubMode === 'beam' ? beamRentalActiveTab : activeTab)
+        : saleSubMode === 'pipe'
+          ? pipeSaleActiveTab
+          : saleSubMode === 'road_plate'
+            ? roadPlateSaleActiveTab
+            : saleSubMode === 'beam'
+              ? beamSaleActiveTab
+              : saleActiveTab;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -209,7 +225,9 @@ function App() {
                 <img src="/header-logo.png" alt="Intra B.V." className="h-10 w-auto" />
               </div>
               <p className="text-blue-200 text-sm">
-                {mode === 'sale'
+                {mode === 'stats'
+                  ? 'Statystyki handlowe'
+                  : mode === 'sale'
                   ? (saleSubMode === 'pipe'
                       ? 'Kalkulator Sprzedaży Rur Stalowych'
                       : saleSubMode === 'road_plate'
@@ -246,6 +264,16 @@ function App() {
                   }`}
                 >
                   Sprzedaż
+                </button>
+                <button
+                  onClick={() => setMode('stats')}
+                  className={`px-4 py-2 transition-colors ${
+                    mode === 'stats'
+                      ? 'bg-white text-blue-900'
+                      : 'bg-transparent text-blue-200 hover:bg-blue-800'
+                  }`}
+                >
+                  Statystyki
                 </button>
               </div>
             </div>
@@ -347,7 +375,8 @@ function App() {
                 <button
                   key={tab.id}
                   onClick={() => {
-                    if (mode === 'rental') {
+                    if (mode === 'stats') setStatsActiveTab(tab.id as StatsTab);
+                    else if (mode === 'rental') {
                       if (rentalSubMode === 'beam') setBeamRentalActiveTab(tab.id as BeamRentalTab);
                       else setActiveTab(tab.id as Tab);
                     }
@@ -393,6 +422,12 @@ function App() {
               Spróbuj ponownie
             </button>
           </div>
+        ) : mode === 'stats' ? (
+          <StatsSection
+            activeTab={statsActiveTab}
+            onTabChange={setStatsActiveTab}
+            onFollowUpCountChange={setStatsFollowUpCount}
+          />
         ) : mode === 'sale' ? (
           saleSubMode === 'pipe' ? (
             <PipeSaleSection
