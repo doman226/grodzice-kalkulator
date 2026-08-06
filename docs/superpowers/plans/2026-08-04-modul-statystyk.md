@@ -205,25 +205,45 @@ nazwa migracji: `stats_module_view_and_followups`.
 
 **PYTAJ UŻYTKOWNIKA O ZGODĘ PRZED WYKONANIEM** — to zmiana w produkcyjnej bazie.
 
-- [ ] **Krok 3: Weryfikacja — sumy z widoku muszą zgadzać się z tabelami**
+- [ ] **Krok 3: Weryfikacja — niezmiennik widoku (test regresji)**
+
+**NIE porównuj z liczbą zapamiętaną wcześniej** — baza produkcyjna żyje, oferty
+przybywają w trakcie pracy, więc „525 zamiast 506" nic nie dowodzi. Właściwy
+test sprawdza niezmiennik odporny na wzrost danych:
 
 ```sql
-SELECT count(*) ofert, round(sum(value_pln)) wartosc, round(sum(mass_t)) tony,
-       count(*) FILTER (WHERE status='przyjęta') przyjete,
-       count(DISTINCT module_code) modulow
-FROM v_offer_stats;
+WITH widok AS (
+  SELECT module_code, count(*) n, count(DISTINCT id) unikalnych
+  FROM v_offer_stats GROUP BY 1
+), zrodlo AS (
+  SELECT 'OF' mc, count(*) n FROM offers
+    WHERE deleted_at IS NULL AND COALESCE(item_type,'sheet_pile')='sheet_pile'
+  UNION ALL SELECT 'OP', count(*) FROM offers
+    WHERE deleted_at IS NULL AND item_type='road_plate'
+  UNION ALL SELECT 'OH', count(*) FROM beam_rental_offers WHERE deleted_at IS NULL
+  UNION ALL SELECT 'SP', count(*) FROM sale_offers WHERE deleted_at IS NULL
+  UNION ALL SELECT 'SR', count(*) FROM pipe_sale_offers WHERE deleted_at IS NULL
+  UNION ALL SELECT 'SPP', count(*) FROM road_plate_sale_offers WHERE deleted_at IS NULL
+  UNION ALL SELECT 'SH', count(*) FROM beam_sale_offers WHERE deleted_at IS NULL
+)
+SELECT z.mc, z.n w_tabeli, w.n w_widoku, w.unikalnych,
+       CASE WHEN z.n = w.n AND w.n = w.unikalnych THEN 'OK' ELSE 'ROZJAZD' END wynik
+FROM zrodlo z JOIN widok w ON w.module_code = z.mc ORDER BY z.mc;
 ```
 
-Oczekiwane (stan 2026-08-04, liczby rosną wraz z nowymi ofertami):
-`ofert ≈ 506`, `wartosc ≈ 219 911 033`, `tony ≈ 68 540`, `przyjete = 30`,
-`modulow = 7`.
+Wymagane: **`OK` w każdym z 7 wierszy.**
 
-Kontrola per moduł — musi się zgadzać z tabelą w specu:
+- `w_tabeli = w_widoku` — widok nie gubi ani nie dokłada ofert
+- `n = unikalnych` — `LEFT JOIN` (clients, offer_followups) nie duplikuje wierszy.
+  To najczęstszy błąd w widokach tego typu; przy `UNION ALL` przez 7 tabel
+  zawyżyłby **każdą kwotę w module** i byłby niewidoczny gołym okiem.
 
-```sql
-SELECT module_code, count(*), round(sum(value_pln)), round(sum(mass_t))
-FROM v_offer_stats GROUP BY module_code ORDER BY 3 DESC;
-```
+Ten test uruchamiaj ponownie po każdej zmianie widoku i przy dodaniu ósmego
+modułu.
+
+**Wynik wykonania 2026-08-06:** wszystkie 7 modułów `OK`
+(OF 105, OP 4, OH 2, SP 297, SR 111, SPP 3, SH 3 — razem 525 ofert,
+245 371 958 PLN, 74 137 t).
 
 - [ ] **Krok 4: Weryfikacja uprawnień z poziomu PostgREST**
 
