@@ -868,6 +868,46 @@ Task 4 pominął **własny zakres dat** z listy filtrów — uzupełnione w Task
 
 ---
 
+## Dług techniczny — do ponownej oceny
+
+### Agregacja po stronie klienta zamiast w bazie
+
+**Status: świadomie odłożone (decyzja użytkownika, 2026-08-06).**
+
+`fetchOfferFacts` pobiera surowe wiersze widoku i agreguje je w przeglądarce.
+Dwa ograniczenia serwera stawiają temu granicę:
+
+| Ograniczenie | Wartość | Weryfikacja |
+|---|---|---|
+| Limit wierszy PostgREST | `pgrst.db_max_rows = 5000` | `SELECT rolconfig FROM pg_roles WHERE rolname='authenticator'` |
+| Limit czasu zapytania | `statement_timeout = 3s` dla roli **`anon`** | `SELECT rolconfig FROM pg_roles WHERE rolname='anon'` |
+
+Widok liczy masę skorelowanym podzapytaniem do tabeli pozycji **dla każdego
+wiersza osobno**, więc koszt rośnie z liczbą ofert razy liczba pozycji.
+Prawdopodobnie **limit czasu uderzy przed limitem wierszy**.
+
+**Dlaczego odłożone:** obecna skala (ok. 530 ofert wobec limitu 5000) tego nie
+wymaga, a planowane przejście na **Supabase Auth** przeniesie aplikację z roli
+`anon` na `authenticated`, co może unieważnić argument o `statement_timeout=3s`
+(rola `authenticated` ma własną konfigurację — sprawdzić przy migracji).
+
+**Zabezpieczenie tymczasowe (wdrożone):** `FETCH_LIMIT = 5000` równy limitowi
+serwera plus wykrywanie ucięcia — moduł pokazuje czerwony baner „dane są
+niepełne" zamiast po cichu zaniżać statystyki. Cicha awaria zamieniona w głośną.
+
+**Kiedy wrócić do tematu:**
+- statystyki zaczynają zauważalnie zwalniać przy wejściu w moduł,
+- pojawia się baner o niepełnych danych,
+- liczba ofert przekracza ok. 3000 (60% limitu),
+- przy okazji wdrażania Supabase Auth — sprawdzić `rolconfig` roli `authenticated`.
+
+**Rozwiązanie docelowe:** RPC zwracające gotowe agregaty zamiast surowych
+wierszy (jedno wywołanie = kilkanaście wierszy wyniku) oraz zamiana
+skorelowanych podzapytań w widoku na `LEFT JOIN LATERAL` z pojedynczą
+agregacją pozycji.
+
+---
+
 ## Poza zakresem tego planu
 
 Zakładki Produkty i Klienci (10 wykresów), eksport PDF/Excel, cele sprzedażowe,
