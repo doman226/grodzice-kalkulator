@@ -243,6 +243,52 @@ export function computeFollowUps(facts: OfferFact[], olderThanDays: number): Off
 export const daysAgo = (iso: string): number =>
   Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
 
+export interface AgeBucket {
+  label: string;
+  count: number;
+  valuePln: number;
+  /**
+   * Próg dla zakładki Do domknięcia, albo `null` gdy przedział nie jest
+   * jeszcze zaległy. Lista pokazuje oferty STARSZE NIŻ próg, więc kliknięcie
+   * w przedział „60–90" pokaże także wszystko powyżej 90 — to nadzbiór.
+   */
+  threshold: number | null;
+}
+
+/**
+ * Wiek ofert czekających na decyzję, w przedziałach.
+ *
+ * Semantyka identyczna z `computeFollowUps`: tylko status „wysłana", z
+ * pominięciem ofert aktywnie odłożonych („wciąż w grze"). Dzięki temu liczby
+ * na tej karcie zgadzają się z tym, co użytkownik zobaczy po kliknięciu.
+ */
+export function computePendingAge(facts: OfferFact[]): AgeBucket[] {
+  const now = Date.now();
+  const pending = facts.filter(x =>
+    x.status === 'wysłana' &&
+    (!x.snoozed_until || new Date(x.snoozed_until).getTime() < now));
+
+  const defs: { label: string; min: number; max: number; threshold: number | null }[] = [
+    { label: 'do 30 dni',   min: 0,  max: 30,       threshold: null },
+    { label: '30–60 dni',   min: 30, max: 60,       threshold: 30 },
+    { label: '60–90 dni',   min: 60, max: 90,       threshold: 60 },
+    { label: 'ponad 90 dni', min: 90, max: Infinity, threshold: 90 },
+  ];
+
+  return defs.map(d => {
+    const inBucket = pending.filter(x => {
+      const age = daysAgo(x.created_at);
+      return age >= d.min && age < d.max;
+    });
+    return {
+      label: d.label,
+      count: inBucket.length,
+      valuePln: sumValue(inBucket),
+      threshold: d.threshold,
+    };
+  });
+}
+
 // ─── Okresy ───────────────────────────────────────────────────────────────────
 
 const startOfDay = (d: Date) => { d.setHours(0, 0, 0, 0); return d; };

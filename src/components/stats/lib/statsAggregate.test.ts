@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   computeKpis, computeByRep, computeMonthly, computeStatusSplit,
-  applyFilters, inDateRange, computeFollowUps,
+  applyFilters, inDateRange, computeFollowUps, computePendingAge,
   buildPeriod, previousPeriod, pctChange,
 } from './statsAggregate';
 import type { OfferFact, StatsFilters, StatsModule } from './statsTypes';
@@ -251,6 +251,40 @@ describe('oferty do domknięcia', () => {
     expect(ids).not.toContain(szkic.id);          // nie trafiła do klienta
     expect(ids).not.toContain(odlozone.id);       // odłożona na przyszłość
     expect(wynik.length).toBe(2);
+  });
+});
+
+describe('wiek ofert nierozstrzygniętych', () => {
+  it('16. przypisuje przedziały rozłącznie i pomija to, czego nie ma na liście', () => {
+    const buckets = computePendingAge([
+      fact({ status: 'wysłana', created_at: daysFromNow(-10),  value_pln: 100 }),
+      fact({ status: 'wysłana', created_at: daysFromNow(-45),  value_pln: 200 }),
+      fact({ status: 'wysłana', created_at: daysFromNow(-75),  value_pln: 300 }),
+      fact({ status: 'wysłana', created_at: daysFromNow(-200), value_pln: 400 }),
+      fact({ status: 'przyjęta', created_at: daysFromNow(-200) }),          // rozstrzygnięta
+      fact({ status: 'szkic',    created_at: daysFromNow(-200) }),          // nie u klienta
+      fact({ status: 'wysłana', created_at: daysFromNow(-200),
+             snoozed_until: daysFromNow(15) }),                             // odłożona
+    ]);
+    expect(buckets.map(b => b.count)).toEqual([1, 1, 1, 1]);
+    expect(buckets.map(b => b.valuePln)).toEqual([100, 200, 300, 400]);
+    // Suma przedziałów = liczba ofert, które pokazałaby lista Do domknięcia.
+    expect(buckets.reduce((s, b) => s + b.count, 0)).toBe(4);
+  });
+
+  it('17. progi przejścia: pierwszy przedział bez akcji, pozostałe z dolną granicą', () => {
+    const buckets = computePendingAge([fact({ status: 'wysłana', created_at: daysFromNow(-5) })]);
+    expect(buckets.map(b => b.threshold)).toEqual([null, 30, 60, 90]);
+  });
+
+  it('granica przedziału należy do starszego kubełka', () => {
+    // Dokładnie 30 dni → „30–60", nie „do 30". Przedziały muszą być rozłączne,
+    // inaczej oferta liczyłaby się dwa razy albo znikała.
+    const buckets = computePendingAge([
+      fact({ status: 'wysłana', created_at: daysFromNow(-30) }),
+    ]);
+    expect(buckets[0].count).toBe(0);
+    expect(buckets[1].count).toBe(1);
   });
 });
 

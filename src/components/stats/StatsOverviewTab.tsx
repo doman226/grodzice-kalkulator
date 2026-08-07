@@ -10,8 +10,9 @@ import KpiCard from './charts/KpiCard';
 import TrendChart from './charts/TrendChart';
 import StatusDonut from './charts/StatusDonut';
 import ModuleBars from './charts/ModuleBars';
+import PendingAgeBars from './charts/PendingAgeBars';
 import {
-  computeKpis, computeMonthly, computeStatusSplit, computeByModule,
+  computeKpis, computeMonthly, computeStatusSplit, computeByModule, computePendingAge,
   pctChange, fmtInt, fmtCompact, fmtPct, fmtTons,
 } from './lib/statsAggregate';
 import type { OfferFact, StatsKind } from './lib/statsTypes';
@@ -24,14 +25,19 @@ interface Props {
   /** Aktywny zakres — decyduje, czy wartość pokazać łącznie czy rozdzielnie. */
   kind: StatsKind | 'all';
   onTabChange: (tab: StatsTab) => void;
+  /** Przejście do Do domknięcia z ustawionym progiem wieku. */
+  onJumpToFollowUp: (threshold: number) => void;
 }
 
-export default function StatsOverviewTab({ facts, previousFacts, kind, onTabChange }: Props) {
+export default function StatsOverviewTab({
+  facts, previousFacts, kind, onTabChange, onJumpToFollowUp,
+}: Props) {
   const kpis     = useMemo(() => computeKpis(facts), [facts]);
   const prev     = useMemo(() => computeKpis(previousFacts), [previousFacts]);
   const monthly  = useMemo(() => computeMonthly(facts), [facts]);
   const statuses = useMemo(() => computeStatusSplit(facts), [facts]);
   const modules  = useMemo(() => computeByModule(facts), [facts]);
+  const ageBuckets = useMemo(() => computePendingAge(facts), [facts]);
 
   // Bez danych porównawczych nie pokazujemy wskaźnika zmiany zamiast zmyślać 0%.
   const hasPrev = previousFacts.length > 0;
@@ -151,11 +157,19 @@ export default function StatsOverviewTab({ facts, previousFacts, kind, onTabChan
       {/* items-start: karty przyjmują własną wysokość. Bez tego siatka
           rozciągałaby kartę statusów do wysokości sąsiadki z 7-wierszową
           tabelą, zostawiając pod pierścieniem ~450 px pustego pola. */}
+      {/* DWIE kolumny, nie trzy. Trzy karty wrzucone wprost do `auto-fit`
+          utworzyłyby trzeci tor i ścisnęły kartę modułów (z 7-kolumnową
+          tabelą) do jednej trzeciej szerokości. Dlatego obie niskie karty
+          siedzą w zagnieżdżonej kolumnie po lewej. */}
       <div className="grid gap-4 items-start"
            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
-        {/* Donut dostaje PEŁNĄ liczbę ofert (ze szkicami) — inaczej udziały
-            nie sumowałyby się do 100%, bo szkice są jednym z segmentów. */}
-        <StatusDonut data={statuses} total={facts.length} />
+        <div className="grid gap-4 content-start">
+          {/* Donut dostaje PEŁNĄ liczbę ofert (ze szkicami) — inaczej udziały
+              nie sumowałyby się do 100%, bo szkice są jednym z segmentów. */}
+          <StatusDonut data={statuses} total={facts.length} />
+          {/* Dopełnia donut: on mówi ILE ofert wisi, ta karta — JAK DŁUGO. */}
+          <PendingAgeBars buckets={ageBuckets} onJump={onJumpToFollowUp} />
+        </div>
         <ModuleBars rows={modules} />
       </div>
     </div>

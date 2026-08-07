@@ -26,12 +26,19 @@ interface Props {
   facts: OfferFact[];
   /** Aktywny filtr handlowca — trafia do `decided_by` jako ślad, kto domknął. */
   activeRep: string | 'all';
+  /**
+   * Próg wieku trzymany w kontenerze, nie lokalnie — dzięki temu karta
+   * „Jak długo czekają oferty" w Przeglądzie może go ustawić przy przejściu.
+   */
+  threshold: number;
+  onThresholdChange: (days: number) => void;
   /** Aktualizuje fakt w stanie rodzica, żeby KPI przeliczyły się bez refetchu. */
   onFactUpdate: (id: string, patch: Partial<OfferFact>) => void;
 }
 
-export default function StatsFollowUpTab({ facts, activeRep, onFactUpdate }: Props) {
-  const [threshold, setThreshold] = useState<number>(30);
+export default function StatsFollowUpTab({
+  facts, activeRep, threshold, onThresholdChange, onFactUpdate,
+}: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
@@ -152,7 +159,8 @@ export default function StatsFollowUpTab({ facts, activeRep, onFactUpdate }: Pro
           </span>
           <div className="flex gap-1.5">
             {THRESHOLDS.map(t => (
-              <button key={t} type="button" onClick={() => { setThreshold(t); setSelected(new Set()); }}
+              <button key={t} type="button"
+                      onClick={() => { onThresholdChange(t); setSelected(new Set()); }}
                       className={chip(threshold === t)}>
                 {t} dni
               </button>

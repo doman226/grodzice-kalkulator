@@ -40,6 +40,9 @@ export default function StatsSection({ activeTab, onTabChange, onFollowUpCountCh
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState('');
   const [truncated, setTruncated] = useState(false);
+  /** Próg wieku dla zakładki Do domknięcia — w kontenerze, bo ustawia go
+   *  także karta „Jak długo czekają oferty" w Przeglądzie. */
+  const [followUpThreshold, setFollowUpThreshold] = useState(FOLLOWUP_DEFAULT_DAYS);
 
   const [filters, setFilters] = useState<StatsFilters>(() => {
     const { from, to } = buildPeriod('this_year');
@@ -154,12 +157,19 @@ export default function StatsSection({ activeTab, onTabChange, onFollowUpCountCh
       ) : (
         <>
           {activeTab === 'overview' && (
-            <StatsOverviewTab facts={filtered} previousFacts={filteredPrev}
-                              kind={filters.kind} onTabChange={onTabChange} />
+            <StatsOverviewTab
+              facts={filtered} previousFacts={filteredPrev}
+              kind={filters.kind} onTabChange={onTabChange}
+              onJumpToFollowUp={(days) => { setFollowUpThreshold(days); onTabChange('followup'); }}
+            />
           )}
           {activeTab === 'reps'     && <StatsRepsTab facts={filtered} />}
           {activeTab === 'followup' && (
-            <StatsFollowUpTab facts={filtered} activeRep={filters.rep} onFactUpdate={handleFactUpdate} />
+            <StatsFollowUpTab
+              facts={filtered} activeRep={filters.rep}
+              threshold={followUpThreshold} onThresholdChange={setFollowUpThreshold}
+              onFactUpdate={handleFactUpdate}
+            />
           )}
         </>
       )}
