@@ -1,10 +1,15 @@
 /**
- * MarginScatter.tsx — obrót zestawiony ze średnią marżą, punkt = handlowiec.
+ * MarginScatter.tsx — wartość wystawionych ofert zestawiona ze średnią marżą,
+ * punkt = handlowiec.
  *
- * Sens tego wykresu: ranking po samym obrocie premiuje tego, kto najwięcej
- * upuszcza z ceny. Zestawienie obrotu z marżą rozdziela dwie różne rzeczy —
- * „robi duży wolumen" i „robi duże pieniądze". Handlowiec wysoko na osi X, ale
- * nisko na Y, kupuje obrót rabatem.
+ * UWAGA TERMINOLOGICZNA: to NIE jest obrót. Moduł analizuje oferty, a nie
+ * faktury — oferta za 129 mln nie oznacza 129 mln przychodu. Słowo „obrót"
+ * jest tu świadomie unikane, bo zarząd czyta je jako przychód księgowy.
+ *
+ * Sens wykresu: ranking po samej wartości ofert premiuje tego, kto najwięcej
+ * upuszcza z ceny. Zestawienie z marżą rozdziela dwie różne rzeczy — „wystawia
+ * duże oferty" i „zarabia". Handlowiec wysoko na osi X, ale nisko na Y, kupuje
+ * wolumen rabatem.
  *
  * Wykonalne tylko dlatego, że baza trzyma `margin_pct` per oferta.
  * Handlowcy bez ofert sprzedaży (sam wynajem) nie mają marży — są wypisani pod
@@ -30,7 +35,7 @@ export default function MarginScatter({ rows }: Props) {
   if (withMargin.length === 0) {
     return (
       <div className="bg-white border border-gray-200 rounded-lg p-5">
-        <h3 className="text-sm font-semibold text-gray-800">Obrót a marża</h3>
+        <h3 className="text-sm font-semibold text-gray-800">Wartość ofert a marża</h3>
         <p className="text-xs text-gray-400 mt-4">
           Brak ofert sprzedaży w filtrze — marża dotyczy tylko sprzedaży.
         </p>
@@ -53,16 +58,16 @@ export default function MarginScatter({ rows }: Props) {
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-5">
-      <h3 className="text-sm font-semibold text-gray-800">Obrót a marża</h3>
+      <h3 className="text-sm font-semibold text-gray-800">Wartość ofert a marża</h3>
       <p className="text-xs text-gray-400 mt-0.5 mb-3">
-        Duży słupek nie zawsze znaczy duże pieniądze
+        Duża wartość ofert nie zawsze znaczy duże pieniądze
       </p>
 
       <div className="overflow-x-auto">
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ minWidth: 360, display: 'block' }}
              role="img"
              aria-label={`Wykres punktowy obrotu i marży: ${
-               withMargin.map(r => `${r.rep} — obrót ${fmtCompact(r.valuePln)} PLN, marża ${fmtPct(r.avgMargin)}`).join('; ')}`}>
+               withMargin.map(r => `${r.rep} — wartość ofert ${fmtCompact(r.valuePln)} PLN, marża ${fmtPct(r.avgMargin)}`).join('; ')}`}>
           {yTicks.map((t, i) => (
             <g key={`y${t}`}>
               <line x1={PAD_L} x2={W - PAD_R} y1={yOf(t)} y2={yOf(t)}
@@ -93,7 +98,7 @@ export default function MarginScatter({ rows }: Props) {
             return (
               <g key={r.rep}>
                 <title>
-                  {`${r.rep} — obrót ${fmtCompact(r.valuePln)} PLN, marża ${fmtPct(r.avgMargin)}, skuteczność ${fmtPct(r.winRate)}`}
+                  {`${r.rep} — wartość ofert ${fmtCompact(r.valuePln)} PLN, marża ${fmtPct(r.avgMargin)}, skuteczność ${fmtPct(r.winRate)}`}
                 </title>
                 <circle cx={cx} cy={cy} r={8} fill={below ? '#dc2626' : '#1d4ed8'} />
                 <text x={cx} y={cy - 14} textAnchor="middle" fontSize={11}
@@ -105,7 +110,7 @@ export default function MarginScatter({ rows }: Props) {
           })}
 
           <text x={PAD_L + PLOT_W / 2} y={H - 5} textAnchor="middle" fontSize={10} fill="#9ca3af">
-            obrót (PLN) →
+            wartość wystawionych ofert (PLN) →
           </text>
         </svg>
       </div>

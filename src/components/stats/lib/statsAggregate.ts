@@ -6,12 +6,18 @@
  * dlatego jest odizolowane i weryfikowane kontrolą krzyżową SQL.
  *
  * KONWENCJE LICZENIA (spójne we wszystkich funkcjach):
- *  • `count` / `valuePln` / `massT` — WSZYSTKIE oferty w filtrze, także szkice.
- *  • Skuteczność = przyjęte / (przyjęte + odrzucone). Szkice i oferty wysłane
- *    nie wchodzą do mianownika — nie są rozstrzygnięte. Brak rozstrzygniętych
- *    daje `null` (wyświetlane jako „—"), nigdy 0%.
+ *  • SZKICE SĄ POZA METRYKAMI HANDLOWYMI. `count`, `valuePln`, `massT` i
+ *    `avgOffer` liczą wyłącznie oferty, które trafiły do klienta (wysłane,
+ *    przyjęte, odrzucone). Szkic to notatka robocza, nie oferta — wliczanie go
+ *    zawyżało wartość o ok. 5%. Liczba i wartość szkiców są dostępne osobno
+ *    jako `drafts` / `draftPln`.
+ *  • Skuteczność = przyjęte / (przyjęte + odrzucone). Oferty wysłane nie
+ *    wchodzą do mianownika — nie są rozstrzygnięte. Brak rozstrzygniętych daje
+ *    `null` (wyświetlane jako „—"), nigdy 0%.
  *  • Średnia marża pomija szkice ORAZ oferty z marżą ≥ 100% (koszt zakupu = 0,
- *    czyli handlowiec go nie wpisał — inaczej średnia byłaby zawyżona).
+ *    czyli handlowiec go nie wpisał). Marże ZEROWE I UJEMNE WCHODZĄ do średniej —
+ *    wycinanie ich usuwałoby z rachunku wyłącznie najgorsze transakcje i czyniło
+ *    metrykę tym bardziej optymistyczną, im gorzej firma sprzedaje.
  *  • Wykresy czasowe opierają się na `created_at` (data wystawienia), nigdy na
  *    dacie decyzji — patrz spec.
  */
@@ -50,10 +56,16 @@ export function inDateRange(facts: OfferFact[], from: string, to: string): Offer
 // ─── KPI ──────────────────────────────────────────────────────────────────────
 
 export interface Kpis {
-  /** Wszystkie oferty w filtrze, łącznie ze szkicami. */
+  /** Oferty, które trafiły do klienta — BEZ szkiców. */
   count: number;
+  /** Wartość ofert bez szkiców. */
   valuePln: number;
+  /** Tonaż ofert bez szkiców. */
   massT: number;
+  /** Wartość wyłącznie ofert sprzedaży — nigdy sklejana z wynajmem. */
+  saleValuePln: number;
+  /** Wartość wyłącznie ofert wynajmu. */
+  rentalValuePln: number;
   /** Wartość ofert przyjętych. */
   wonPln: number;
   /** Wartość ofert odrzuconych. */
@@ -66,6 +78,7 @@ export interface Kpis {
   rejected: number;
   /** Wysłane i nierozstrzygnięte — mianownik problemu jakości danych. */
   pending: number;
+  /** Liczba szkiców — poza `count`, podawana osobno jako informacja. */
   drafts: number;
   /** przyjęte / (przyjęte + odrzucone) w %, lub null gdy brak rozstrzygniętych. */
   winRate: number | null;
@@ -81,35 +94,40 @@ const sumValue = (facts: OfferFact[]): number =>
   facts.reduce((s, x) => s + num(x.value_pln), 0);
 
 export function computeKpis(facts: OfferFact[]): Kpis {
-  const accepted = facts.filter(x => x.status === 'przyjęta');
-  const rejected = facts.filter(x => x.status === 'odrzucona');
+  // Szkice odpadają ze WSZYSTKICH metryk handlowych — patrz konwencje na górze.
+  const live = facts.filter(x => x.status !== 'szkic');
+  const drafts = facts.filter(x => x.status === 'szkic');
+
+  const accepted = live.filter(x => x.status === 'przyjęta');
+  const rejected = live.filter(x => x.status === 'odrzucona');
   const decided = accepted.length + rejected.length;
 
-  const margins = facts.filter(x =>
-    x.status !== 'szkic' && x.margin_pct !== null &&
-    x.margin_pct > 0 && x.margin_pct < 100);
+  // Marża: bez szkiców i bez ofert z niewpisanym kosztem (≥100%).
+  // Zero i wartości ujemne WCHODZĄ — to realne transakcje po koszcie lub poniżej.
+  const margins = live.filter(x => x.margin_pct !== null && x.margin_pct < 100);
 
-  const valuePln = facts.reduce((s, x) => s + num(x.value_pln), 0);
+  const valuePln = sumValue(live);
 
   return {
-    count: facts.length,
+    count: live.length,
     valuePln,
-    massT: facts.reduce((s, x) => s + num(x.mass_t), 0),
+    massT: live.reduce((s, x) => s + num(x.mass_t), 0),
+    saleValuePln: sumValue(live.filter(x => x.kind === 'sale')),
+    rentalValuePln: sumValue(live.filter(x => x.kind === 'rental')),
     wonPln: sumValue(accepted),
     lostPln: sumValue(rejected),
-    pendingPln: sumValue(facts.filter(x => x.status === 'wysłana')),
-    draftPln: sumValue(facts.filter(x => x.status === 'szkic')),
+    pendingPln: sumValue(live.filter(x => x.status === 'wysłana')),
+    draftPln: sumValue(drafts),
     accepted: accepted.length,
     rejected: rejected.length,
-    pending: facts.filter(x => x.status === 'wysłana').length,
-    drafts: facts.filter(x => x.status === 'szkic').length,
+    pending: live.filter(x => x.status === 'wysłana').length,
+    drafts: drafts.length,
     winRate: decided === 0 ? null : (accepted.length / decided) * 100,
     avgMargin: margins.length === 0
       ? null
       : margins.reduce((s, x) => s + num(x.margin_pct), 0) / margins.length,
-    noCostCount: facts.filter(x =>
-      x.status !== 'szkic' && x.margin_pct !== null && x.margin_pct >= 100).length,
-    avgOffer: facts.length === 0 ? 0 : valuePln / facts.length,
+    noCostCount: live.filter(x => x.margin_pct !== null && x.margin_pct >= 100).length,
+    avgOffer: live.length === 0 ? 0 : valuePln / live.length,
   };
 }
 
@@ -154,9 +172,10 @@ export interface MonthPoint {
   valuePln: number;
 }
 
+/** Trend liczony bez szkiców — spójnie z kaflami KPI. */
 export function computeMonthly(facts: OfferFact[]): MonthPoint[] {
   const map = new Map<string, MonthPoint>();
-  for (const x of facts) {
+  for (const x of facts.filter(f => f.status !== 'szkic')) {
     const month = x.created_at.slice(0, 7);
     const cur = map.get(month) ?? { month, count: 0, valuePln: 0 };
     cur.count += 1;
@@ -166,6 +185,10 @@ export function computeMonthly(facts: OfferFact[]): MonthPoint[] {
   return Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month));
 }
 
+/**
+ * Rozkład statusów — JEDYNA funkcja licząca szkice na równi z resztą,
+ * bo jej zadaniem jest pokazać pełny obraz stanów, w tym ile jest szkiców.
+ */
 export function computeStatusSplit(facts: OfferFact[]): { status: string; count: number }[] {
   return (['wysłana', 'przyjęta', 'odrzucona', 'szkic'] as const)
     .map(status => ({ status, count: facts.filter(x => x.status === status).length }))

@@ -1,20 +1,25 @@
 /**
  * RepStackedBars.tsx — wartość ofert per handlowiec z podziałem na rozstrzygnięcie.
  *
- * Podział jest WARTOŚCIOWY, nie ilościowy: pasek pokazuje, jaka część pieniędzy
- * wystawionych przez handlowca została wygrana, przegrana, wisi lub jest wciąż
- * szkicem. Długość całego paska odpowiada wartości względem lidera, więc widać
- * naraz dwie rzeczy — skalę i strukturę.
+ * Podział jest WARTOŚCIOWY, nie ilościowy: pasek pokazuje, jaka część wartości
+ * ofert wystawionych przez handlowca została przyjęta, odrzucona lub wciąż
+ * czeka na decyzję. Długość całego paska odpowiada wartości względem lidera,
+ * więc widać naraz dwie rzeczy — skalę i strukturę.
+ *
+ * To wartość OFERT, nie obrót — moduł analizuje oferty, a nie faktury.
  */
 
 import type { RepRow } from '../lib/statsAggregate';
 import { fmtCompact, fmtPln } from '../lib/statsAggregate';
 
+/**
+ * Szkice celowo nie są segmentem — są poza metrykami handlowymi, więc suma
+ * trzech poniższych części równa się dokładnie `valuePln` handlowca.
+ */
 const PARTS = [
-  { key: 'wonPln',     label: 'Wygrane',  color: '#16a34a' },
-  { key: 'lostPln',    label: 'Przegrane', color: '#dc2626' },
-  { key: 'pendingPln', label: 'W toku',   color: '#f59e0b' },
-  { key: 'draftPln',   label: 'Szkice',   color: '#d1d5db' },
+  { key: 'wonPln',     label: 'Przyjęte',  color: '#16a34a' },
+  { key: 'lostPln',    label: 'Odrzucone', color: '#dc2626' },
+  { key: 'pendingPln', label: 'W toku',    color: '#f59e0b' },
 ] as const;
 
 interface Props {

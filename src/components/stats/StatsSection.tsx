@@ -17,7 +17,7 @@ import StatsFilterBar from './StatsFilterBar';
 import StatsOverviewTab from './StatsOverviewTab';
 import StatsRepsTab from './StatsRepsTab';
 import StatsFollowUpTab from './StatsFollowUpTab';
-import { fetchOfferFacts } from './lib/statsQueries';
+import { fetchOfferFacts, FETCH_LIMIT } from './lib/statsQueries';
 import {
   applyFilters, inDateRange, computeFollowUps, buildPeriod, previousPeriod,
 } from './lib/statsAggregate';
@@ -36,9 +36,10 @@ interface Props {
 }
 
 export default function StatsSection({ activeTab, onTabChange, onFollowUpCountChange }: Props) {
-  const [facts, setFacts]     = useState<OfferFact[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState('');
+  const [facts, setFacts]         = useState<OfferFact[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState('');
+  const [truncated, setTruncated] = useState(false);
 
   const [filters, setFilters] = useState<StatsFilters>(() => {
     const { from, to } = buildPeriod('this_year');
@@ -60,8 +61,8 @@ export default function StatsSection({ activeTab, onTabChange, onFollowUpCountCh
       setLoading(true);
       setError('');
       try {
-        const data = await fetchOfferFacts(prevRange.from, filters.to);
-        if (!cancelled) setFacts(data);
+        const { facts: data, truncated: cut } = await fetchOfferFacts(prevRange.from, filters.to);
+        if (!cancelled) { setFacts(data); setTruncated(cut); }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Nie udało się pobrać danych statystyk.');
@@ -130,6 +131,16 @@ export default function StatsSection({ activeTab, onTabChange, onFollowUpCountCh
     <div>
       <StatsFilterBar filters={filters} onChange={setFilters} reps={reps} />
 
+      {truncated && (
+        <div className="bg-red-50 border border-red-300 rounded-lg p-4 mb-4">
+          <p className="text-sm text-red-800">
+            <b>Uwaga: dane są niepełne.</b> Zapytanie dobiło do limitu {FETCH_LIMIT} wierszy
+            narzuconego przez serwer, więc statystyki poniżej nie obejmują wszystkich ofert
+            z wybranego okresu. Zawęź okres, żeby zobaczyć prawdziwe liczby.
+          </p>
+        </div>
+      )}
+
       {filters.modules.length === 0 ? (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 text-center">
           <p className="text-amber-800 font-medium">Nie wybrano żadnego modułu</p>
@@ -143,7 +154,8 @@ export default function StatsSection({ activeTab, onTabChange, onFollowUpCountCh
       ) : (
         <>
           {activeTab === 'overview' && (
-            <StatsOverviewTab facts={filtered} previousFacts={filteredPrev} onTabChange={onTabChange} />
+            <StatsOverviewTab facts={filtered} previousFacts={filteredPrev}
+                              kind={filters.kind} onTabChange={onTabChange} />
           )}
           {activeTab === 'reps'     && <StatsRepsTab facts={filtered} />}
           {activeTab === 'followup' && (

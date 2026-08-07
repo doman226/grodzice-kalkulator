@@ -14,17 +14,19 @@ import {
   computeKpis, computeMonthly, computeStatusSplit, computeByModule,
   pctChange, fmtInt, fmtCompact, fmtPct, fmtTons,
 } from './lib/statsAggregate';
-import type { OfferFact } from './lib/statsTypes';
+import type { OfferFact, StatsKind } from './lib/statsTypes';
 import type { StatsTab } from './StatsSection';
 
 interface Props {
   facts: OfferFact[];
   /** Ten sam filtr, ale za poprzedni okres — do wskaźników zmiany. */
   previousFacts: OfferFact[];
+  /** Aktywny zakres — decyduje, czy wartość pokazać łącznie czy rozdzielnie. */
+  kind: StatsKind | 'all';
   onTabChange: (tab: StatsTab) => void;
 }
 
-export default function StatsOverviewTab({ facts, previousFacts, onTabChange }: Props) {
+export default function StatsOverviewTab({ facts, previousFacts, kind, onTabChange }: Props) {
   const kpis     = useMemo(() => computeKpis(facts), [facts]);
   const prev     = useMemo(() => computeKpis(previousFacts), [previousFacts]);
   const monthly  = useMemo(() => computeMonthly(facts), [facts]);
@@ -38,6 +40,14 @@ export default function StatsOverviewTab({ facts, previousFacts, onTabChange }: 
   const decided = kpis.accepted + kpis.rejected;
   const pendingShare = kpis.count === 0 ? 0 : kpis.pending / kpis.count;
 
+  /** Wartość przyjętych ofert w rozbiciu — również nie sumowana na ekranie. */
+  const wonSplit = useMemo(() => {
+    const won = facts.filter(f => f.status === 'przyjęta');
+    const sum = (k: string) => won.filter(f => f.kind === k)
+      .reduce((s, f) => s + (Number(f.value_pln) || 0), 0);
+    return { sale: sum('sale'), rental: sum('rental') };
+  }, [facts]);
+
   return (
     <div>
       <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
@@ -45,20 +55,47 @@ export default function StatsOverviewTab({ facts, previousFacts, onTabChange }: 
           label="Ofert wystawionych"
           value={fmtInt(kpis.count)}
           change={change(kpis.count, prev.count)}
-          hint={kpis.drafts > 0 ? `w tym ${fmtInt(kpis.drafts)} szkiców` : undefined}
+          hint={kpis.drafts > 0 ? `+ ${fmtInt(kpis.drafts)} szkiców poza statystyką` : undefined}
         />
+
+        {/* Wartość sprzedaży i wynajmu NIGDY nie jest sumowana w jedną kwotę:
+            sprzedaż to jednorazowy przychód, wynajem to opłata za okres.
+            W trybie „Wszystko" pokazujemy dwa osobne kafle. */}
+        {kind === 'all' ? (
+          <>
+            <KpiCard
+              label="Wartość sprzedaży"
+              value={fmtCompact(kpis.saleValuePln)}
+              unit="PLN"
+              change={change(kpis.saleValuePln, prev.saleValuePln)}
+              hint="kurs z oferty"
+            />
+            <KpiCard
+              label="Wartość wynajmu"
+              value={fmtCompact(kpis.rentalValuePln)}
+              unit="PLN"
+              change={change(kpis.rentalValuePln, prev.rentalValuePln)}
+              hint="opłata za okres najmu"
+            />
+          </>
+        ) : (
+          <KpiCard
+            label={kind === 'sale' ? 'Wartość sprzedaży' : 'Wartość wynajmu'}
+            value={fmtCompact(kpis.valuePln)}
+            unit="PLN"
+            change={change(kpis.valuePln, prev.valuePln)}
+            hint={kind === 'sale' ? 'kurs z oferty' : 'opłata za okres najmu'}
+          />
+        )}
         <KpiCard
-          label="Wartość ofert"
-          value={fmtCompact(kpis.valuePln)}
-          unit="PLN"
-          change={change(kpis.valuePln, prev.valuePln)}
-          hint="kurs z oferty"
-        />
-        <KpiCard
-          label="Wartość wygrana"
+          label="Wartość przyjętych ofert"
           value={fmtCompact(kpis.wonPln)}
           unit="PLN"
-          hint={`${fmtInt(kpis.accepted)} ofert przyjętych`}
+          hint={
+            kind === 'all' && kpis.wonPln > 0
+              ? <>{fmtInt(kpis.accepted)} ofert · sprzedaż {fmtCompact(wonSplit.sale)} · wynajem {fmtCompact(wonSplit.rental)}</>
+              : `${fmtInt(kpis.accepted)} ofert przyjętych`
+          }
         />
         <KpiCard
           label="Skuteczność"
@@ -112,7 +149,9 @@ export default function StatsOverviewTab({ facts, previousFacts, onTabChange }: 
       </div>
 
       <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
-        <StatusDonut data={statuses} total={kpis.count} />
+        {/* Donut dostaje PEŁNĄ liczbę ofert (ze szkicami) — inaczej udziały
+            nie sumowałyby się do 100%, bo szkice są jednym z segmentów. */}
+        <StatusDonut data={statuses} total={facts.length} />
         <ModuleBars rows={modules} />
       </div>
     </div>

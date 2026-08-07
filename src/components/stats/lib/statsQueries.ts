@@ -37,42 +37,67 @@ function isMissingRelation(error: { code?: string; message?: string } | null): b
 }
 
 /**
- * Pobiera fakty ofertowe z widoku dla zadanego okresu.
+ * TWARDY limit serwera, nie klienta.
  *
- * `.limit(50000)` jest OBOWIĄZKOWY — PostgREST domyślnie zwraca maksymalnie
- * 1000 wierszy bez żadnego ostrzeżenia (HTTP 200, po cichu ucięta odpowiedź).
- * Ta sama pułapka wymusiła `.limit(10000)` w SalePriceMatrix.
+ * Rola `authenticator` ma `pgrst.db_max_rows=5000` (weryfikacja:
+ * `SELECT rolconfig FROM pg_roles WHERE rolname='authenticator'`). Wpisanie
+ * `.limit(50000)` niczego nie zmienia — PostgREST i tak utnie na 5000, i zrobi
+ * to PO CICHU: HTTP 200 z niepełnym zbiorem. Dokładnie ta pułapka wystąpiła już
+ * w tym projekcie przy `sale_prices`.
+ *
+ * Dlatego prosimy o dokładnie tyle, ile serwer może dać, i sprawdzamy, czy
+ * odpowiedź nie dobiła do limitu — patrz `FactsResult.truncated`.
  */
-export async function fetchOfferFacts(from: string, to: string): Promise<OfferFact[]> {
+export const FETCH_LIMIT = 5000;
+
+export interface FactsResult {
+  facts: OfferFact[];
+  /** true = odpowiedź dobiła do limitu serwera, dane są NIEPEŁNE. */
+  truncated: boolean;
+}
+
+/** Pobiera fakty ofertowe z widoku dla zadanego okresu. */
+export async function fetchOfferFacts(from: string, to: string): Promise<FactsResult> {
   const { data, error } = await supabase
     .from('v_offer_stats')
     .select('*')
     .gte('created_at', from)
     .lte('created_at', to)
     .order('created_at', { ascending: false })
-    .limit(50000);
+    .limit(FETCH_LIMIT);
 
   if (error) {
     if (isMissingRelation(error)) throw new Error(MIGRATION_MISSING);
     throw error;
   }
-  return (data ?? []) as OfferFact[];
+  const facts = (data ?? []) as OfferFact[];
+  return { facts, truncated: facts.length >= FETCH_LIMIT };
+}
+
+export interface StatusChangeResult {
+  /** Ostrzeżenie, gdy status zapisano, ale wpis pomocniczy nie przeszedł. */
+  followupWarning?: string;
 }
 
 /**
  * Zmienia status oferty w jej macierzystej tabeli i odnotowuje decyzję.
  *
- * Kolejność ma znaczenie: najpierw właściwy `UPDATE` (to on jest istotny dla
- * modułów sprzedaży i wynajmu), potem wpis pomocniczy. Gdyby drugi krok padł,
- * status i tak jest już poprawnie zmieniony — `offer_followups` przechowuje
- * wyłącznie informacje dodatkowe.
+ * DWA OSOBNE ZAPISY, ŚWIADOMIE RÓŻNIE TRAKTOWANE. Supabase nie daje tu
+ * transakcji, więc drugi krok może paść po udanym pierwszym:
+ *  • `UPDATE` statusu — operacja właściwa. Błąd rzuca wyjątkiem.
+ *  • wpis do `offer_followups` — informacja pomocnicza (kto i kiedy domknął).
+ *    Błąd NIE rzuca wyjątkiem, tylko wraca jako `followupWarning`.
+ *
+ * Gdyby oba traktować jednakowo, awaria drugiego kroku dawałaby komunikat
+ * „nie udało się zmienić statusu", podczas gdy status JEST już zmieniony —
+ * handlowiec kliknąłby ponownie, sądząc że nic się nie stało.
  */
 export async function setOfferStatus(
   moduleCode: StatsModule,
   offerId: string,
   status: OfferStatus,
   decidedBy: string | null,
-): Promise<void> {
+): Promise<StatusChangeResult> {
   const now = new Date().toISOString();
 
   // `updated_at` ustawiane jawnie — tak samo robi OffersTable:88 i
@@ -98,7 +123,16 @@ export async function setOfferStatus(
       },
       { onConflict: 'module_code,offer_id' },
     );
-  if (followupError) throw followupError;
+
+  if (followupError) {
+    console.warn('offer_followups: zapis nie powiódł się', followupError);
+    return {
+      followupWarning:
+        'Status został zmieniony, ale nie zapisano informacji o tym, kto i kiedy ' +
+        'podjął decyzję. Nie trzeba klikać ponownie.',
+    };
+  }
+  return {};
 }
 
 /** „Wciąż w grze" — chowa ofertę z listy Do domknięcia na `days` dni. */

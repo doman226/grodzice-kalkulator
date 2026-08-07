@@ -65,9 +65,11 @@ export default function StatsFollowUpTab({ facts, activeRep, onFactUpdate }: Pro
     setError(''); setInfo('');
     markBusy(fact.id, true);
     try {
-      await setOfferStatus(fact.module_code, fact.id, status, decidedBy);
+      const { followupWarning } = await setOfferStatus(fact.module_code, fact.id, status, decidedBy);
       onFactUpdate(fact.id, { status });
       setSelected(prev => { const n = new Set(prev); n.delete(fact.id); return n; });
+      // Status zapisany — ewentualny problem dotyczy tylko wpisu pomocniczego.
+      if (followupWarning) setInfo(`${fact.offer_number}: ${followupWarning}`);
     } catch (err) {
       setError(`Nie udało się zmienić statusu oferty ${fact.offer_number}. ${
         err instanceof Error ? err.message : ''}`);
@@ -104,13 +106,15 @@ export default function StatsFollowUpTab({ facts, activeRep, onFactUpdate }: Pro
 
     setError(''); setInfo('');
     let ok = 0;
+    let warnings = 0;
     const failed: string[] = [];
     for (const fact of targets) {
       markBusy(fact.id, true);
       try {
-        await setOfferStatus(fact.module_code, fact.id, status, decidedBy);
+        const { followupWarning } = await setOfferStatus(fact.module_code, fact.id, status, decidedBy);
         onFactUpdate(fact.id, { status });
         ok += 1;
+        if (followupWarning) warnings += 1;
       } catch (err) {
         failed.push(fact.offer_number);
         console.error(err);
@@ -119,8 +123,11 @@ export default function StatsFollowUpTab({ facts, activeRep, onFactUpdate }: Pro
       }
     }
     setSelected(new Set());
-    setInfo(`Zmieniono ${ok} z ${targets.length} ofert.`);
-    if (failed.length) setError(`Nie udało się: ${failed.join(', ')}.`);
+    setInfo(
+      `Zmieniono ${ok} z ${targets.length} ofert.` +
+      (warnings > 0 ? ` W ${warnings} przypadkach nie zapisano informacji o autorze decyzji.` : '')
+    );
+    if (failed.length) setError(`Nie udało się zmienić statusu: ${failed.join(', ')}.`);
   }
 
   const chip = (active: boolean) =>
@@ -183,7 +190,7 @@ export default function StatsFollowUpTab({ facts, activeRep, onFactUpdate }: Pro
         <div className="bg-white border border-gray-200 rounded-lg p-10 text-center">
           <p className="text-gray-700 font-medium">Nic nie czeka na decyzję</p>
           <p className="text-sm text-gray-500 mt-1">
-            Brak ofert wysłanych ponad {threshold} dni temu w bieżącym filtrze.
+            Brak ofert utworzonych ponad {threshold} dni temu, które nadal czekają na decyzję.
           </p>
         </div>
       ) : (
@@ -201,7 +208,10 @@ export default function StatsFollowUpTab({ facts, activeRep, onFactUpdate }: Pro
                   <th className="text-left font-semibold pb-2 px-2 border-b border-gray-200">Klient</th>
                   <th className="text-left font-semibold pb-2 px-2 border-b border-gray-200">Handlowiec</th>
                   <th className="text-right font-semibold pb-2 px-2 border-b border-gray-200">Wartość</th>
-                  <th className="text-right font-semibold pb-2 px-2 border-b border-gray-200">Czeka</th>
+                  <th className="text-right font-semibold pb-2 px-2 border-b border-gray-200"
+                      title="Wiek liczony od utworzenia oferty — baza nie zapisuje daty wysłania">
+                    Wiek oferty
+                  </th>
                   <th className="text-left font-semibold pb-2 pl-2 border-b border-gray-200">Decyzja</th>
                 </tr>
               </thead>
@@ -258,6 +268,7 @@ export default function StatsFollowUpTab({ facts, activeRep, onFactUpdate }: Pro
           <p className="text-[11px] text-gray-400 mt-3">
             „W grze" odkłada ofertę o {SNOOZE_DAYS} dni, żeby nie wracała codziennie.
             Zmiana statusu jest natychmiast widoczna w module sprzedaży i wynajmu.
+            Wiek liczony od <b>utworzenia</b> oferty — baza nie zapisuje daty wysłania do klienta.
           </p>
         </div>
       )}
