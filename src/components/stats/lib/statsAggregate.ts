@@ -140,7 +140,10 @@ export interface RepRow extends Kpis {
 }
 
 export function computeByRep(facts: OfferFact[]): RepRow[] {
-  const total = facts.reduce((s, x) => s + num(x.value_pln), 0);
+  // Mianownik MUSI pomijać szkice tak samo jak licznik — `valuePln` każdego
+  // handlowca jest już bez szkiców, więc liczenie ich w sumie zaniżałoby
+  // wszystkie udziały i kolumna „Udział" nie sumowałaby się do 100%.
+  const total = sumValue(facts.filter(x => x.status !== 'szkic'));
   const reps = Array.from(new Set(facts.map(x => x.prepared_by ?? NO_REP)));
   return reps
     .map(rep => {
