@@ -14,9 +14,12 @@ import type { OfferStatus } from '../../../types';
 import { STATUS_COLORS } from '../lib/statsTypes';
 import { fmtInt } from '../lib/statsAggregate';
 
-const SIZE = 140;
-const R = 54;
-const STROKE = 20;
+// Karta stoi w siatce obok „Udziału modułów", która jest znacznie wyższa —
+// siatka rozciąga obie do równej wysokości. Pierścień musi być na tyle duży,
+// żeby wypełnić tę przestrzeń, zamiast tonąć w pustym polu.
+const SIZE = 200;
+const R = 78;
+const STROKE = 30;
 const CIRC = 2 * Math.PI * R;
 
 interface Props {
@@ -46,12 +49,16 @@ export default function StatusDonut({ data, total }: Props) {
     return seg;
   });
 
+  // Karta CELOWO bez `h-full`. Wysokość procentowa rozwiązuje się względem
+  // obszaru siatki, więc `h-full` przebiłoby `items-start` na kontenerze
+  // w StatsOverviewTab i karta znów rozciągałaby się do wysokości sąsiadki
+  // z 7-wierszową tabelą, zostawiając pod pierścieniem pustą przestrzeń.
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-5">
       <h3 className="text-sm font-semibold text-gray-800">Struktura statusów</h3>
       <p className="text-xs text-gray-400 mt-0.5 mb-3">{fmtInt(total)} ofert w filtrze</p>
 
-      <div className="flex items-center gap-6 flex-wrap">
+      <div className="flex items-center justify-center gap-8 flex-wrap py-2">
         <div style={{ position: 'relative', width: SIZE, height: SIZE, flexShrink: 0 }}>
           <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE} role="img"
                aria-label={`Udział statusów: ${data.map(d => `${d.status} ${d.count}`).join(', ')}`}>
@@ -65,8 +72,8 @@ export default function StatusDonut({ data, total }: Props) {
             </g>
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <span className="text-xl font-semibold text-gray-900">{topShare}%</span>
-            <span className="text-[10px] text-gray-400">{top.status}</span>
+            <span className="text-3xl font-semibold text-gray-900 leading-none">{topShare}%</span>
+            <span className="text-xs text-gray-400 mt-1">{top.status}</span>
           </div>
         </div>
 

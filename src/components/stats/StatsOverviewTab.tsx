@@ -148,7 +148,11 @@ export default function StatsOverviewTab({ facts, previousFacts, kind, onTabChan
         <TrendChart data={monthly} />
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+      {/* items-start: karty przyjmują własną wysokość. Bez tego siatka
+          rozciągałaby kartę statusów do wysokości sąsiadki z 7-wierszową
+          tabelą, zostawiając pod pierścieniem ~450 px pustego pola. */}
+      <div className="grid gap-4 items-start"
+           style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
         {/* Donut dostaje PEŁNĄ liczbę ofert (ze szkicami) — inaczej udziały
             nie sumowałyby się do 100%, bo szkice są jednym z segmentów. */}
         <StatusDonut data={statuses} total={facts.length} />
