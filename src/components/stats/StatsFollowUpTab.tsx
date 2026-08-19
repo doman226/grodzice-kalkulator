@@ -146,9 +146,14 @@ export default function StatsFollowUpTab({
     <div className="space-y-4">
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
         <p className="text-sm text-amber-900">
-          <b>{fmtInt(rows.length)} ofert czeka na rozstrzygnięcie</b>
-          {rows.length > 0 && <> o łącznej wartości {fmtPln(totalValue)}.</>}
+          <b>{fmtInt(rows.length)} ofert czeka dłużej niż {threshold} dni</b>
+          {rows.length > 0 && <> — łącznie {fmtPln(totalValue)}.</>}
           {' '}Każda domknięta oferta natychmiast poprawia statystyki — moduł liczy na żywo.
+        </p>
+        <p className="text-xs text-amber-800 mt-1.5">
+          Lista pomija oferty młodsze niż {threshold} dni oraz odłożone przyciskiem „W grze".
+          Kafel „Skuteczność" w Przeglądzie pokazuje szerszą liczbę — wszystkie oferty bez decyzji,
+          niezależnie od wieku.
         </p>
       </div>
 
@@ -277,6 +282,10 @@ export default function StatsFollowUpTab({
             „W grze" odkłada ofertę o {SNOOZE_DAYS} dni, żeby nie wracała codziennie.
             Zmiana statusu jest natychmiast widoczna w module sprzedaży i wynajmu.
             Wiek liczony od <b>utworzenia</b> oferty — baza nie zapisuje daty wysłania do klienta.
+            {threshold !== 30 && (
+              <> Licznik przy nazwie zakładki zawsze pokazuje zaległości powyżej <b>30 dni</b>,
+              niezależnie od wybranego tu progu — dlatego może różnić się od liczby wierszy.</>
+            )}
           </p>
         </div>
       )}

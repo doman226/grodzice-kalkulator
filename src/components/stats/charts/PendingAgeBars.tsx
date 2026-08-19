@@ -16,6 +16,12 @@ import { fmtInt, fmtCompact } from '../lib/statsAggregate';
 
 interface Props {
   buckets: AgeBucket[];
+  /**
+   * Oferty ukryte przyciskiem „W grze". NIE wchodzą do przedziałów poniżej,
+   * więc bez tej liczby suma słupków nie zgadzałaby się z kaflem KPI
+   * „bez decyzji" i wyglądałaby na błąd.
+   */
+  snoozed: number;
   /** Przeniesienie do zakładki Do domknięcia z podanym progiem dni. */
   onJump: (threshold: number) => void;
 }
@@ -28,7 +34,7 @@ const TONE = [
   { bar: 'bg-red-500',    text: 'text-red-700' },
 ];
 
-export default function PendingAgeBars({ buckets, onJump }: Props) {
+export default function PendingAgeBars({ buckets, snoozed, onJump }: Props) {
   const total = buckets.reduce((s, b) => s + b.count, 0);
   const max = buckets.reduce((m, b) => Math.max(m, b.count), 0);
   const oldest = buckets[buckets.length - 1];
@@ -46,7 +52,9 @@ export default function PendingAgeBars({ buckets, onJump }: Props) {
     <div className="bg-white border border-gray-200 rounded-lg p-5">
       <h3 className="text-sm font-semibold text-gray-800">Jak długo czekają oferty</h3>
       <p className="text-xs text-gray-400 mt-0.5 mb-4">
-        {fmtInt(total)} nierozstrzygniętych · wiek od utworzenia
+        {fmtInt(total)} czeka na decyzję
+        {snoozed > 0 && <> · {fmtInt(snoozed)} odłożonych przyciskiem „W grze"</>}
+        {' '}· wiek liczony od utworzenia oferty
       </p>
 
       <div className="space-y-2.5">

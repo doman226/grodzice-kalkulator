@@ -39,6 +39,23 @@ export default function StatsOverviewTab({
   const modules  = useMemo(() => computeByModule(facts), [facts]);
   const ageBuckets = useMemo(() => computePendingAge(facts), [facts]);
 
+  /**
+   * Zaległe = przedziały z progiem (30+ dni). To DOKŁADNIE ta liczba, którą
+   * pokazuje licznik przy zakładce Do domknięcia — mniejsza od `kpis.pending`,
+   * bo pomija oferty świeże i odłożone przyciskiem „W grze".
+   */
+  const overdue = useMemo(
+    () => ageBuckets.filter(b => b.threshold !== null).reduce((s, b) => s + b.count, 0),
+    [ageBuckets],
+  );
+
+  /** Oferty ukryte przyciskiem „W grze" — trzecia część `kpis.pending`. */
+  const snoozed = useMemo(() => {
+    const now = Date.now();
+    return facts.filter(f => f.status === 'wysłana' &&
+      f.snoozed_until && new Date(f.snoozed_until).getTime() > now).length;
+  }, [facts]);
+
   // Bez danych porównawczych nie pokazujemy wskaźnika zmiany zamiast zmyślać 0%.
   const hasPrev = previousFacts.length > 0;
   const change = (cur: number, before: number) => (hasPrev ? pctChange(cur, before) : null);
@@ -110,7 +127,7 @@ export default function StatsOverviewTab({
           hint={
             decided === 0
               ? 'brak rozstrzygniętych ofert'
-              : <>{fmtInt(kpis.accepted)} z {fmtInt(decided)} rozstrzygniętych · <b>{fmtInt(kpis.pending)} czeka</b></>
+              : <>{fmtInt(kpis.accepted)} z {fmtInt(decided)} rozstrzygniętych · <b>{fmtInt(kpis.pending)} bez decyzji</b></>
           }
         />
         <KpiCard
@@ -135,7 +152,8 @@ export default function StatsOverviewTab({
       {pendingShare > 0.5 && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-5 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-amber-900">
-            <b>{fmtInt(kpis.pending)} ofert ({Math.round(pendingShare * 100)}%) czeka na rozstrzygnięcie.</b>{' '}
+            <b>{fmtInt(kpis.pending)} ofert ({Math.round(pendingShare * 100)}%) nie ma jeszcze rozstrzygnięcia</b>
+            {overdue > 0 && <>, w tym <b>{fmtInt(overdue)} czeka dłużej niż 30 dni</b></>}.{' '}
             {decided > 0
               ? <>Skuteczność {fmtPct(kpis.winRate)} liczona jest z {fmtInt(decided)} domkniętych ofert — to {Math.round((decided / kpis.count) * 100)}% zbioru.</>
               : <>Bez domkniętych ofert skuteczności nie da się policzyć.</>}
@@ -168,7 +186,7 @@ export default function StatsOverviewTab({
               nie sumowałyby się do 100%, bo szkice są jednym z segmentów. */}
           <StatusDonut data={statuses} total={facts.length} />
           {/* Dopełnia donut: on mówi ILE ofert wisi, ta karta — JAK DŁUGO. */}
-          <PendingAgeBars buckets={ageBuckets} onJump={onJumpToFollowUp} />
+          <PendingAgeBars buckets={ageBuckets} snoozed={snoozed} onJump={onJumpToFollowUp} />
         </div>
         <ModuleBars rows={modules} />
       </div>
